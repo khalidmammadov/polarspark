@@ -785,7 +785,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         +---+---+
 
         """
-        return DataFrame(self._jdf.exceptAll(other._jdf), self.sparkSession)
+        return self._to_df(self._jdf.exceptAll(other._ldf))
 
     def isLocal(self) -> bool:
         """Returns ``True`` if the :func:`collect` and :func:`take` methods can be run locally
@@ -993,7 +993,8 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
             )
 
         if isinstance(truncate, bool) and truncate:
-            print(self._jdf.showString(n, 20, vertical))
+            # print(self._jdf.showString(n, 20, vertical))
+            print(self._ldf.collect())
         else:
             try:
                 int_truncate = int(truncate)
@@ -1006,33 +1007,18 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
                     },
                 )
 
-            print(self._jdf.showString(n, int_truncate, vertical))
+            # print(self._jdf.showString(n, int_truncate, vertical))
+            print(self._ldf.collect())
 
     def __repr__(self) -> str:
-        if not self._support_repr_html and self.sparkSession._jconf.isReplEagerEvalEnabled():
-            vertical = False
-            return self._jdf.showString(
-                self.sparkSession._jconf.replEagerEvalMaxNumRows(),
-                self.sparkSession._jconf.replEagerEvalTruncate(),
-                vertical,
-            )
-        else:
-            return "DataFrame[%s]" % (", ".join("%s: %s" % c for c in self.dtypes))
+        return "DataFrame[%s]" % (", ".join("%s: %s" % c for c in self.dtypes))
 
     def _repr_html_(self) -> Optional[str]:
         """Returns a :class:`DataFrame` with html code when you enabled eager evaluation
         by 'spark.sql.repl.eagerEval.enabled', this only called by REPL you are
         using support eager evaluation with HTML.
         """
-        if not self._support_repr_html:
-            self._support_repr_html = True
-        if self.sparkSession._jconf.isReplEagerEvalEnabled():
-            return self._jdf.htmlString(
-                self.sparkSession._jconf.replEagerEvalMaxNumRows(),
-                self.sparkSession._jconf.replEagerEvalTruncate(),
-            )
-        else:
-            return None
+        return None
 
     def checkpoint(self, eager: bool = True) -> "DataFrame":
         """Returns a checkpointed version of this :class:`DataFrame`. Checkpointing can be used to
@@ -1066,8 +1052,9 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         ...     df.checkpoint(False)
         DataFrame[age: bigint, name: string]
         """
-        jdf = self._jdf.checkpoint(eager)
-        return DataFrame(jdf, self.sparkSession)
+        # ldf = self._ldf.checkpoint(eager)
+        # return DataFrame(jdf, self.sparkSession)
+        return self
 
     def localCheckpoint(self, eager: bool = True) -> "DataFrame":
         """Returns a locally checkpointed version of this :class:`DataFrame`. Checkpointing can be
@@ -1098,186 +1085,187 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.localCheckpoint(False)
         DataFrame[age: bigint, name: string]
         """
-        jdf = self._jdf.localCheckpoint(eager)
-        return DataFrame(jdf, self.sparkSession)
+        # jdf = self._jdf.localCheckpoint(eager)
+        # return DataFrame(jdf, self.sparkSession)
+        return self
 
-    def withWatermark(self, eventTime: str, delayThreshold: str) -> "DataFrame":
-        """Defines an event time watermark for this :class:`DataFrame`. A watermark tracks a point
-        in time before which we assume no more late data is going to arrive.
+    # def withWatermark(self, eventTime: str, delayThreshold: str) -> "DataFrame":
+    #     """Defines an event time watermark for this :class:`DataFrame`. A watermark tracks a point
+    #     in time before which we assume no more late data is going to arrive.
+    #
+    #     Spark will use this watermark for several purposes:
+    #       - To know when a given time window aggregation can be finalized and thus can be emitted
+    #         when using output modes that do not allow updates.
+    #
+    #       - To minimize the amount of state that we need to keep for on-going aggregations.
+    #
+    #     The current watermark is computed by looking at the `MAX(eventTime)` seen across
+    #     all of the partitions in the query minus a user specified `delayThreshold`.  Due to the cost
+    #     of coordinating this value across partitions, the actual watermark used is only guaranteed
+    #     to be at least `delayThreshold` behind the actual event time.  In some cases we may still
+    #     process records that arrive more than `delayThreshold` late.
+    #
+    #     .. versionadded:: 2.1.0
+    #
+    #     .. versionchanged:: 3.5.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     eventTime : str
+    #         the name of the column that contains the event time of the row.
+    #     delayThreshold : str
+    #         the minimum delay to wait to data to arrive late, relative to the
+    #         latest record that has been processed in the form of an interval
+    #         (e.g. "1 minute" or "5 hours").
+    #
+    #     Returns
+    #     -------
+    #     :class:`DataFrame`
+    #         Watermarked DataFrame
+    #
+    #     Notes
+    #     -----
+    #     This is a feature only for Structured Streaming.
+    #
+    #     This API is evolving.
+    #
+    #     Examples
+    #     --------
+    #     >>> from plspark.sql import Row
+    #     >>> from plspark.sql.functions import timestamp_seconds
+    #     >>> df = spark.readStream.format("rate").load().selectExpr(
+    #     ...     "value % 5 AS value", "timestamp")
+    #     >>> df.select("value", df.timestamp.alias("time")).withWatermark("time", '10 minutes')
+    #     DataFrame[value: bigint, time: timestamp]
+    #
+    #     Group the data by window and value (0 - 4), and compute the count of each group.
+    #
+    #     >>> import time
+    #     >>> from plspark.sql.functions import window
+    #     >>> query = (df
+    #     ...     .withWatermark("timestamp", "10 minutes")
+    #     ...     .groupBy(
+    #     ...         window(df.timestamp, "10 minutes", "5 minutes"),
+    #     ...         df.value)
+    #     ...     ).count().writeStream.outputMode("complete").format("console").start()
+    #     >>> time.sleep(3)
+    #     >>> query.stop()
+    #     """
+    #     if not eventTime or type(eventTime) is not str:
+    #         raise PySparkTypeError(
+    #             error_class="NOT_STR",
+    #             message_parameters={"arg_name": "eventTime", "arg_type": type(eventTime).__name__},
+    #         )
+    #     if not delayThreshold or type(delayThreshold) is not str:
+    #         raise PySparkTypeError(
+    #             error_class="NOT_STR",
+    #             message_parameters={
+    #                 "arg_name": "delayThreshold",
+    #                 "arg_type": type(delayThreshold).__name__,
+    #             },
+    #         )
+    #     jdf = self._jdf.withWatermark(eventTime, delayThreshold)
+    #     return DataFrame(jdf, self.sparkSession)
 
-        Spark will use this watermark for several purposes:
-          - To know when a given time window aggregation can be finalized and thus can be emitted
-            when using output modes that do not allow updates.
-
-          - To minimize the amount of state that we need to keep for on-going aggregations.
-
-        The current watermark is computed by looking at the `MAX(eventTime)` seen across
-        all of the partitions in the query minus a user specified `delayThreshold`.  Due to the cost
-        of coordinating this value across partitions, the actual watermark used is only guaranteed
-        to be at least `delayThreshold` behind the actual event time.  In some cases we may still
-        process records that arrive more than `delayThreshold` late.
-
-        .. versionadded:: 2.1.0
-
-        .. versionchanged:: 3.5.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        eventTime : str
-            the name of the column that contains the event time of the row.
-        delayThreshold : str
-            the minimum delay to wait to data to arrive late, relative to the
-            latest record that has been processed in the form of an interval
-            (e.g. "1 minute" or "5 hours").
-
-        Returns
-        -------
-        :class:`DataFrame`
-            Watermarked DataFrame
-
-        Notes
-        -----
-        This is a feature only for Structured Streaming.
-
-        This API is evolving.
-
-        Examples
-        --------
-        >>> from plspark.sql import Row
-        >>> from plspark.sql.functions import timestamp_seconds
-        >>> df = spark.readStream.format("rate").load().selectExpr(
-        ...     "value % 5 AS value", "timestamp")
-        >>> df.select("value", df.timestamp.alias("time")).withWatermark("time", '10 minutes')
-        DataFrame[value: bigint, time: timestamp]
-
-        Group the data by window and value (0 - 4), and compute the count of each group.
-
-        >>> import time
-        >>> from plspark.sql.functions import window
-        >>> query = (df
-        ...     .withWatermark("timestamp", "10 minutes")
-        ...     .groupBy(
-        ...         window(df.timestamp, "10 minutes", "5 minutes"),
-        ...         df.value)
-        ...     ).count().writeStream.outputMode("complete").format("console").start()
-        >>> time.sleep(3)
-        >>> query.stop()
-        """
-        if not eventTime or type(eventTime) is not str:
-            raise PySparkTypeError(
-                error_class="NOT_STR",
-                message_parameters={"arg_name": "eventTime", "arg_type": type(eventTime).__name__},
-            )
-        if not delayThreshold or type(delayThreshold) is not str:
-            raise PySparkTypeError(
-                error_class="NOT_STR",
-                message_parameters={
-                    "arg_name": "delayThreshold",
-                    "arg_type": type(delayThreshold).__name__,
-                },
-            )
-        jdf = self._jdf.withWatermark(eventTime, delayThreshold)
-        return DataFrame(jdf, self.sparkSession)
-
-    def hint(
-        self, name: str, *parameters: Union["PrimitiveType", "Column", List["PrimitiveType"]]
-    ) -> "DataFrame":
-        """Specifies some hint on the current :class:`DataFrame`.
-
-        .. versionadded:: 2.2.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        name : str
-            A name of the hint.
-        parameters : str, list, float or int
-            Optional parameters.
-
-        Returns
-        -------
-        :class:`DataFrame`
-            Hinted DataFrame
-
-        Examples
-        --------
-        >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")], schema=["age", "name"])
-        >>> df2 = spark.createDataFrame([Row(height=80, name="Tom"), Row(height=85, name="Bob")])
-        >>> df.join(df2, "name").explain()  # doctest: +SKIP
-        == Physical Plan ==
-        ...
-        ... +- SortMergeJoin ...
-        ...
-
-        Explicitly trigger the broadcast hashjoin by providing the hint in ``df2``.
-
-        >>> df.join(df2.hint("broadcast"), "name").explain()
-        == Physical Plan ==
-        ...
-        ... +- BroadcastHashJoin ...
-        ...
-        """
-        if len(parameters) == 1 and isinstance(parameters[0], list):
-            parameters = parameters[0]  # type: ignore[assignment]
-
-        if not isinstance(name, str):
-            raise PySparkTypeError(
-                error_class="NOT_STR",
-                message_parameters={"arg_name": "name", "arg_type": type(name).__name__},
-            )
-
-        allowed_types = (str, float, int, Column, list)
-        allowed_primitive_types = (str, float, int)
-        allowed_types_repr = ", ".join(
-            [t.__name__ for t in allowed_types[:-1]]
-            + ["list[" + t.__name__ + "]" for t in allowed_primitive_types]
-        )
-        for p in parameters:
-            if not isinstance(p, allowed_types):
-                raise PySparkTypeError(
-                    error_class="DISALLOWED_TYPE_FOR_CONTAINER",
-                    message_parameters={
-                        "arg_name": "parameters",
-                        "allowed_types": allowed_types_repr,
-                        "item_type": type(p).__name__,
-                    },
-                )
-            if isinstance(p, list):
-                if not all(isinstance(e, allowed_primitive_types) for e in p):
-                    raise PySparkTypeError(
-                        error_class="DISALLOWED_TYPE_FOR_CONTAINER",
-                        message_parameters={
-                            "arg_name": "parameters",
-                            "allowed_types": allowed_types_repr,
-                            "item_type": type(p).__name__ + "[" + type(p[0]).__name__ + "]",
-                        },
-                    )
-
-        def _converter(parameter: Union[str, list, float, int, Column]) -> Any:
-            if isinstance(parameter, Column):
-                return _to_java_column(parameter)
-            elif isinstance(parameter, list):
-                # for list input, we are assuming only one element type exist in the list.
-                # for empty list, we are converting it into an empty long[] in the JVM side.
-                gateway = self._sc._gateway
-                assert gateway is not None
-                jclass = gateway.jvm.long
-                if len(parameter) >= 1:
-                    mapping = {
-                        str: gateway.jvm.java.lang.String,
-                        float: gateway.jvm.double,
-                        int: gateway.jvm.long,
-                    }
-                    jclass = mapping[type(parameter[0])]
-                return toJArray(gateway, jclass, parameter)
-            else:
-                return parameter
-
-        jdf = self._jdf.hint(name, self._jseq(parameters, _converter))
-        return DataFrame(jdf, self.sparkSession)
+    # def hint(
+    #     self, name: str, *parameters: Union["PrimitiveType", "Column", List["PrimitiveType"]]
+    # ) -> "DataFrame":
+    #     """Specifies some hint on the current :class:`DataFrame`.
+    #
+    #     .. versionadded:: 2.2.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     name : str
+    #         A name of the hint.
+    #     parameters : str, list, float or int
+    #         Optional parameters.
+    #
+    #     Returns
+    #     -------
+    #     :class:`DataFrame`
+    #         Hinted DataFrame
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")], schema=["age", "name"])
+    #     >>> df2 = spark.createDataFrame([Row(height=80, name="Tom"), Row(height=85, name="Bob")])
+    #     >>> df.join(df2, "name").explain()  # doctest: +SKIP
+    #     == Physical Plan ==
+    #     ...
+    #     ... +- SortMergeJoin ...
+    #     ...
+    #
+    #     Explicitly trigger the broadcast hashjoin by providing the hint in ``df2``.
+    #
+    #     >>> df.join(df2.hint("broadcast"), "name").explain()
+    #     == Physical Plan ==
+    #     ...
+    #     ... +- BroadcastHashJoin ...
+    #     ...
+    #     """
+    #     if len(parameters) == 1 and isinstance(parameters[0], list):
+    #         parameters = parameters[0]  # type: ignore[assignment]
+    #
+    #     if not isinstance(name, str):
+    #         raise PySparkTypeError(
+    #             error_class="NOT_STR",
+    #             message_parameters={"arg_name": "name", "arg_type": type(name).__name__},
+    #         )
+    #
+    #     allowed_types = (str, float, int, Column, list)
+    #     allowed_primitive_types = (str, float, int)
+    #     allowed_types_repr = ", ".join(
+    #         [t.__name__ for t in allowed_types[:-1]]
+    #         + ["list[" + t.__name__ + "]" for t in allowed_primitive_types]
+    #     )
+    #     for p in parameters:
+    #         if not isinstance(p, allowed_types):
+    #             raise PySparkTypeError(
+    #                 error_class="DISALLOWED_TYPE_FOR_CONTAINER",
+    #                 message_parameters={
+    #                     "arg_name": "parameters",
+    #                     "allowed_types": allowed_types_repr,
+    #                     "item_type": type(p).__name__,
+    #                 },
+    #             )
+    #         if isinstance(p, list):
+    #             if not all(isinstance(e, allowed_primitive_types) for e in p):
+    #                 raise PySparkTypeError(
+    #                     error_class="DISALLOWED_TYPE_FOR_CONTAINER",
+    #                     message_parameters={
+    #                         "arg_name": "parameters",
+    #                         "allowed_types": allowed_types_repr,
+    #                         "item_type": type(p).__name__ + "[" + type(p[0]).__name__ + "]",
+    #                     },
+    #                 )
+    #
+    #     def _converter(parameter: Union[str, list, float, int, Column]) -> Any:
+    #         if isinstance(parameter, Column):
+    #             return _to_java_column(parameter)
+    #         elif isinstance(parameter, list):
+    #             # for list input, we are assuming only one element type exist in the list.
+    #             # for empty list, we are converting it into an empty long[] in the JVM side.
+    #             gateway = self._sc._gateway
+    #             assert gateway is not None
+    #             jclass = gateway.jvm.long
+    #             if len(parameter) >= 1:
+    #                 mapping = {
+    #                     str: gateway.jvm.java.lang.String,
+    #                     float: gateway.jvm.double,
+    #                     int: gateway.jvm.long,
+    #                 }
+    #                 jclass = mapping[type(parameter[0])]
+    #             return toJArray(gateway, jclass, parameter)
+    #         else:
+    #             return parameter
+    #
+    #     jdf = self._jdf.hint(name, self._jseq(parameters, _converter))
+    #     return DataFrame(jdf, self.sparkSession)
 
     def count(self) -> int:
         """Returns the number of rows in this :class:`DataFrame`.
@@ -1302,7 +1290,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.count()
         3
         """
-        return int(self._jdf.count())
+        return self._ldf.select(pl.len()).collect().item()
 
     def collect(self) -> List[Row]:
         """Returns all the records in the DataFrame as a list of :class:`Row`.
@@ -1374,7 +1362,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         # return list(_load_from_socket(sock_info, BatchedSerializer(CPickleSerializer())))
 
         pdf: pl.DataFrame = self._ldf.collect()
-        return _pdf_to_row(pdf)
+        return list(_pdf_to_row_iter(pdf))
 
     def toLocalIterator(self, prefetchPartitions: bool = False) -> Iterator[Row]:
         """
@@ -1408,9 +1396,8 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         >>> list(df.toLocalIterator())
         [Row(age=14, name='Tom'), Row(age=23, name='Alice'), Row(age=16, name='Bob')]
         """
-        with SCCallSiteSync(self._sc):
-            sock_info = self._jdf.toPythonIterator(prefetchPartitions)
-        return _local_iterator_from_socket(sock_info, BatchedSerializer(CPickleSerializer()))
+        pdf: pl.DataFrame = self._ldf.collect()
+        return _pdf_to_row_iter(pdf)
 
     def limit(self, num: int) -> "DataFrame":
         """Limits the result count to the number specified.
@@ -1448,7 +1435,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         +---+----+
         """
         ldf = self._ldf.slice(0, num)
-        return DataFrame(ldf, self.sparkSession)
+        return self._to_df(ldf)
 
     def offset(self, num: int) -> "DataFrame":
         """Returns a new :class: `DataFrame` by skipping the first `n` rows.
@@ -1485,8 +1472,8 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         +---+----+
         +---+----+
         """
-        jdf = self._jdf.offset(num)
-        return DataFrame(jdf, self.sparkSession)
+        ldf = self._ldf.slice(num)
+        return self._to_df(ldf)
 
     def take(self, num: int) -> List[Row]:
         """Returns the first ``num`` rows as a :class:`list` of :class:`Row`.
@@ -1550,9 +1537,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.tail(2)
         [Row(age=23, name='Alice'), Row(age=16, name='Bob')]
         """
-        with SCCallSiteSync(self._sc):
-            sock_info = self._jdf.tailToPython(num)
-        return list(_load_from_socket(sock_info, BatchedSerializer(CPickleSerializer())))
+        return self._to_df(self._ldf.tail(num)).collect()
 
     def foreach(self, f: Callable[[Row], None]) -> None:
         """Applies the ``f`` function to all :class:`Row` of this :class:`DataFrame`.
@@ -1579,7 +1564,8 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         ...
         >>> df.foreach(func)
         """
-        self.rdd.foreach(f)
+        for item in self.toLocalIterator():
+            f(item)
 
     def foreachPartition(self, f: Callable[[Iterator[Row]], None]) -> None:
         """Applies the ``f`` function to each partition of this :class:`DataFrame`.
@@ -1607,7 +1593,10 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         ...
         >>> df.foreachPartition(func)
         """
-        self.rdd.foreachPartition(f)  # type: ignore[arg-type]
+        def top_iter():
+            yield self.toLocalIterator()
+        for item in top_iter():
+            f(item)
 
     def cache(self) -> "DataFrame":
         """Persists the :class:`DataFrame` with the default storage level (`MEMORY_AND_DISK_DESER`).
@@ -1638,8 +1627,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         +- InMemoryTableScan ...
         """
         self.is_cached = True
-        self._jdf.cache()
-        return self
+        return self._to_df(self._ldf.cache())
 
     def persist(
         self,
@@ -1686,10 +1674,10 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.persist(StorageLevel.DISK_ONLY)
         DataFrame[id: bigint]
         """
-        self.is_cached = True
-        javaStorageLevel = self._sc._getJavaStorageLevel(storageLevel)
-        self._jdf.persist(javaStorageLevel)
-        return self
+        # self.is_cached = True
+        # javaStorageLevel = self._sc._getJavaStorageLevel(storageLevel)
+        # self._jdf.persist(javaStorageLevel)
+        return self.cache()
 
     @property
     def storageLevel(self) -> StorageLevel:
@@ -1761,8 +1749,8 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.unpersist(True)
         DataFrame[id: bigint]
         """
-        self.is_cached = False
-        self._jdf.unpersist(blocking)
+        # self.is_cached = False
+        # self._jdf.unpersist(blocking)
         return self
 
     def coalesce(self, numPartitions: int) -> "DataFrame":
@@ -1820,7 +1808,8 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         |        0|
         +---------+
         """
-        return DataFrame(self._jdf.coalesce(numPartitions), self.sparkSession)
+        # return DataFrame(self._jdf.coalesce(numPartitions), self.sparkSession)
+        return self
 
     @overload
     def repartition(self, numPartitions: int, *cols: "ColumnOrName") -> "DataFrame":
@@ -1935,25 +1924,26 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         |        2|
         +---------+
         """
-        if isinstance(numPartitions, int):
-            if len(cols) == 0:
-                return DataFrame(self._jdf.repartition(numPartitions), self.sparkSession)
-            else:
-                return DataFrame(
-                    self._jdf.repartition(numPartitions, self._jcols(*cols)),
-                    self.sparkSession,
-                )
-        elif isinstance(numPartitions, (str, Column)):
-            cols = (numPartitions,) + cols
-            return DataFrame(self._jdf.repartition(self._jcols(*cols)), self.sparkSession)
-        else:
-            raise PySparkTypeError(
-                error_class="NOT_COLUMN_OR_STR",
-                message_parameters={
-                    "arg_name": "numPartitions",
-                    "arg_type": type(numPartitions).__name__,
-                },
-            )
+        # if isinstance(numPartitions, int):
+        #     if len(cols) == 0:
+        #         return DataFrame(self._jdf.repartition(numPartitions), self.sparkSession)
+        #     else:
+        #         return DataFrame(
+        #             self._jdf.repartition(numPartitions, self._jcols(*cols)),
+        #             self.sparkSession,
+        #         )
+        # elif isinstance(numPartitions, (str, Column)):
+        #     cols = (numPartitions,) + cols
+        #     return DataFrame(self._jdf.repartition(self._jcols(*cols)), self.sparkSession)
+        # else:
+        #     raise PySparkTypeError(
+        #         error_class="NOT_COLUMN_OR_STR",
+        #         message_parameters={
+        #             "arg_name": "numPartitions",
+        #             "arg_type": type(numPartitions).__name__,
+        #         },
+        #     )
+        return self
 
     @overload
     def repartitionByRange(self, numPartitions: int, *cols: "ColumnOrName") -> "DataFrame":
@@ -6584,13 +6574,8 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
     ) -> "PandasOnSparkDataFrame":
         return self.pandas_api(index_col)
 
-
-# def _to_scala_map(sc: SparkContext, jm: Dict) -> JavaObject:
-#     """
-#     Convert a dict into a JVM Map.
-#     """
-#     assert sc._jvm is not None
-#     return sc._jvm.PythonUtils.toScalaMap(jm)
+    def _to_df(self, ldf: PyLazyFrame) -> "DataFrame":
+        return DataFrame(ldf, self.sparkSession)
 
 
 class DataFrameNaFunctions:
@@ -6738,9 +6723,12 @@ class DataFrameStatFunctions:
 
     sampleBy.__doc__ = DataFrame.sampleBy.__doc__
 
-def _pdf_to_row(pdf):
+
+def _pdf_to_row_iter(pdf) -> Iterator[Row]:
     cols = pdf.columns
-    return [Row(**dict(list(zip(cols, row)))) for row in pdf.iter_rows()]
+    for row in  pdf.iter_rows():
+        yield Row(**dict(list(zip(cols, row))))
+
 
 def _test() -> None:
     import doctest
