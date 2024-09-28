@@ -1,0 +1,4 @@
+polars
+setuptools~=68.2.0
+numpy
+cloudpickle
