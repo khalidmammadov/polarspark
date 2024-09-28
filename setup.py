@@ -1,22 +1,23 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='plspark',                    # The name of your package
-    version='0.1.0',                      # Version of your package
-    packages=find_packages(),             # Automatically find package directories
-    install_requires=[                    # External dependencies, add more as needed
-        # 'pandas>=1.1.0'
-        # 'cloudpickle==3.0.0'
-        # 'numpy==2.0.2'
-        'polars==1.8.2'
+    name='plspark',
+    version='0.1.0',
+    packages=find_packages(),
+    install_requires=[
+        'pandas>=1.4.4',
+        'numpy>=1.21',
+        'polars==1.8.2',
+        'pyarrow>=4.0.0',
+        'tzlocal==5.2'
     ],
     author='Khalid Mammadov',
     author_email='your.email@example.com',
     description='Spark on Polars',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/yourusername/my_project',  # Optional: project URL (GitHub, etc.)
-    classifiers=[                         # Classifiers help users find your project
+    url='https://github.com/khalidmammadov/plspark',
+    classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',

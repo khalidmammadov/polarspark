@@ -59,11 +59,10 @@ from plspark.sql.types import (
     _parse_datatype_json_string,
 )
 from plspark.sql.utils import get_active_spark_context#, toJArray
-# from plspark.sql.pandas.conversion import PandasConversionMixin
-# from plspark.sql.pandas.map_ops import PandasMapOpsMixin
+from plspark.sql.pandas.conversion import PandasConversionMixin, schema_from_polars
+from plspark.sql.pandas.map_ops import PandasMapOpsMixin
 
 import polars as pl
-from polars.polars import PyDataFrame, PySeries, PyLazyFrame
 from polars.lazyframe import LazyFrame
 
 if TYPE_CHECKING:
@@ -84,7 +83,7 @@ if TYPE_CHECKING:
 __all__ = ["DataFrame", "DataFrameNaFunctions", "DataFrameStatFunctions"]
 
 
-class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
+class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     """A distributed collection of data grouped into named columns.
 
     .. versionadded:: 1.3.0
@@ -138,7 +137,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
 
     def __init__(
         self,
-        ldf: PyLazyFrame,
+        ldf: LazyFrame,
         # jdf: JavaObject,
         sql_ctx: Union["SQLContext", "SparkSession"],
     ):
@@ -161,7 +160,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
 
         self._sc: SparkContext = sql_ctx._sc
         # self._jdf: JavaObject = jdf
-        self._ldf: PyLazyFrame = ldf
+        self._ldf: LazyFrame = ldf
         self.is_cached = False
         # initialized lazily
         self._schema: Optional[StructType] = None
@@ -577,9 +576,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         """
         if self._schema is None:
             try:
-                self._schema = cast(
-                    StructType, _parse_datatype_json_string(self._jdf.schema().json())
-                )
+                self._schema = schema_from_polars(self._ldf.first().collect())
             except Exception as e:
                 raise PySparkValueError(
                     error_class="CANNOT_PARSE_DATATYPE",
@@ -2009,28 +2006,29 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         | 23|Alice|                   1|
         +---+-----+--------------------+
         """
-        if isinstance(numPartitions, int):
-            if len(cols) == 0:
-                raise PySparkValueError(
-                    error_class="CANNOT_BE_EMPTY",
-                    message_parameters={"item": "partition-by expression"},
-                )
-            else:
-                return DataFrame(
-                    self._jdf.repartitionByRange(numPartitions, self._jcols(*cols)),
-                    self.sparkSession,
-                )
-        elif isinstance(numPartitions, (str, Column)):
-            cols = (numPartitions,) + cols
-            return DataFrame(self._jdf.repartitionByRange(self._jcols(*cols)), self.sparkSession)
-        else:
-            raise PySparkTypeError(
-                error_class="NOT_COLUMN_OR_INT_OR_STR",
-                message_parameters={
-                    "arg_name": "numPartitions",
-                    "arg_type": type(numPartitions).__name__,
-                },
-            )
+        # if isinstance(numPartitions, int):
+        #     if len(cols) == 0:
+        #         raise PySparkValueError(
+        #             error_class="CANNOT_BE_EMPTY",
+        #             message_parameters={"item": "partition-by expression"},
+        #         )
+        #     else:
+        #         return DataFrame(
+        #             self._jdf.repartitionByRange(numPartitions, self._jcols(*cols)),
+        #             self.sparkSession,
+        #         )
+        # elif isinstance(numPartitions, (str, Column)):
+        #     cols = (numPartitions,) + cols
+        #     return DataFrame(self._jdf.repartitionByRange(self._jcols(*cols)), self.sparkSession)
+        # else:
+        #     raise PySparkTypeError(
+        #         error_class="NOT_COLUMN_OR_INT_OR_STR",
+        #         message_parameters={
+        #             "arg_name": "numPartitions",
+        #             "arg_type": type(numPartitions).__name__,
+        #         },
+        #     )
+        return self
 
     def distinct(self) -> "DataFrame":
         """Returns a new :class:`DataFrame` containing the distinct rows in this :class:`DataFrame`.
@@ -2130,7 +2128,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
         | 23|Alice|     F|
         +---+-----+------+
         """
-        return DataFrame(self._jdf.distinct(), self.sparkSession)
+        return self._to_df(self._ldf.unique(subset=None, maintain_order=False,  keep="any"))
 
     @overload
     def sample(self, fraction: float, seed: Optional[int] = ...) -> "DataFrame":
@@ -6574,7 +6572,7 @@ class DataFrame: #(PandasMapOpsMixin, PandasConversionMixin):
     ) -> "PandasOnSparkDataFrame":
         return self.pandas_api(index_col)
 
-    def _to_df(self, ldf: PyLazyFrame) -> "DataFrame":
+    def _to_df(self, ldf: LazyFrame) -> "DataFrame":
         return DataFrame(ldf, self.sparkSession)
 
 

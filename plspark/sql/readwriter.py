@@ -20,10 +20,13 @@ from typing import cast, overload, Dict, Iterable, List, Optional, Tuple, TYPE_C
 from plspark import RDD, since
 #from plspark.sql.column import _to_seq, _to_java_column, Column
 from plspark.sql.column import Column
+from plspark.sql.pandas.conversion import schema_from_polars
 from plspark.sql.types import StructType
 from plspark.sql import utils
 from plspark.sql.utils import to_str
 from plspark.errors import PySparkTypeError, PySparkValueError
+
+import polars as pl
 
 if TYPE_CHECKING:
     from plspark.sql._typing import OptionalPrimitiveType, ColumnOrName
@@ -66,7 +69,9 @@ class DataFrameReader(OptionUtils):
     """
 
     def __init__(self, spark: "SparkSession"):
-        self._jreader = spark._jsparkSession.read()
+        # self._jreader = spark._jsparkSession.read()
+        self._options = None
+        self._source = None
         self._spark = spark
 
     # def _df(self, jdf: JavaObject) -> "DataFrame":
@@ -109,7 +114,8 @@ class DataFrameReader(OptionUtils):
         |100|Hyukjin Kwon|
         +---+------------+
         """
-        self._jreader = self._jreader.format(source)
+        # self._jreader = self._jreader.format(source)
+        self._source = source
         return self
 
     def schema(self, schema: Union[StructType, str]) -> "DataFrameReader":
@@ -247,8 +253,7 @@ class DataFrameReader(OptionUtils):
         |100|NULL|
         +---+----+
         """
-        for k in options:
-            self._jreader = self._jreader.option(k, to_str(options[k]))
+        self._options = options
         return self
 
     def load(
@@ -308,14 +313,25 @@ class DataFrameReader(OptionUtils):
             self.schema(schema)
         self.options(**options)
         if isinstance(path, str):
-            return self._df(self._jreader.load(path))
-        elif path is not None:
-            if type(path) != list:
-                path = [path]  # type: ignore[list-item]
-            assert self._spark._sc._jvm is not None
-            return self._df(self._jreader.load(self._spark._sc._jvm.PythonUtils.toSeq(path)))
-        else:
-            return self._df(self._jreader.load())
+            from plspark.sql.dataframe import DataFrame
+            readers = {
+                "csv": pl.read_csv,
+                "json": pl.read_json
+            }
+            reader = readers[self._source]
+            pdf = reader(path, **options)
+            df = DataFrame(pdf.lazy(), self._spark)
+            df._schema = schema_from_polars(pdf)
+            return df
+        # FIX add multipath
+        #     return self._df(self._jreader.load(path))
+        # elif path is not None:
+        #     if type(path) != list:
+        #         path = [path]  # type: ignore[list-item]
+        #     assert self._spark._sc._jvm is not None
+        #     return self._df(self._jreader.load(self._spark._sc._jvm.PythonUtils.toSeq(path)))
+        # else:
+        #     return self._df(self._jreader.load())
 
     def json(
         self,
