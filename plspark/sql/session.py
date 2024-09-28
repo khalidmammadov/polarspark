@@ -48,7 +48,7 @@ from plspark.rdd import RDD
 from plspark.sql.conf import RuntimeConfig
 from plspark.sql.dataframe import DataFrame
 from plspark.sql.functions import lit
-# from plspark.sql.pandas.conversion import SparkConversionMixin
+from plspark.sql.pandas.conversion import SparkConversionMixin
 from plspark.sql.readwriter import DataFrameReader
 # from plspark.sql.sql_formatter import SQLStringFormatter
 # from plspark.sql.streaming import DataStreamReader
@@ -125,7 +125,7 @@ class classproperty(property):
         return classmethod(self.fget).__get__(None, owner)()  # type: ignore
 
 
-class SparkSession:
+class SparkSession(SparkConversionMixin):
     """The entry point to programming Spark with the Dataset and DataFrame API.
 
     A SparkSession can be used to create :class:`DataFrame`, register :class:`DataFrame` as
