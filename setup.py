@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='plspark',
+    name='polarspark',
     version='0.1.0',
     packages=find_packages(),
     install_requires=[
@@ -16,7 +16,7 @@ setup(
     description='Spark on Polars',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/khalidmammadov/plspark',
+    url='https://github.com/khalidmammadov/polarspark',
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
