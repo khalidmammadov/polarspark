@@ -16,6 +16,7 @@
 #
 import sys
 from typing import cast, overload, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING, Union
+from functools import partial, reduce
 
 from plspark import RDD, since
 #from plspark.sql.column import _to_seq, _to_java_column, Column
@@ -70,7 +71,7 @@ class DataFrameReader(OptionUtils):
 
     def __init__(self, spark: "SparkSession"):
         # self._jreader = spark._jsparkSession.read()
-        self._options = None
+        self._options = {}
         self._format = None
         self._spark = spark
 
@@ -312,30 +313,46 @@ class DataFrameReader(OptionUtils):
         if schema is not None:
             self.schema(schema)
         self.options(**options)
+
+        readers = {
+            "csv": self.csv,
+            "json": self.json,
+            "parquet": partial(self._read_df, reader=pl.read_parquet),
+            "delta": partial(self._read_paths_with_concat, reader=pl.read_delta),
+            "avro": partial(self._read_paths_with_concat, reader=pl.read_avro),
+            "excel": partial(self._read_paths_with_concat, reader=pl.read_excel),
+        }
+        reader = readers[self._format]
+        return reader(path)
+
+    def _read_df(self, path, reader):
+        from plspark.sql.dataframe import DataFrame
+        pdf = reader(path, **self._options)
+        df = DataFrame(pdf.lazy(), self._spark)
+        df._schema = schema_from_polars(pdf)
+        return df
+
+    def _read_paths_with_concat(self, path, reader):
+        from plspark.sql.dataframe import DataFrame
         if isinstance(path, str):
-            from plspark.sql.dataframe import DataFrame
-            readers = {
-                "csv": pl.read_csv,
-                "json": pl.read_json,
-                "parquet": pl.read_parquet,
-                "delta": pl.read_delta,
-                "avro": pl.read_avro,
-                "excel": pl.read_excel,
-            }
-            reader = readers[self._format]
-            pdf = reader(path, **options)
+            path = [path]
+        if type(path) == list:
+            pdfs = []
+            for p in path:
+                pdf = reader(p, **self._options)
+                pdfs.append(pdf)
+            pdf = reduce(lambda a, b: pl.concat([a, b]), pdfs)
             df = DataFrame(pdf.lazy(), self._spark)
             df._schema = schema_from_polars(pdf)
             return df
-        # FIX add multipath
-        #     return self._df(self._jreader.load(path))
-        # elif path is not None:
-        #     if type(path) != list:
-        #         path = [path]  # type: ignore[list-item]
-        #     assert self._spark._sc._jvm is not None
-        #     return self._df(self._jreader.load(self._spark._sc._jvm.PythonUtils.toSeq(path)))
-        # else:
-        #     return self._df(self._jreader.load())
+        else:
+            raise PySparkTypeError(
+                error_class="NOT_STR_OR_LIST_OF_RDD",
+                message_parameters={
+                    "arg_name": "path",
+                    "arg_type": type(path).__name__,
+                },
+            )
 
     def json(
         self,
@@ -442,34 +459,7 @@ class DataFrameReader(OptionUtils):
             modifiedAfter=modifiedAfter,
             allowNonNumericNumbers=allowNonNumericNumbers,
         )
-        if isinstance(path, str):
-            path = [path]
-        if type(path) == list:
-            assert self._spark._sc._jvm is not None
-            return self._df(self._jreader.json(self._spark._sc._jvm.PythonUtils.toSeq(path)))
-        elif isinstance(path, RDD):
-
-            def func(iterator: Iterable) -> Iterable:
-                for x in iterator:
-                    if not isinstance(x, str):
-                        x = str(x)
-                    if isinstance(x, str):
-                        x = x.encode("utf-8")
-                    yield x
-
-            keyed = path.mapPartitions(func)
-            keyed._bypass_serializer = True  # type: ignore[attr-defined]
-            assert self._spark._jvm is not None
-            jrdd = keyed._jrdd.map(self._spark._jvm.BytesToString())
-            return self._df(self._jreader.json(jrdd))
-        else:
-            raise PySparkTypeError(
-                error_class="NOT_STR_OR_LIST_OF_RDD",
-                message_parameters={
-                    "arg_name": "path",
-                    "arg_type": type(path).__name__,
-                },
-            )
+        return self._read_paths_with_concat(path, pl.read_json)
 
     def table(self, tableName: str) -> "DataFrame":
         """Returns the specified table as a :class:`DataFrame`.
@@ -613,7 +603,7 @@ class DataFrameReader(OptionUtils):
             int96RebaseMode=int96RebaseMode,
         )
 
-        return self._df(self._jreader.parquet(_to_seq(self._spark._sc, paths)))
+        return self._read_df(paths, pl.read_parquet)
 
     def text(
         self,
@@ -805,40 +795,7 @@ class DataFrameReader(OptionUtils):
             modifiedAfter=modifiedAfter,
             unescapedQuoteHandling=unescapedQuoteHandling,
         )
-        if isinstance(path, str):
-            path = [path]
-        if type(path) == list:
-            assert self._spark._sc._jvm is not None
-            return self._df(self._jreader.csv(self._spark._sc._jvm.PythonUtils.toSeq(path)))
-        elif isinstance(path, RDD):
-
-            def func(iterator):
-                for x in iterator:
-                    if not isinstance(x, str):
-                        x = str(x)
-                    if isinstance(x, str):
-                        x = x.encode("utf-8")
-                    yield x
-
-            keyed = path.mapPartitions(func)
-            keyed._bypass_serializer = True
-            jrdd = keyed._jrdd.map(self._spark._jvm.BytesToString())
-            # see SPARK-22112
-            # There aren't any jvm api for creating a dataframe from rdd storing csv.
-            # We can do it through creating a jvm dataset firstly and using the jvm api
-            # for creating a dataframe from dataset storing csv.
-            jdataset = self._spark._jsparkSession.createDataset(
-                jrdd.rdd(), self._spark._jvm.Encoders.STRING()
-            )
-            return self._df(self._jreader.csv(jdataset))
-        else:
-            raise PySparkTypeError(
-                error_class="NOT_STR_OR_LIST_OF_RDD",
-                message_parameters={
-                    "arg_name": "path",
-                    "arg_type": type(path).__name__,
-                },
-            )
+        return self._read_paths_with_concat(path, pl.read_csv)
 
     def xml(
         self,
