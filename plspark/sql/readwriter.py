@@ -17,6 +17,9 @@
 import sys
 from typing import cast, overload, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING, Union
 from functools import partial, reduce
+from pathlib import Path
+import shutil
+import uuid
 
 from plspark import RDD, since
 #from plspark.sql.column import _to_seq, _to_java_column, Column
@@ -25,7 +28,7 @@ from plspark.sql.pandas.conversion import schema_from_polars
 from plspark.sql.types import StructType
 from plspark.sql import utils
 from plspark.sql.utils import to_str
-from plspark.errors import PySparkTypeError, PySparkValueError
+from plspark.errors import PySparkTypeError, PySparkValueError, PySparkRuntimeError
 
 import polars as pl
 
@@ -308,15 +311,15 @@ class DataFrameReader(OptionUtils):
         |100|NULL|
         +---+----+
         """
-        if format is not None:
+        if format:
             self.format(format)
-        if schema is not None:
+        if schema:
             self.schema(schema)
         self.options(**options)
 
         readers = {
-            "csv": self.csv,
-            "json": self.json,
+            "csv": partial(self._read_paths_with_concat, reader=pl.read_csv),
+            "json": partial(self._read_paths_with_concat, reader=pl.read_json),
             "parquet": partial(self._read_df, reader=pl.read_parquet),
             "delta": partial(self._read_paths_with_concat, reader=pl.read_delta),
             "avro": partial(self._read_paths_with_concat, reader=pl.read_avro),
@@ -334,25 +337,38 @@ class DataFrameReader(OptionUtils):
 
     def _read_paths_with_concat(self, path, reader):
         from plspark.sql.dataframe import DataFrame
+        _paths = path
         if isinstance(path, str):
-            path = [path]
-        if type(path) == list:
-            pdfs = []
-            for p in path:
-                pdf = reader(p, **self._options)
-                pdfs.append(pdf)
-            pdf = reduce(lambda a, b: pl.concat([a, b]), pdfs)
-            df = DataFrame(pdf.lazy(), self._spark)
-            df._schema = schema_from_polars(pdf)
-            return df
-        else:
+            _paths = [path]
+
+        if type(_paths) != list:
             raise PySparkTypeError(
                 error_class="NOT_STR_OR_LIST_OF_RDD",
                 message_parameters={
                     "arg_name": "path",
-                    "arg_type": type(path).__name__,
+                    "arg_type": type(_paths).__name__,
                 },
             )
+
+        # Check if path is a directory of files
+        paths = []
+        for p in _paths:
+            _p = Path(p)
+            if _p.is_dir():
+                for i in _p.iterdir():
+                    paths.append(i)
+            else:
+                paths.append(p)
+
+        pdfs = []
+        for p in paths:
+            pdf = reader(p, **self._options)
+            pdfs.append(pdf)
+        pdf = reduce(lambda a, b: pl.concat([a, b]), pdfs)
+        df = DataFrame(pdf.lazy(), self._spark)
+        df._schema = schema_from_polars(pdf)
+        return df
+
 
     def json(
         self,
@@ -459,7 +475,8 @@ class DataFrameReader(OptionUtils):
             modifiedAfter=modifiedAfter,
             allowNonNumericNumbers=allowNonNumericNumbers,
         )
-        return self._read_paths_with_concat(path, pl.read_json)
+        self.format("json")
+        return self.load(path)
 
     def table(self, tableName: str) -> "DataFrame":
         """Returns the specified table as a :class:`DataFrame`.
@@ -795,7 +812,8 @@ class DataFrameReader(OptionUtils):
             modifiedAfter=modifiedAfter,
             unescapedQuoteHandling=unescapedQuoteHandling,
         )
-        return self._read_paths_with_concat(path, pl.read_csv)
+        self.format("csv")
+        return self.load(path)
 
     def xml(
         self,
@@ -1113,7 +1131,7 @@ class DataFrameWriter(OptionUtils):
     def __init__(self, df: "DataFrame"):
         self._df = df
         self._spark = df.sparkSession
-        self._mode = None
+        self._mode = "error"
         self._format = None
         self._options = {}
 
@@ -1608,11 +1626,29 @@ class DataFrameWriter(OptionUtils):
         |100|Hyukjin Kwon|
         +---+------------+
         """
-        self.mode(mode).options(**options)
+        if mode:
+            self.mode(mode)
+        if options:
+            self.options(**options)
         if partitionBy is not None:
             self.partitionBy(partitionBy)
         if format is not None:
             self.format(format)
+
+        # Create dir with target file name
+        p = Path(path)
+        path = p / f"part-00000-{uuid.uuid4()}-c000{p.suffix}"
+        if p.exists() and self._mode == "overwrite":
+            shutil.rmtree(p)
+        elif p.exists() and self._mode == "error":
+            raise PySparkRuntimeError(
+                error_class="PATH_ALREADY_EXISTS",
+                message_parameters={"path":str(p)},
+            )
+        if not p.exists():
+            p.mkdir()
+
+
         if path is None:
             pass
             # FIX check what is default path or table?
@@ -1626,8 +1662,8 @@ class DataFrameWriter(OptionUtils):
                 "delta": self._df._ldf.collect().write_delta,
                 "excel": self._df._ldf.collect().write_excel,
             }
-            writer = writers[self._format]
-            writer(path, **options)
+            write = writers[self._format]
+            write(path, **options)
 
     def insertInto(self, tableName: str, overwrite: Optional[bool] = None) -> None:
         """Inserts the content of the :class:`DataFrame` to the specified table.
