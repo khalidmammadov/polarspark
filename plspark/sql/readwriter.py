@@ -71,7 +71,7 @@ class DataFrameReader(OptionUtils):
     def __init__(self, spark: "SparkSession"):
         # self._jreader = spark._jsparkSession.read()
         self._options = None
-        self._source = None
+        self._format = None
         self._spark = spark
 
     # def _df(self, jdf: JavaObject) -> "DataFrame":
@@ -115,7 +115,7 @@ class DataFrameReader(OptionUtils):
         +---+------------+
         """
         # self._jreader = self._jreader.format(source)
-        self._source = source
+        self._format = source
         return self
 
     def schema(self, schema: Union[StructType, str]) -> "DataFrameReader":
@@ -316,9 +316,13 @@ class DataFrameReader(OptionUtils):
             from plspark.sql.dataframe import DataFrame
             readers = {
                 "csv": pl.read_csv,
-                "json": pl.read_json
+                "json": pl.read_json,
+                "parquet": pl.read_parquet,
+                "delta": pl.read_delta,
+                "avro": pl.read_avro,
+                "excel": pl.read_excel,
             }
-            reader = readers[self._source]
+            reader = readers[self._format]
             pdf = reader(path, **options)
             df = DataFrame(pdf.lazy(), self._spark)
             df._schema = schema_from_polars(pdf)
@@ -1152,7 +1156,9 @@ class DataFrameWriter(OptionUtils):
     def __init__(self, df: "DataFrame"):
         self._df = df
         self._spark = df.sparkSession
-        self._jwrite = df._jdf.write()
+        self._mode = None
+        self._format = None
+        self._options = {}
 
     # def _sq(self, jsq: JavaObject) -> "StreamingQuery":
     #     from plspark.sql.streaming import StreamingQuery
@@ -1214,10 +1220,7 @@ class DataFrameWriter(OptionUtils):
         |100| Hyukjin Kwon|
         +---+-------------+
         """
-        # At the JVM side, the default value of mode is already set to "error".
-        # So, if the given saveMode is None, we will not call JVM-side's mode method.
-        if saveMode is not None:
-            self._jwrite = self._jwrite.mode(saveMode)
+        self._mode = saveMode
         return self
 
     def format(self, source: str) -> "DataFrameWriter":
@@ -1255,7 +1258,7 @@ class DataFrameWriter(OptionUtils):
         |100|Hyukjin Kwon|
         +---+------------+
         """
-        self._jwrite = self._jwrite.format(source)
+        self._format = source
         return self
 
     def option(self, key: str, value: "OptionalPrimitiveType") -> "DataFrameWriter":
@@ -1296,7 +1299,7 @@ class DataFrameWriter(OptionUtils):
         +---+------------+
         """
 
-        self._jwrite = self._jwrite.option(key, to_str(value))
+        self._options[key] =to_str(value)
         return self
 
     def options(self, **options: "OptionalPrimitiveType") -> "DataFrameWriter":
@@ -1347,7 +1350,7 @@ class DataFrameWriter(OptionUtils):
         +---+------------+
         """
         for k in options:
-            self._jwrite = self._jwrite.option(k, to_str(options[k]))
+            self._options[k] = to_str(options[k])
         return self
 
     @overload
@@ -1654,9 +1657,20 @@ class DataFrameWriter(OptionUtils):
         if format is not None:
             self.format(format)
         if path is None:
-            self._jwrite.save()
+            pass
+            # FIX check what is default path or table?
+            # self._jwrite.save()
         else:
-            self._jwrite.save(path)
+            # self._jwrite.save(path)
+            writers = {
+                "csv": self._df._ldf.sink_csv,
+                "json": self._df._ldf.sink_ndjson,
+                "parquet": self._df._ldf.sink_parquet,
+                "delta": self._df._ldf.collect().write_delta,
+                "excel": self._df._ldf.collect().write_excel,
+            }
+            writer = writers[self._format]
+            writer(path, **options)
 
     def insertInto(self, tableName: str, overwrite: Optional[bool] = None) -> None:
         """Inserts the content of the :class:`DataFrame` to the specified table.
