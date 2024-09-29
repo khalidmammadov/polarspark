@@ -636,6 +636,11 @@ ERROR_CLASSES_JSON = """
     "message" : [
       "Only a single trigger is allowed."
     ]
+  },  
+  "PATH_ALREADY_EXISTS" : {
+    "message" : [
+      "Path <path> already exists. Set mode as \\"overwrite\\" to overwrite the existing path."
+    ]
   },
   "PIPE_FUNCTION_EXITED" : {
     "message" : [
