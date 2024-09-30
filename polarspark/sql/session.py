@@ -496,10 +496,10 @@ class SparkSession(SparkConversionMixin):
     def __init__(
         self,
         sparkContext: SparkContext,
-        # jsparkSession: Optional[JavaObject] = None,
         options: Dict[str, Any] = {},
     ):
         self._sc = sparkContext
+        self._pl_ctx = pl.SQLContext()
         # self._jsc = self._sc._jsc
         # self._jvm = self._sc._jvm
 
@@ -1571,21 +1571,23 @@ class SparkSession(SparkConversionMixin):
         +---+---+---+
         """
 
-        formatter = SQLStringFormatter(self)
-        if len(kwargs) > 0:
-            sqlQuery = formatter.format(sqlQuery, **kwargs)
-        try:
-            if isinstance(args, Dict):
-                litArgs = {k: _to_java_column(lit(v)) for k, v in (args or {}).items()}
-            else:
-                assert self._jvm is not None
-                litArgs = self._jvm.PythonUtils.toArray(
-                    [_to_java_column(lit(v)) for v in (args or [])]
-                )
-            return DataFrame(self._jsparkSession.sql(sqlQuery, litArgs), self)
-        finally:
-            if len(kwargs) > 0:
-                formatter.clear()
+        # FIX add support for placeholders
+        # formatter = SQLStringFormatter(self)
+        # if len(kwargs) > 0:
+        #     sqlQuery = formatter.format(sqlQuery, **kwargs)
+        # try:
+        #     if isinstance(args, Dict):
+        #         litArgs = {k: _to_java_column(lit(v)) for k, v in (args or {}).items()}
+        #     else:
+        #         assert self._jvm is not None
+        #         litArgs = self._jvm.PythonUtils.toArray(
+        #             [_to_java_column(lit(v)) for v in (args or [])]
+        #         )
+        #     return DataFrame(self._jsparkSession.sql(sqlQuery, litArgs), self)
+        # finally:
+        #     if len(kwargs) > 0:
+        #         formatter.clear()
+        return DataFrame(self._pl_ctx.execute(sqlQuery), self)
 
     def table(self, tableName: str) -> DataFrame:
         """Returns the specified table as a :class:`DataFrame`.
