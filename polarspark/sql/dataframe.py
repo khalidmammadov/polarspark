@@ -138,7 +138,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     def __init__(
         self,
         ldf: LazyFrame,
-        # jdf: JavaObject,
         sql_ctx: Union["SQLContext", "SparkSession"],
     ):
         from polarspark.sql.context import SQLContext
@@ -202,28 +201,28 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         return self._session
 
-    @property
-    def rdd(self) -> "RDD[Row]":
-        """Returns the content as an :class:`polarspark.RDD` of :class:`Row`.
-
-        .. versionadded:: 1.3.0
-
-        Returns
-        -------
-        :class:`RDD`
-
-        Examples
-        --------
-        >>> df = spark.range(1)
-        >>> type(df.rdd)
-        <class 'polarspark.rdd.RDD'>
-        """
-        if self._lazy_rdd is None:
-            jrdd = self._jdf.javaToPython()
-            self._lazy_rdd = RDD(
-                jrdd, self.sparkSession._sc, BatchedSerializer(CPickleSerializer())
-            )
-        return self._lazy_rdd
+    # @property
+    # def rdd(self) -> "RDD[Row]":
+    #     """Returns the content as an :class:`polarspark.RDD` of :class:`Row`.
+    #
+    #     .. versionadded:: 1.3.0
+    #
+    #     Returns
+    #     -------
+    #     :class:`RDD`
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.range(1)
+    #     >>> type(df.rdd)
+    #     <class 'polarspark.rdd.RDD'>
+    #     """
+    #     if self._lazy_rdd is None:
+    #         jrdd = self._jdf.javaToPython()
+    #         self._lazy_rdd = RDD(
+    #             jrdd, self.sparkSession._sc, BatchedSerializer(CPickleSerializer())
+    #         )
+    #     return self._lazy_rdd
 
     @property
     def na(self) -> "DataFrameNaFunctions":
@@ -279,30 +278,30 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         return DataFrameStatFunctions(self)
 
-    def toJSON(self, use_unicode: bool = True) -> RDD[str]:
-        """Converts a :class:`DataFrame` into a :class:`RDD` of string.
-
-        Each row is turned into a JSON document as one element in the returned RDD.
-
-        .. versionadded:: 1.3.0
-
-        Parameters
-        ----------
-        use_unicode : bool, optional, default True
-            Whether to convert to unicode or not.
-
-        Returns
-        -------
-        :class:`RDD`
-
-        Examples
-        --------
-        >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")], schema=["age", "name"])
-        >>> df.toJSON().first()
-        '{"age":2,"name":"Alice"}'
-        """
-        rdd = self._jdf.toJSON()
-        return RDD(rdd.toJavaRDD(), self._sc, UTF8Deserializer(use_unicode))
+    # def toJSON(self, use_unicode: bool = True) -> RDD[str]:
+    #     """Converts a :class:`DataFrame` into a :class:`RDD` of string.
+    #
+    #     Each row is turned into a JSON document as one element in the returned RDD.
+    #
+    #     .. versionadded:: 1.3.0
+    #
+    #     Parameters
+    #     ----------
+    #     use_unicode : bool, optional, default True
+    #         Whether to convert to unicode or not.
+    #
+    #     Returns
+    #     -------
+    #     :class:`RDD`
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")], schema=["age", "name"])
+    #     >>> df.toJSON().first()
+    #     '{"age":2,"name":"Alice"}'
+    #     """
+    #     rdd = self._jdf.toJSON()
+    #     return RDD(rdd.toJavaRDD(), self._sc, UTF8Deserializer(use_unicode))
 
     def registerTempTable(self, name: str) -> None:
         """Registers this :class:`DataFrame` as a temporary table using the given name.
@@ -335,7 +334,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         """
         warnings.warn("Deprecated in 2.0, use createOrReplaceTempView instead.", FutureWarning)
-        self._jdf.createOrReplaceTempView(name)
+        self.createOrReplaceTempView(name)
 
     def createTempView(self, name: str) -> None:
         """Creates a local temporary view with this :class:`DataFrame`.
@@ -375,7 +374,12 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
-        self._jdf.createTempView(name)
+        if name in self._session._pl_ctx.tables():
+            raise PySparkValueError(
+                error_class="TEMP_TABLE_OR_VIEW_ALREADY_EXISTS",
+                message_parameters={"relationName": name},
+            )
+        self._session._pl_ctx.register(name, self._ldf)
 
     def createOrReplaceTempView(self, name: str) -> None:
         """Creates or replaces a local temporary view with this :class:`DataFrame`.
@@ -411,7 +415,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
-        self._jdf.createOrReplaceTempView(name)
+        self._session._pl_ctx.register(name, self._ldf)
 
     def createGlobalTempView(self, name: str) -> None:
         """Creates a global temporary view with this :class:`DataFrame`.
@@ -450,7 +454,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
-        self._jdf.createGlobalTempView(name)
+        self.createTempView(name)
 
     def createOrReplaceGlobalTempView(self, name: str) -> None:
         """Creates or replaces a global temporary view using the given name.
@@ -485,7 +489,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
-        self._jdf.createOrReplaceGlobalTempView(name)
+        self.createTempView(name)
 
     @property
     def write(self) -> DataFrameWriter:
@@ -622,10 +626,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
          |    |-- _1: long (nullable = true)
          |    |-- _2: long (nullable = true)
         """
-        if level:
-            print(self._jdf.schema().treeString(level))
-        else:
-            print(self._jdf.schema().treeString())
+        print(self.schema.treeString(level))
 
     def explain(
         self, extended: Optional[Union[bool, str]] = None, mode: Optional[str] = None

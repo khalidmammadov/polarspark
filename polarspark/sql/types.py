@@ -187,6 +187,14 @@ class DataType:
         assert len(schema) == 1
         return schema[0].dataType
 
+    @staticmethod
+    def build_formatted_string(data_type: "DataType",
+                               prefix: str,
+                               string_concat: List[str],
+                               depth: int
+                               ):
+        if isinstance(data_type, (ArrayType, StructType, MapType)):
+            data_type.buildFormattedString(prefix, string_concat, depth - 1)
 
 # This singleton pattern does not work with pickle, you will get
 # another object after pickle and unpickle
@@ -655,6 +663,20 @@ class ArrayType(DataType):
             return obj
         return obj and [self.elementType.fromInternal(v) for v in obj]
 
+    def buildFormattedString(self,
+                             prefix: str,
+                             string_concat: List[str],
+                             depth: int
+                             ):
+        if depth > 0:
+            string_concat.append(
+                f"{prefix}-- element: {self.elementType.typeName} (containsNull = $containsNull)\n"
+            )
+            DataType.build_formatted_string(self.elementType,
+                                            f"{prefix}    |",
+                                            string_concat,
+                                            depth
+                                            )
 
 class MapType(DataType):
     """Map data type.
@@ -780,6 +802,29 @@ class MapType(DataType):
             (self.keyType.fromInternal(k), self.valueType.fromInternal(v)) for k, v in obj.items()
         )
 
+    def buildFormattedString(self,
+                             prefix: str,
+                             string_concat: List[str],
+                             depth: int
+                             ):
+        if depth > 0:
+            DataType.build_formatted_string(self.keyType,
+                                            f"{prefix}    |",
+                                            string_concat,
+                                            depth
+                                            )
+            string_concat.append(
+                f"{prefix}-- key: {self.keyType.typeName}\n"
+            )
+            string_concat.append(
+                f"{prefix}-- value: {self.valueType.typeName} " +
+                f"(valueContainsNull = {self.valueContainsNull})\n"
+            )
+            DataType.build_formatted_string(self.valueType,
+                                            f"{prefix}    |",
+                                            string_concat,
+                                            depth
+                                            )
 
 class StructField(DataType):
     """A field in :class:`StructType`.
@@ -836,6 +881,16 @@ class StructField(DataType):
             "nullable": self.nullable,
             "metadata": self.metadata,
         }
+
+    def build_formatted_string(self, prefix: str, string_concat: List[str], depth: int):
+        if depth > 0:
+            string_concat.append(f"{prefix}-- {escape_meta_characters(self.name)}: " +
+                f"{self.dataType.typeName} (nullable = {self.nullable})\n")
+            DataType.build_formatted_string(self.dataType,
+                                            f"{prefix}    |",
+                                            string_concat,
+                                            depth
+                                            )
 
     @classmethod
     def fromJson(cls, json: Dict[str, Any]) -> "StructField":
@@ -1098,6 +1153,23 @@ class StructType(DataType):
         StructField('c', StructType([StructField('d', IntegerType(), True)]), True)]), True)])
         """
         return self._as_nullable()
+
+    def treeString(self, maxDepth: int = sys.maxsize) -> str:
+        string_concat = ["root\n"]
+        prefix = " |"
+        depth = maxDepth if (maxDepth and maxDepth > 0) else sys.maxsize
+        for f in self.fields:
+            print(type(f))
+            f.build_formatted_string(prefix, string_concat, depth)
+        return "".join(string_concat)
+
+    def buildFormattedString(self,
+                             prefix: str,
+                             string_concat: List[str],
+                             depth: int
+                             ):
+        for f in self.fields:
+            f.build_formatted_string(prefix, string_concat, depth)
 
     def __repr__(self) -> str:
         return "StructType([%s])" % ", ".join(str(field) for field in self)
@@ -2702,6 +2774,16 @@ class NumpyScalarConverter:
 #         for i in range(len(plist)):
 #             jarr[i] = plist[i]
 #         return jarr
+
+
+def escape_meta_characters(string: str) -> str:
+    return (re.sub(r'\n', r'\\n', string)
+              .replace('\r', r'\\r')
+              .replace('\t', r'\\t')
+              .replace('\f', r'\\f')
+              .replace('\b', r'\\b')
+              .replace('\u000b', r'\\v')
+              .replace('\u0007', r'\\a'))
 
 
 # datetime is a subclass of date, we should register DatetimeConverter first
