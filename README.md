@@ -24,9 +24,10 @@ resources of a single machine.
 Examples:
 ### Create spark session
 ```python
-from polarspark.sql.session import SparkSession
-
-base_path = "/var/tmp"
+try:            
+    from polarspark.sql.session import SparkSession
+except Exception:
+    from pyspark.sql.session import SparkSession
 
 spark = SparkSession.builder.master("local").appName("myapp").getOrCreate()
 
@@ -39,8 +40,15 @@ print(type(spark))
 
 ### Create DataFrame
 ```python
-from polarspark.sql import Row
+try:
+    from polarspark.sql import Row
+    from polarspark.sql.types import *
+except Exception:
+    from pyspark.sql import Row
+    from pyspark.sql.types import *
+    
 from pprint import pprint
+
 d = [{'name': 'Alice', 'age': 1}, 
      {'name': 'Tome', 'age': 100}, 
      {'name': 'Sim', 'age': 199}]
@@ -54,9 +62,19 @@ pprint(rows)
 
 pprint(df.offset(1).first())
 >>>  Row(age=100, name='Tome')
+
+schema = StructType([
+            StructField("name", StringType(), True),
+            StructField("age", IntegerType(), True)])
+df_no_rows = spark.createDataFrame([], schema=schema)
+print(df_no_rows.isEmpty())
+
+>>> True
+
 ```
-### Reads and writes
+### Read and write Parquet, Delta, CSV etc.
 ```python
+base_path = "/var/tmp"
 
 df1 = spark.read.format("json").load([f"{base_path}/data.json",
                                      f"{base_path}/data.json"
@@ -123,5 +141,5 @@ df.distinct().show()
 
 
 NOTE: Some of the features are not directly mapped but relies on Polars. 
-e.g. df.show() will print polars' print(df)
+e.g. df.show() or df.explain() will print polars relevant method output 
 
