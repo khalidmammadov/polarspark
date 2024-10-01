@@ -45,33 +45,37 @@ try:
     from polarspark.sql.types import *
 except Exception:
     from pyspark.sql import Row
-    from pyspark.sql.types import *
-    
+    from pyspark.sql.types import *    
 from pprint import pprint
+
 
 d = [{'name': 'Alice', 'age': 1}, 
      {'name': 'Tome', 'age': 100}, 
-     {'name': 'Sim', 'age': 199}]
+     {'name': 'Sim', 'age': 99}]
 df = spark.createDataFrame(d)
 rows = df.collect()
 
 pprint(rows)
 >>> [Row(age=1, name='Alice'),
 >>>  Row(age=100, name='Tome'),
->>>  Row(age=199, name='Sim')]
+>>>  Row(age=99, name='Sim')]
 
-pprint(df.offset(1).first())
->>>  Row(age=100, name='Tome')
 
+# Wiith schema
 schema = StructType([
             StructField("name", StringType(), True),
             StructField("age", IntegerType(), True)])
 df_no_rows = spark.createDataFrame([], schema=schema)
 print(df_no_rows.isEmpty())
-
 >>> True
 
 ```
+### Project
+```python
+pprint(df.offset(1).first())
+>>>  Row(age=100, name='Tome')
+```
+
 ### Read and write Parquet, Delta, CSV etc.
 ```python
 base_path = "/var/tmp"
@@ -100,8 +104,6 @@ Some more:
 ```python
 df.show()
 
-pprint(df.tail(2))
-
 shape: (3, 2)
 ┌─────┬──────────┐
 │ age ┆ name     │
@@ -110,9 +112,22 @@ shape: (3, 2)
 ╞═════╪══════════╡
 │ 1   ┆ Alice    │
 │ 100 ┆ Tome     │
-│ 199 ┆ Sim      │
+│ 99  ┆ Sim      │
 └─────┴──────────┘
+```
 
+```python
+df.explain()
+                 0
+   ┌─────────────────────────
+   │
+   │  ╭─────────────────────╮
+   │  │ DF ["age", "name"]  │
+ 0 │  │ PROJECT */2 COLUMNS │
+   │  ╰─────────────────────╯
+```
+
+```python
 print(repr(df))
 >>>  DataFrame[age: bigint, name: string]
 print(df.count())
