@@ -259,7 +259,7 @@ def get_active_spark_context() -> SparkContext:
     """Raise RuntimeError if SparkContext is not initialized,
     otherwise, returns the active SparkContext."""
     sc = SparkContext._active_spark_context
-    if sc is None or sc._jvm is None:
+    if sc is None:
         raise RuntimeError("SparkContext or SparkSession should be created first.")
     return sc
 
