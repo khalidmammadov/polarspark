@@ -697,54 +697,55 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ...
         """
 
-        if extended is not None and mode is not None:
-            raise PySparkValueError(
-                error_class="CANNOT_SET_TOGETHER",
-                message_parameters={"arg_list": "extended and mode"},
-            )
-
-        # For the no argument case: df.explain()
-        is_no_argument = extended is None and mode is None
-
-        # For the cases below:
-        #   explain(True)
-        #   explain(extended=False)
-        is_extended_case = isinstance(extended, bool) and mode is None
-
-        # For the case when extended is mode:
-        #   df.explain("formatted")
-        is_extended_as_mode = isinstance(extended, str) and mode is None
-
-        # For the mode specified:
-        #   df.explain(mode="formatted")
-        is_mode_case = extended is None and isinstance(mode, str)
-
-        if not (is_no_argument or is_extended_case or is_extended_as_mode or is_mode_case):
-            if (extended is not None) and (not isinstance(extended, (bool, str))):
-                raise PySparkTypeError(
-                    error_class="NOT_BOOL_OR_STR",
-                    message_parameters={
-                        "arg_name": "extended",
-                        "arg_type": type(extended).__name__,
-                    },
-                )
-            if (mode is not None) and (not isinstance(mode, str)):
-                raise PySparkTypeError(
-                    error_class="NOT_STR",
-                    message_parameters={"arg_name": "mode", "arg_type": type(mode).__name__},
-                )
-
-        # Sets an explain mode depending on a given argument
-        if is_no_argument:
-            explain_mode = "simple"
-        elif is_extended_case:
-            explain_mode = "extended" if extended else "simple"
-        elif is_mode_case:
-            explain_mode = cast(str, mode)
-        elif is_extended_as_mode:
-            explain_mode = cast(str, extended)
-        assert self._sc._jvm is not None
-        print(self._sc._jvm.PythonSQLUtils.explainString(self._jdf.queryExecution(), explain_mode))
+        # if extended is not None and mode is not None:
+        #     raise PySparkValueError(
+        #         error_class="CANNOT_SET_TOGETHER",
+        #         message_parameters={"arg_list": "extended and mode"},
+        #     )
+        #
+        # # For the no argument case: df.explain()
+        # is_no_argument = extended is None and mode is None
+        #
+        # # For the cases below:
+        # #   explain(True)
+        # #   explain(extended=False)
+        # is_extended_case = isinstance(extended, bool) and mode is None
+        #
+        # # For the case when extended is mode:
+        # #   df.explain("formatted")
+        # is_extended_as_mode = isinstance(extended, str) and mode is None
+        #
+        # # For the mode specified:
+        # #   df.explain(mode="formatted")
+        # is_mode_case = extended is None and isinstance(mode, str)
+        #
+        # if not (is_no_argument or is_extended_case or is_extended_as_mode or is_mode_case):
+        #     if (extended is not None) and (not isinstance(extended, (bool, str))):
+        #         raise PySparkTypeError(
+        #             error_class="NOT_BOOL_OR_STR",
+        #             message_parameters={
+        #                 "arg_name": "extended",
+        #                 "arg_type": type(extended).__name__,
+        #             },
+        #         )
+        #     if (mode is not None) and (not isinstance(mode, str)):
+        #         raise PySparkTypeError(
+        #             error_class="NOT_STR",
+        #             message_parameters={"arg_name": "mode", "arg_type": type(mode).__name__},
+        #         )
+        #
+        # # Sets an explain mode depending on a given argument
+        # if is_no_argument:
+        #     explain_mode = "simple"
+        # elif is_extended_case:
+        #     explain_mode = "extended" if extended else "simple"
+        # elif is_mode_case:
+        #     explain_mode = cast(str, mode)
+        # elif is_extended_as_mode:
+        #     explain_mode = cast(str, extended)
+        # assert self._sc._jvm is not None
+        # print(self._sc._jvm.PythonSQLUtils.explainString(self._jdf.queryExecution(), explain_mode))
+        print(self._ldf.explain(format="tree"))
 
     def exceptAll(self, other: "DataFrame") -> "DataFrame":
         """Return a new :class:`DataFrame` containing rows in this :class:`DataFrame` but
@@ -783,7 +784,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         +---+---+
 
         """
-        return self._to_df(self._jdf.exceptAll(other._ldf))
+        raise NotImplementedError()
+        # return self._to_df(self._ldf.exceptAll(other._ldf))
 
     def isLocal(self) -> bool:
         """Returns ``True`` if the :func:`collect` and :func:`take` methods can be run locally
@@ -804,7 +806,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.isLocal()
         True
         """
-        return self._jdf.isLocal()
+        return True
 
     @property
     def isStreaming(self) -> bool:
@@ -835,7 +837,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.isStreaming
         True
         """
-        return self._jdf.isStreaming()
+        return False
 
     def isEmpty(self) -> bool:
         """
@@ -886,7 +888,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df_no_rows.isEmpty()
         True
         """
-        return self._jdf.isEmpty()
+        return self._ldf.limit(1).collect().is_empty()
 
     def show(self, n: int = 20, truncate: Union[bool, int] = True, vertical: bool = False) -> None:
         """
@@ -1087,69 +1089,69 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         # return DataFrame(jdf, self.sparkSession)
         return self
 
-    # def withWatermark(self, eventTime: str, delayThreshold: str) -> "DataFrame":
-    #     """Defines an event time watermark for this :class:`DataFrame`. A watermark tracks a point
-    #     in time before which we assume no more late data is going to arrive.
-    #
-    #     Spark will use this watermark for several purposes:
-    #       - To know when a given time window aggregation can be finalized and thus can be emitted
-    #         when using output modes that do not allow updates.
-    #
-    #       - To minimize the amount of state that we need to keep for on-going aggregations.
-    #
-    #     The current watermark is computed by looking at the `MAX(eventTime)` seen across
-    #     all of the partitions in the query minus a user specified `delayThreshold`.  Due to the cost
-    #     of coordinating this value across partitions, the actual watermark used is only guaranteed
-    #     to be at least `delayThreshold` behind the actual event time.  In some cases we may still
-    #     process records that arrive more than `delayThreshold` late.
-    #
-    #     .. versionadded:: 2.1.0
-    #
-    #     .. versionchanged:: 3.5.0
-    #         Supports Spark Connect.
-    #
-    #     Parameters
-    #     ----------
-    #     eventTime : str
-    #         the name of the column that contains the event time of the row.
-    #     delayThreshold : str
-    #         the minimum delay to wait to data to arrive late, relative to the
-    #         latest record that has been processed in the form of an interval
-    #         (e.g. "1 minute" or "5 hours").
-    #
-    #     Returns
-    #     -------
-    #     :class:`DataFrame`
-    #         Watermarked DataFrame
-    #
-    #     Notes
-    #     -----
-    #     This is a feature only for Structured Streaming.
-    #
-    #     This API is evolving.
-    #
-    #     Examples
-    #     --------
-    #     >>> from polarspark.sql import Row
-    #     >>> from polarspark.sql.functions import timestamp_seconds
-    #     >>> df = spark.readStream.format("rate").load().selectExpr(
-    #     ...     "value % 5 AS value", "timestamp")
-    #     >>> df.select("value", df.timestamp.alias("time")).withWatermark("time", '10 minutes')
-    #     DataFrame[value: bigint, time: timestamp]
-    #
-    #     Group the data by window and value (0 - 4), and compute the count of each group.
-    #
-    #     >>> import time
-    #     >>> from polarspark.sql.functions import window
-    #     >>> query = (df
-    #     ...     .withWatermark("timestamp", "10 minutes")
-    #     ...     .groupBy(
-    #     ...         window(df.timestamp, "10 minutes", "5 minutes"),
-    #     ...         df.value)
-    #     ...     ).count().writeStream.outputMode("complete").format("console").start()
-    #     >>> time.sleep(3)
-    #     >>> query.stop()
-    #     """
+    def withWatermark(self, eventTime: str, delayThreshold: str) -> "DataFrame":
+        """Defines an event time watermark for this :class:`DataFrame`. A watermark tracks a point
+        in time before which we assume no more late data is going to arrive.
+
+        Spark will use this watermark for several purposes:
+          - To know when a given time window aggregation can be finalized and thus can be emitted
+            when using output modes that do not allow updates.
+
+          - To minimize the amount of state that we need to keep for on-going aggregations.
+
+        The current watermark is computed by looking at the `MAX(eventTime)` seen across
+        all of the partitions in the query minus a user specified `delayThreshold`.  Due to the cost
+        of coordinating this value across partitions, the actual watermark used is only guaranteed
+        to be at least `delayThreshold` behind the actual event time.  In some cases we may still
+        process records that arrive more than `delayThreshold` late.
+
+        .. versionadded:: 2.1.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
+
+        Parameters
+        ----------
+        eventTime : str
+            the name of the column that contains the event time of the row.
+        delayThreshold : str
+            the minimum delay to wait to data to arrive late, relative to the
+            latest record that has been processed in the form of an interval
+            (e.g. "1 minute" or "5 hours").
+
+        Returns
+        -------
+        :class:`DataFrame`
+            Watermarked DataFrame
+
+        Notes
+        -----
+        This is a feature only for Structured Streaming.
+
+        This API is evolving.
+
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> from polarspark.sql.functions import timestamp_seconds
+        >>> df = spark.readStream.format("rate").load().selectExpr(
+        ...     "value % 5 AS value", "timestamp")
+        >>> df.select("value", df.timestamp.alias("time")).withWatermark("time", '10 minutes')
+        DataFrame[value: bigint, time: timestamp]
+
+        Group the data by window and value (0 - 4), and compute the count of each group.
+
+        >>> import time
+        >>> from polarspark.sql.functions import window
+        >>> query = (df
+        ...     .withWatermark("timestamp", "10 minutes")
+        ...     .groupBy(
+        ...         window(df.timestamp, "10 minutes", "5 minutes"),
+        ...         df.value)
+        ...     ).count().writeStream.outputMode("complete").format("console").start()
+        >>> time.sleep(3)
+        >>> query.stop()
+        """
     #     if not eventTime or type(eventTime) is not str:
     #         raise PySparkTypeError(
     #             error_class="NOT_STR",
@@ -1165,47 +1167,48 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #         )
     #     jdf = self._jdf.withWatermark(eventTime, delayThreshold)
     #     return DataFrame(jdf, self.sparkSession)
+        raise NotImplementedError()
 
-    # def hint(
-    #     self, name: str, *parameters: Union["PrimitiveType", "Column", List["PrimitiveType"]]
-    # ) -> "DataFrame":
-    #     """Specifies some hint on the current :class:`DataFrame`.
-    #
-    #     .. versionadded:: 2.2.0
-    #
-    #     .. versionchanged:: 3.4.0
-    #         Supports Spark Connect.
-    #
-    #     Parameters
-    #     ----------
-    #     name : str
-    #         A name of the hint.
-    #     parameters : str, list, float or int
-    #         Optional parameters.
-    #
-    #     Returns
-    #     -------
-    #     :class:`DataFrame`
-    #         Hinted DataFrame
-    #
-    #     Examples
-    #     --------
-    #     >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")], schema=["age", "name"])
-    #     >>> df2 = spark.createDataFrame([Row(height=80, name="Tom"), Row(height=85, name="Bob")])
-    #     >>> df.join(df2, "name").explain()  # doctest: +SKIP
-    #     == Physical Plan ==
-    #     ...
-    #     ... +- SortMergeJoin ...
-    #     ...
-    #
-    #     Explicitly trigger the broadcast hashjoin by providing the hint in ``df2``.
-    #
-    #     >>> df.join(df2.hint("broadcast"), "name").explain()
-    #     == Physical Plan ==
-    #     ...
-    #     ... +- BroadcastHashJoin ...
-    #     ...
-    #     """
+    def hint(
+        self, name: str, *parameters: Union["PrimitiveType", "Column", List["PrimitiveType"]]
+    ) -> "DataFrame":
+        """Specifies some hint on the current :class:`DataFrame`.
+
+        .. versionadded:: 2.2.0
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
+        Parameters
+        ----------
+        name : str
+            A name of the hint.
+        parameters : str, list, float or int
+            Optional parameters.
+
+        Returns
+        -------
+        :class:`DataFrame`
+            Hinted DataFrame
+
+        Examples
+        --------
+        >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")], schema=["age", "name"])
+        >>> df2 = spark.createDataFrame([Row(height=80, name="Tom"), Row(height=85, name="Bob")])
+        >>> df.join(df2, "name").explain()  # doctest: +SKIP
+        == Physical Plan ==
+        ...
+        ... +- SortMergeJoin ...
+        ...
+
+        Explicitly trigger the broadcast hashjoin by providing the hint in ``df2``.
+
+        >>> df.join(df2.hint("broadcast"), "name").explain()
+        == Physical Plan ==
+        ...
+        ... +- BroadcastHashJoin ...
+        ...
+        """
     #     if len(parameters) == 1 and isinstance(parameters[0], list):
     #         parameters = parameters[0]  # type: ignore[assignment]
     #
@@ -1264,6 +1267,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #
     #     jdf = self._jdf.hint(name, self._jseq(parameters, _converter))
     #     return DataFrame(jdf, self.sparkSession)
+        raise NotImplementedError()
 
     def count(self) -> int:
         """Returns the number of rows in this :class:`DataFrame`.
@@ -1288,7 +1292,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.count()
         3
         """
-        return self._ldf.select(pl.len()).collect().item()
+        return len(self._ldf.collect())
 
     def collect(self) -> List[Row]:
         """Returns all the records in the DataFrame as a list of :class:`Row`.
@@ -1355,10 +1359,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> [row.asDict() for row in rows]
         [{'age': 14, 'name': 'Tom'}, {'age': 23, 'name': 'Alice'}, {'age': 16, 'name': 'Bob'}]
         """
-        # with SCCallSiteSync(self._sc):
-        #     sock_info = self._jdf.collectToPython()
-        # return list(_load_from_socket(sock_info, BatchedSerializer(CPickleSerializer())))
-
         pdf: pl.DataFrame = self._ldf.collect()
         return list(_pdf_to_row_iter(pdf))
 
@@ -1703,13 +1703,12 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df2.persist(StorageLevel.DISK_ONLY_2).storageLevel
         StorageLevel(True, False, False, False, 2)
         """
-        java_storage_level = self._jdf.storageLevel()
         storage_level = StorageLevel(
-            java_storage_level.useDisk(),
-            java_storage_level.useMemory(),
-            java_storage_level.useOffHeap(),
-            java_storage_level.deserialized(),
-            java_storage_level.replication(),
+            False,
+            True,
+            False,
+            True,
+            1,
         )
         return storage_level
 
@@ -1806,7 +1805,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |        0|
         +---------+
         """
-        # return DataFrame(self._jdf.coalesce(numPartitions), self.sparkSession)
+        # There is always one copy in the memory
         return self
 
     @overload
@@ -1922,25 +1921,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |        2|
         +---------+
         """
-        # if isinstance(numPartitions, int):
-        #     if len(cols) == 0:
-        #         return DataFrame(self._jdf.repartition(numPartitions), self.sparkSession)
-        #     else:
-        #         return DataFrame(
-        #             self._jdf.repartition(numPartitions, self._jcols(*cols)),
-        #             self.sparkSession,
-        #         )
-        # elif isinstance(numPartitions, (str, Column)):
-        #     cols = (numPartitions,) + cols
-        #     return DataFrame(self._jdf.repartition(self._jcols(*cols)), self.sparkSession)
-        # else:
-        #     raise PySparkTypeError(
-        #         error_class="NOT_COLUMN_OR_STR",
-        #         message_parameters={
-        #             "arg_name": "numPartitions",
-        #             "arg_type": type(numPartitions).__name__,
-        #         },
-        #     )
+        # Nothing to repartition
+        # There is always one copy/partition in the memory
         return self
 
     @overload
@@ -2029,6 +2011,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         #             "arg_type": type(numPartitions).__name__,
         #         },
         #     )
+        # Nothing to repartition
+        # There is always one copy/partition in the memory
         return self
 
     def distinct(self) -> "DataFrame":
@@ -2195,45 +2179,52 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         10
         """
 
-        # For the cases below:
-        #   sample(True, 0.5 [, seed])
-        #   sample(True, fraction=0.5 [, seed])
-        #   sample(withReplacement=False, fraction=0.5 [, seed])
-        is_withReplacement_set = type(withReplacement) == bool and isinstance(fraction, float)
+        # # For the cases below:
+        # #   sample(True, 0.5 [, seed])
+        # #   sample(True, fraction=0.5 [, seed])
+        # #   sample(withReplacement=False, fraction=0.5 [, seed])
+        # is_withReplacement_set = type(withReplacement) == bool and isinstance(fraction, float)
+        #
+        # # For the case below:
+        # #   sample(faction=0.5 [, seed])
+        # is_withReplacement_omitted_kwargs = withReplacement is None and isinstance(fraction, float)
+        #
+        # # For the case below:
+        # #   sample(0.5 [, seed])
+        # is_withReplacement_omitted_args = isinstance(withReplacement, float)
+        #
+        # if not (
+        #     is_withReplacement_set
+        #     or is_withReplacement_omitted_kwargs
+        #     or is_withReplacement_omitted_args
+        # ):
+        #     argtypes = [type(arg).__name__ for arg in [withReplacement, fraction, seed]]
+        #     raise PySparkTypeError(
+        #         error_class="NOT_BOOL_OR_FLOAT_OR_INT",
+        #         message_parameters={
+        #             "arg_name": "withReplacement (optional), "
+        #             + "fraction (required) and seed (optional)",
+        #             "arg_type": ", ".join(argtypes),
+        #         },
+        #     )
+        #
+        # if is_withReplacement_omitted_args:
+        #     if fraction is not None:
+        #         seed = cast(int, fraction)
+        #     fraction = withReplacement
+        #     withReplacement = None
+        #
+        # seed = int(seed) if seed is not None else None
+        # args = [arg for arg in [withReplacement, fraction, seed] if arg is not None]
+        # jdf = self._jdf.sample(*args)
+        # return DataFrame(jdf, self.sparkSession)
 
-        # For the case below:
-        #   sample(faction=0.5 [, seed])
-        is_withReplacement_omitted_kwargs = withReplacement is None and isinstance(fraction, float)
-
-        # For the case below:
-        #   sample(0.5 [, seed])
-        is_withReplacement_omitted_args = isinstance(withReplacement, float)
-
-        if not (
-            is_withReplacement_set
-            or is_withReplacement_omitted_kwargs
-            or is_withReplacement_omitted_args
-        ):
-            argtypes = [type(arg).__name__ for arg in [withReplacement, fraction, seed]]
-            raise PySparkTypeError(
-                error_class="NOT_BOOL_OR_FLOAT_OR_INT",
-                message_parameters={
-                    "arg_name": "withReplacement (optional), "
-                    + "fraction (required) and seed (optional)",
-                    "arg_type": ", ".join(argtypes),
-                },
-            )
-
-        if is_withReplacement_omitted_args:
-            if fraction is not None:
-                seed = cast(int, fraction)
-            fraction = withReplacement
-            withReplacement = None
-
-        seed = int(seed) if seed is not None else None
-        args = [arg for arg in [withReplacement, fraction, seed] if arg is not None]
-        jdf = self._jdf.sample(*args)
-        return DataFrame(jdf, self.sparkSession)
+        # This is not optimum but at least makes use of Polars sample method
+        pdf: pl.DataFrame = self._ldf.collect()
+        if not fraction:
+            fraction = 0.1
+        n = len(pdf)*fraction
+        return self._to_df(pdf.sample(n, seed=seed).lazy())
 
     def sampleBy(
         self, col: "ColumnOrName", fractions: Dict[Any, float], seed: Optional[int] = None
@@ -2279,35 +2270,37 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> dataset.sampleBy(col("key"), fractions={2: 1.0}, seed=0).count()
         33
         """
-        if isinstance(col, str):
-            col = Column(col)
-        elif not isinstance(col, Column):
-            raise PySparkTypeError(
-                error_class="NOT_COLUMN_OR_STR",
-                message_parameters={"arg_name": "col", "arg_type": type(col).__name__},
-            )
-        if not isinstance(fractions, dict):
-            raise PySparkTypeError(
-                error_class="NOT_DICT",
-                message_parameters={"arg_name": "fractions", "arg_type": type(fractions).__name__},
-            )
-        for k, v in fractions.items():
-            if not isinstance(k, (float, int, str)):
-                raise PySparkTypeError(
-                    error_class="DISALLOWED_TYPE_FOR_CONTAINER",
-                    message_parameters={
-                        "arg_name": "fractions",
-                        "arg_type": type(fractions).__name__,
-                        "allowed_types": "float, int, str",
-                        "return_type": type(k).__name__,
-                    },
-                )
-            fractions[k] = float(v)
-        col = col._jc
-        seed = seed if seed is not None else random.randint(0, sys.maxsize)
-        return DataFrame(
-            self._jdf.stat().sampleBy(col, self._jmap(fractions), seed), self.sparkSession
-        )
+        # if isinstance(col, str):
+        #     col = Column(col)
+        # elif not isinstance(col, Column):
+        #     raise PySparkTypeError(
+        #         error_class="NOT_COLUMN_OR_STR",
+        #         message_parameters={"arg_name": "col", "arg_type": type(col).__name__},
+        #     )
+        # if not isinstance(fractions, dict):
+        #     raise PySparkTypeError(
+        #         error_class="NOT_DICT",
+        #         message_parameters={"arg_name": "fractions", "arg_type": type(fractions).__name__},
+        #     )
+        # for k, v in fractions.items():
+        #     if not isinstance(k, (float, int, str)):
+        #         raise PySparkTypeError(
+        #             error_class="DISALLOWED_TYPE_FOR_CONTAINER",
+        #             message_parameters={
+        #                 "arg_name": "fractions",
+        #                 "arg_type": type(fractions).__name__,
+        #                 "allowed_types": "float, int, str",
+        #                 "return_type": type(k).__name__,
+        #             },
+        #         )
+        #     fractions[k] = float(v)
+        # col = col._jc
+        # seed = seed if seed is not None else random.randint(0, sys.maxsize)
+        # return DataFrame(
+        #     self._jdf.stat().sampleBy(col, self._jmap(fractions), seed), self.sparkSession
+        # )
+        # This is not optimum but at least makes use of Polars sample method
+        return self._to_df(self._ldf.collect().sample(seed=seed).lazy())
 
     def randomSplit(self, weights: List[float], seed: Optional[int] = None) -> List["DataFrame"]:
         """Randomly splits this :class:`DataFrame` with the provided weights.
@@ -6723,7 +6716,7 @@ class DataFrameStatFunctions:
     sampleBy.__doc__ = DataFrame.sampleBy.__doc__
 
 
-def _pdf_to_row_iter(pdf) -> Iterator[Row]:
+def _pdf_to_row_iter(pdf: pl.DataFrame) -> Iterator[Row]:
     cols = pdf.columns
     for row in  pdf.iter_rows():
         yield Row(**dict(list(zip(cols, row))))

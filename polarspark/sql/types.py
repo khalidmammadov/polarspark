@@ -1159,7 +1159,6 @@ class StructType(DataType):
         prefix = " |"
         depth = maxDepth if (maxDepth and maxDepth > 0) else sys.maxsize
         for f in self.fields:
-            print(type(f))
             f.build_formatted_string(prefix, string_concat, depth)
         return "".join(string_concat)
 
