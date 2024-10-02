@@ -2300,7 +2300,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         #     self._jdf.stat().sampleBy(col, self._jmap(fractions), seed), self.sparkSession
         # )
         # This is not optimum but at least makes use of Polars sample method
-        return self._to_df(self._ldf.collect().sample(seed=seed).lazy())
+        return self.sample()
 
     def randomSplit(self, weights: List[float], seed: Optional[int] = None) -> List["DataFrame"]:
         """Randomly splits this :class:`DataFrame` with the provided weights.
@@ -2339,17 +2339,18 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> splits[1].count()
         2
         """
-        for w in weights:
-            if w < 0.0:
-                raise PySparkValueError(
-                    error_class="VALUE_NOT_POSITIVE",
-                    message_parameters={"arg_name": "weights", "arg_value": str(w)},
-                )
-        seed = seed if seed is not None else random.randint(0, sys.maxsize)
-        df_array = self._jdf.randomSplit(
-            _to_list(self.sparkSession._sc, cast(List["ColumnOrName"], weights)), int(seed)
-        )
-        return [DataFrame(df, self.sparkSession) for df in df_array]
+        # for w in weights:
+        #     if w < 0.0:
+        #         raise PySparkValueError(
+        #             error_class="VALUE_NOT_POSITIVE",
+        #             message_parameters={"arg_name": "weights", "arg_value": str(w)},
+        #         )
+        # seed = seed if seed is not None else random.randint(0, sys.maxsize)
+        # df_array = self._jdf.randomSplit(
+        #     _to_list(self.sparkSession._sc, cast(List["ColumnOrName"], weights)), int(seed)
+        # )
+        # return [DataFrame(df, self.sparkSession) for df in df_array]
+        raise NotImplementedError()
 
     @property
     def dtypes(self) -> List[Tuple[str, str]]:
@@ -3549,16 +3550,15 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  5| Bob|
         +---+----+
         """
+        from polarspark.sql.functions import col
         if isinstance(item, str):
-            jc = self._jdf.apply(item)
-            return Column(jc)
+            return col(item)
         elif isinstance(item, Column):
             return self.filter(item)
         elif isinstance(item, (list, tuple)):
             return self.select(*item)
         elif isinstance(item, int):
-            jc = self._jdf.apply(self.columns[item])
-            return Column(jc)
+            return col(self.schema[item].name)
         else:
             raise PySparkTypeError(
                 error_class="NOT_COLUMN_OR_FLOAT_OR_INT_OR_LIST_OR_STR",
@@ -3602,8 +3602,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             raise AttributeError(
                 "'%s' object has no attribute '%s'" % (self.__class__.__name__, name)
             )
-        jc = self._jdf.apply(name)
-        return Column(jc)
+        return self.__getitem__(name)
 
     def __dir__(self) -> List[str]:
         """
@@ -3699,8 +3698,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  Bob| 15|
         +-----+---+
         """
-        jdf = self._jdf.select(self._jcols(*cols))
-        return DataFrame(jdf, self.sparkSession)
+        # jdf = self._jdf.select(self._jcols(*cols))
+        # return DataFrame(jdf, self.sparkSession)
+        pl_cols = [c._expr if isinstance(c, Column) else c for c in cols]
+        return self._to_df(self._ldf.select(*pl_cols))
 
     @overload
     def selectExpr(self, *expr: str) -> "DataFrame":
@@ -3896,15 +3897,15 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         +---+-----+-------+
         """
         if isinstance(condition, str):
-            jdf = self._jdf.filter(condition)
+            ldf = self._ldf.filter(condition)
         elif isinstance(condition, Column):
-            jdf = self._jdf.filter(condition._jc)
+            ldf = self._ldf.filter(condition._expr)
         else:
             raise PySparkTypeError(
                 error_class="NOT_COLUMN_OR_STR",
                 message_parameters={"arg_name": "condition", "arg_type": type(condition).__name__},
             )
-        return DataFrame(jdf, self.sparkSession)
+        return self._to_df(ldf)
 
     @overload
     def groupBy(self, *cols: "ColumnOrNameOrOrdinal") -> "GroupedData":

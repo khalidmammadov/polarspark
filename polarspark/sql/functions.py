@@ -39,6 +39,8 @@ from typing import (
     ValuesView,
 )
 
+import polars as pl
+
 from polarspark import SparkContext
 from polarspark.errors import PySparkTypeError, PySparkValueError
 from polarspark.sql.column import Column#, _to_java_column, _to_seq, _create_column_from_literal
@@ -221,7 +223,8 @@ def col(col: str) -> Column:
     >>> column('x')
     Column<'x'>
     """
-    return _invoke_function("col", col)
+    # return _invoke_function("col", col)
+    return Column(pl.col(col))
 
 
 column = col
