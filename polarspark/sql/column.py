@@ -31,6 +31,8 @@ from typing import (
     Union,
 )
 
+import polars as pl
+
 from polarspark import copy_func
 from polarspark.context import SparkContext
 from polarspark.errors import PySparkAttributeError, PySparkTypeError, PySparkValueError
@@ -171,9 +173,9 @@ def _bin_op(
         self: "Column",
         other: Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"],
     ) -> "Column":
-        jc = other._jc if isinstance(other, Column) else other
-        njc = getattr(self._jc, name)(jc)
-        return Column(njc)
+        oc = other._expr if isinstance(other, Column) else other
+        new_expr = getattr(self._expr, name)(oc)
+        return Column(new_expr)
 
     _.__doc__ = doc
     return _
@@ -225,38 +227,39 @@ class Column:
     Column<...>
     """
 
-    # def __init__(self, jc: JavaObject) -> None:
-    #     self._jc = jc
+    def __init__(self, expr: pl.Expr) -> None:
+        self._expr: pl.Expr = expr
 
     # arithmetic operators
     __neg__ = _func_op("negate")
     __add__ = cast(
         Callable[["Column", Union["Column", "LiteralType", "DecimalLiteral"]], "Column"],
-        _bin_op("plus"),
+        _bin_op("__add__"),
     )
     __sub__ = cast(
         Callable[["Column", Union["Column", "LiteralType", "DecimalLiteral"]], "Column"],
-        _bin_op("minus"),
+        _bin_op("__sub__"),
     )
     __mul__ = cast(
         Callable[["Column", Union["Column", "LiteralType", "DecimalLiteral"]], "Column"],
-        _bin_op("multiply"),
+        _bin_op("__mul__"),
     )
     __div__ = cast(
         Callable[["Column", Union["Column", "LiteralType", "DecimalLiteral"]], "Column"],
-        _bin_op("divide"),
+        _bin_op("__div__"),
     )
     __truediv__ = cast(
         Callable[["Column", Union["Column", "LiteralType", "DecimalLiteral"]], "Column"],
-        _bin_op("divide"),
+        _bin_op("__truediv__"),
     )
     __mod__ = cast(
         Callable[["Column", Union["Column", "LiteralType", "DecimalLiteral"]], "Column"],
-        _bin_op("mod"),
+        _bin_op("__mod__"),
     )
     __radd__ = cast(
         Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"], _bin_op("plus")
     )
+    # FIX DOWNWARDS
     __rsub__ = _reverse_op("minus")
     __rmul__ = cast(
         Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"], _bin_op("multiply")
@@ -1185,24 +1188,25 @@ class Column:
         99
         """
 
-        metadata = kwargs.pop("metadata", None)
-        assert not kwargs, "Unexpected kwargs where passed: %s" % kwargs
-
-        sc = get_active_spark_context()
-        if len(alias) == 1:
-            if metadata:
-                assert sc._jvm is not None
-                jmeta = sc._jvm.org.apache.spark.sql.types.Metadata.fromJson(json.dumps(metadata))
-                return Column(getattr(self._jc, "as")(alias[0], jmeta))
-            else:
-                return Column(getattr(self._jc, "as")(alias[0]))
-        else:
-            if metadata:
-                raise PySparkValueError(
-                    error_class="ONLY_ALLOWED_FOR_SINGLE_COLUMN",
-                    message_parameters={"arg_name": "metadata"},
-                )
-            return Column(getattr(self._jc, "as")(_to_seq(sc, list(alias))))
+        # metadata = kwargs.pop("metadata", None)
+        # assert not kwargs, "Unexpected kwargs where passed: %s" % kwargs
+        #
+        # sc = get_active_spark_context()
+        # if len(alias) == 1:
+        #     if metadata:
+        #         assert sc._jvm is not None
+        #         jmeta = sc._jvm.org.apache.spark.sql.types.Metadata.fromJson(json.dumps(metadata))
+        #         return Column(getattr(self._jc, "as")(alias[0], jmeta))
+        #     else:
+        #         return Column(getattr(self._jc, "as")(alias[0]))
+        # else:
+        #     if metadata:
+        #         raise PySparkValueError(
+        #             error_class="ONLY_ALLOWED_FOR_SINGLE_COLUMN",
+        #             message_parameters={"arg_name": "metadata"},
+        #         )
+        #     return Column(getattr(self._jc, "as")(_to_seq(sc, list(alias))))
+        return Column(self._expr.alias(alias[0]))
 
     name = copy_func(alias, sinceversion=2.0, doc=":func:`name` is an alias for :func:`alias`.")
 
