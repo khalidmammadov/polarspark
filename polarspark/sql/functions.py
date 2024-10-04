@@ -95,9 +95,8 @@ def _invoke_function(name: str, *args: Any) -> Column:
     Invokes JVM function identified by name with args
     and wraps the result with :class:`~polarspark.sql.Column`.
     """
-    assert SparkContext._active_spark_context is not None
-    jf = _get_jvm_function(name, SparkContext._active_spark_context)
-    return Column(jf(*args))
+    func = getattr(pl, name)
+    return Column(func(*args))
 
 
 def _invoke_function_over_columns(name: str, *cols: "ColumnOrName") -> Column:
@@ -223,8 +222,7 @@ def col(col: str) -> Column:
     >>> column('x')
     Column<'x'>
     """
-    # return _invoke_function("col", col)
-    return Column(pl.col(col))
+    return _invoke_function("col", col)
 
 
 column = col
