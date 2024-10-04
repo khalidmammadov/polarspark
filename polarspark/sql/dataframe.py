@@ -5827,13 +5827,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 message_parameters={"arg_name": "colsMap", "arg_type": type(colsMap).__name__},
             )
 
-        col_names = list(colsMap.keys())
-        cols = list(colsMap.values())
-
-        return DataFrame(
-            self._jdf.withColumns(_to_seq(self._sc, col_names), self._jcols(*cols)),
-            self.sparkSession,
-        )
+        exprs = {n:c._expr for n, c in colsMap.items()}
+        return self._to_df(self._ldf.with_columns(**exprs))
 
     def withColumn(self, colName: str, col: Column) -> "DataFrame":
         """
@@ -5883,7 +5878,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="NOT_COLUMN",
                 message_parameters={"arg_name": "col", "arg_type": type(col).__name__},
             )
-        return DataFrame(self._jdf.withColumn(colName, col._jc), self.sparkSession)
+        return self._to_df(self._ldf.with_columns(col._expr.alias(colName)))
 
     def withColumnRenamed(self, existing: str, new: str) -> "DataFrame":
         """
@@ -5945,7 +5940,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |   5|  Bob|
         +----+-----+
         """
-        return DataFrame(self._jdf.withColumnRenamed(existing, new), self.sparkSession)
+        return self._to_df(self._ldf.rename({existing: new}))
 
     def withColumnsRenamed(self, colsMap: Dict[str, str]) -> "DataFrame":
         """
@@ -6020,7 +6015,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 message_parameters={"arg_name": "colsMap", "arg_type": type(colsMap).__name__},
             )
 
-        return DataFrame(self._jdf.withColumnsRenamed(colsMap), self.sparkSession)
+        return self._to_df(self._ldf.rename(colsMap))
 
     def withMetadata(self, columnName: str, metadata: Dict[str, Any]) -> "DataFrame":
         """Returns a new :class:`DataFrame` by updating an existing column with metadata.
