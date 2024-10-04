@@ -16,6 +16,7 @@
 #
 
 import sys
+import re
 import json
 import warnings
 from typing import (
@@ -47,8 +48,7 @@ __all__ = ["Column"]
 
 
 def _create_column_from_literal(literal: Union["LiteralType", "DecimalLiteral"]) -> "Column":
-    sc = get_active_spark_context()
-    return cast(JVMView, sc._jvm).functions.lit(literal)
+    return Column(pl.lit(literal))
 
 
 def _create_column_from_name(name: str) -> "Column":
@@ -137,25 +137,8 @@ def _unary_op(
 
 def _func_op(name: str, doc: str = "") -> Callable[["Column"], "Column"]:
     def _(self: "Column") -> "Column":
-        sc = get_active_spark_context()
-        jc = getattr(cast(JVMView, sc._jvm).functions, name)(self._jc)
-        return Column(jc)
-
-    _.__doc__ = doc
-    return _
-
-
-def _bin_func_op(
-    name: str,
-    reverse: bool = False,
-    doc: str = "binary function",
-) -> Callable[["Column", Union["Column", "LiteralType", "DecimalLiteral"]], "Column"]:
-    def _(self: "Column", other: Union["Column", "LiteralType", "DecimalLiteral"]) -> "Column":
-        sc = get_active_spark_context()
-        fn = getattr(cast(JVMView, sc._jvm).functions, name)
-        jc = other._jc if isinstance(other, Column) else _create_column_from_literal(other)
-        njc = fn(self._jc, jc) if not reverse else fn(jc, self._jc)
-        return Column(njc)
+        new_expr = getattr(self._expr, name)()
+        return Column(new_expr)
 
     _.__doc__ = doc
     return _
@@ -180,6 +163,24 @@ def _bin_op(
     _.__doc__ = doc
     return _
 
+def _bin_op_str(
+    name: str,
+    doc: str = "binary operator",
+) -> Callable[
+    ["Column", Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"]], "Column"
+]:
+    """Create a method for given binary operator"""
+
+    def _(
+        self: "Column",
+        other: Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"],
+    ) -> "Column":
+        oc = other._expr if isinstance(other, Column) else pl.lit(other)
+        new_expr = getattr(self._expr.str, name)(oc)
+        return Column(new_expr)
+
+    _.__doc__ = doc
+    return _
 
 def _reverse_op(
     name: str,
@@ -188,12 +189,21 @@ def _reverse_op(
     """Create a method for binary operator (this object is on right side)"""
 
     def _(self: "Column", other: Union["LiteralType", "DecimalLiteral"]) -> "Column":
-        jother = _create_column_from_literal(other)
-        jc = getattr(jother, name)(self._jc)
-        return Column(jc)
+        pother = _create_column_from_literal(other)
+        new_expr = getattr(pother._expr, name)(self._expr)
+        return Column(new_expr)
 
     _.__doc__ = doc
     return _
+
+
+def _like_to_regex(like_expression):
+    # Escape all regex metacharacters except for '%' and '_'
+    escaped = re.escape(like_expression)
+    # Replace escaped '%' with regex '.*' and escaped '_' with regex '.'
+    regex_pattern = escaped.replace(r'%', '.*').replace(r'_', '.')
+
+    return f"^{regex_pattern}$"
 
 
 class Column:
@@ -231,7 +241,7 @@ class Column:
         self._expr: pl.Expr = expr
 
     # arithmetic operators
-    __neg__ = _func_op("negate")
+    __neg__ = _func_op("__neg__")
     __add__ = cast(
         Callable[["Column", Union["Column", "LiteralType", "DecimalLiteral"]], "Column"],
         _bin_op("__add__"),
@@ -257,22 +267,18 @@ class Column:
         _bin_op("__mod__"),
     )
     __radd__ = cast(
-        Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"], _bin_op("plus")
+        Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"], _bin_op("__add__")
     )
-    # FIX DOWNWARDS
-    __rsub__ = _reverse_op("minus")
+    __rsub__ = _reverse_op("__rsub__")
     __rmul__ = cast(
-        Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"], _bin_op("multiply")
+        Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"], _bin_op("__rmul__")
     )
-    __rdiv__ = _reverse_op("divide")
-    __rtruediv__ = _reverse_op("divide")
-    __rmod__ = _reverse_op("mod")
+    __rdiv__ = _reverse_op("__rdiv__")
+    __rtruediv__ = _reverse_op("__rtruediv__")
+    __rmod__ = _reverse_op("__rmod__")
 
-    __pow__ = _bin_func_op("pow")
-    __rpow__ = cast(
-        Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"],
-        _bin_func_op("pow", reverse=True),
-    )
+    __pow__ = _bin_op("__pow__")
+    __rpow__ = _reverse_op("__pow__")
 
     # logistic operators
     def __eq__(  # type: ignore[override]
@@ -280,19 +286,19 @@ class Column:
         other: Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"],
     ) -> "Column":
         """binary function"""
-        return _bin_op("equalTo")(self, other)
+        return _bin_op("__eq__")(self, other)
 
     def __ne__(  # type: ignore[override]
         self,
         other: Any,
     ) -> "Column":
         """binary function"""
-        return _bin_op("notEqual")(self, other)
+        return _bin_op("__ne__")(self, other)
 
-    __lt__ = _bin_op("lt")
-    __le__ = _bin_op("leq")
-    __ge__ = _bin_op("geq")
-    __gt__ = _bin_op("gt")
+    __lt__ = _bin_op("__lt__")
+    __le__ = _bin_op("__le__")
+    __ge__ = _bin_op("__ge__")
+    __gt__ = _bin_op("__gt__")
 
     _eqNullSafe_doc = """
     Equality test that is safe for null values.
@@ -357,7 +363,8 @@ class Column:
     `NaN Semantics <https://spark.apache.org/docs/latest/sql-ref-datatypes.html#nan-semantics>`_
     for details.
     """
-    eqNullSafe = _bin_op("eqNullSafe", _eqNullSafe_doc)
+    # FIX NULL equality
+    eqNullSafe = _bin_op("__eq__", _eqNullSafe_doc)
 
     # `and`, `or`, `not` cannot be overloaded in Python,
     # so use bitwise operators as boolean operators
@@ -433,301 +440,302 @@ class Column:
     [Row((a ^ b)=225)]
     """
 
-    bitwiseOR = _bin_op("bitwiseOR", _bitwiseOR_doc)
-    bitwiseAND = _bin_op("bitwiseAND", _bitwiseAND_doc)
-    bitwiseXOR = _bin_op("bitwiseXOR", _bitwiseXOR_doc)
+    bitwiseOR = _bin_op("or_", _bitwiseOR_doc)
+    bitwiseAND = _bin_op("and_", _bitwiseAND_doc)
+    # Polars does not support XOR yet
+    # bitwiseXOR = _bin_op("bitwiseXOR", _bitwiseXOR_doc)
 
-    def getItem(self, key: Any) -> "Column":
-        """
-        An expression that gets an item at position ``ordinal`` out of a list,
-        or gets an item by key out of a dict.
+    # def getItem(self, key: Any) -> "Column":
+    #     """
+    #     An expression that gets an item at position ``ordinal`` out of a list,
+    #     or gets an item by key out of a dict.
+    #
+    #     .. versionadded:: 1.3.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     key
+    #         a literal value, or a :class:`Column` expression.
+    #         The result will only be true at a location if the item matches in the column.
+    #
+    #          .. deprecated:: 3.0.0
+    #              :class:`Column` as a parameter is deprecated.
+    #
+    #     Returns
+    #     -------
+    #     :class:`Column`
+    #         Column representing the item(s) got at position out of a list or by key out of a dict.
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.createDataFrame([([1, 2], {"key": "value"})], ["l", "d"])
+    #     >>> df.select(df.l.getItem(0), df.d.getItem("key")).show()
+    #     +----+------+
+    #     |l[0]|d[key]|
+    #     +----+------+
+    #     |   1| value|
+    #     +----+------+
+    #     """
+    #     if isinstance(key, Column):
+    #         warnings.warn(
+    #             "A column as 'key' in getItem is deprecated as of Spark 3.0, and will not "
+    #             "be supported in the future release. Use `column[key]` or `column.key` syntax "
+    #             "instead.",
+    #             FutureWarning,
+    #         )
+    #     return self[key]
 
-        .. versionadded:: 1.3.0
+    # def getField(self, name: Any) -> "Column":
+    #     """
+    #     An expression that gets a field by name in a :class:`StructType`.
+    #
+    #     .. versionadded:: 1.3.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     name
+    #         a literal value, or a :class:`Column` expression.
+    #         The result will only be true at a location if the field matches in the Column.
+    #
+    #          .. deprecated:: 3.0.0
+    #              :class:`Column` as a parameter is deprecated.
+    #     Returns
+    #     -------
+    #     :class:`Column`
+    #         Column representing whether each element of Column got by name.
+    #
+    #     Examples
+    #     --------
+    #     >>> from polarspark.sql import Row
+    #     >>> df = spark.createDataFrame([Row(r=Row(a=1, b="b"))])
+    #     >>> df.select(df.r.getField("b")).show()
+    #     +---+
+    #     |r.b|
+    #     +---+
+    #     |  b|
+    #     +---+
+    #     >>> df.select(df.r.a).show()
+    #     +---+
+    #     |r.a|
+    #     +---+
+    #     |  1|
+    #     +---+
+    #     """
+    #     if isinstance(name, Column):
+    #         warnings.warn(
+    #             "A column as 'name' in getField is deprecated as of Spark 3.0, and will not "
+    #             "be supported in the future release. Use `column[name]` or `column.name` syntax "
+    #             "instead.",
+    #             FutureWarning,
+    #         )
+    #     return self[name]
 
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
+    # def withField(self, fieldName: str, col: "Column") -> "Column":
+    #     """
+    #     An expression that adds/replaces a field in :class:`StructType` by name.
+    #
+    #     .. versionadded:: 3.1.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     fieldName : str
+    #         a literal value.
+    #         The result will only be true at a location if any field matches in the Column.
+    #     col : :class:`Column`
+    #         A :class:`Column` expression for the column with `fieldName`.
+    #
+    #     Returns
+    #     -------
+    #     :class:`Column`
+    #         Column representing whether each element of Column
+    #         which field was added/replaced by fieldName.
+    #
+    #     Examples
+    #     --------
+    #     >>> from polarspark.sql import Row
+    #     >>> from polarspark.sql.functions import lit
+    #     >>> df = spark.createDataFrame([Row(a=Row(b=1, c=2))])
+    #     >>> df.withColumn('a', df['a'].withField('b', lit(3))).select('a.b').show()
+    #     +---+
+    #     |  b|
+    #     +---+
+    #     |  3|
+    #     +---+
+    #     >>> df.withColumn('a', df['a'].withField('d', lit(4))).select('a.d').show()
+    #     +---+
+    #     |  d|
+    #     +---+
+    #     |  4|
+    #     +---+
+    #     """
+    #     if not isinstance(fieldName, str):
+    #         raise PySparkTypeError(
+    #             error_class="NOT_STR",
+    #             message_parameters={"arg_name": "fieldName", "arg_type": type(fieldName).__name__},
+    #         )
+    #
+    #     if not isinstance(col, Column):
+    #         raise PySparkTypeError(
+    #             error_class="NOT_COLUMN",
+    #             message_parameters={"arg_name": "col", "arg_type": type(col).__name__},
+    #         )
+    #
+    #     return Column(self._jc.withField(fieldName, col._jc))
 
-        Parameters
-        ----------
-        key
-            a literal value, or a :class:`Column` expression.
-            The result will only be true at a location if the item matches in the column.
+    # def dropFields(self, *fieldNames: str) -> "Column":
+    #     """
+    #     An expression that drops fields in :class:`StructType` by name.
+    #     This is a no-op if the schema doesn't contain field name(s).
+    #
+    #     .. versionadded:: 3.1.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     fieldNames : str
+    #         Desired field names (collects all positional arguments passed)
+    #         The result will drop at a location if any field matches in the Column.
+    #
+    #     Returns
+    #     -------
+    #     :class:`Column`
+    #         Column representing whether each element of Column with field dropped by fieldName.
+    #
+    #     Examples
+    #     --------
+    #     >>> from polarspark.sql import Row
+    #     >>> from polarspark.sql.functions import col, lit
+    #     >>> df = spark.createDataFrame([
+    #     ...     Row(a=Row(b=1, c=2, d=3, e=Row(f=4, g=5, h=6)))])
+    #     >>> df.withColumn('a', df['a'].dropFields('b')).show()
+    #     +-----------------+
+    #     |                a|
+    #     +-----------------+
+    #     |{2, 3, {4, 5, 6}}|
+    #     +-----------------+
+    #
+    #     >>> df.withColumn('a', df['a'].dropFields('b', 'c')).show()
+    #     +--------------+
+    #     |             a|
+    #     +--------------+
+    #     |{3, {4, 5, 6}}|
+    #     +--------------+
+    #
+    #     This method supports dropping multiple nested fields directly e.g.
+    #
+    #     >>> df.withColumn("a", col("a").dropFields("e.g", "e.h")).show()
+    #     +--------------+
+    #     |             a|
+    #     +--------------+
+    #     |{1, 2, 3, {4}}|
+    #     +--------------+
+    #
+    #     However, if you are going to add/replace multiple nested fields,
+    #     it is preferred to extract out the nested struct before
+    #     adding/replacing multiple fields e.g.
+    #
+    #     >>> df.select(col("a").withField(
+    #     ...     "e", col("a.e").dropFields("g", "h")).alias("a")
+    #     ... ).show()
+    #     +--------------+
+    #     |             a|
+    #     +--------------+
+    #     |{1, 2, 3, {4}}|
+    #     +--------------+
+    #
+    #     """
+    #     sc = get_active_spark_context()
+    #     jc = self._jc.dropFields(_to_seq(sc, fieldNames))
+    #     return Column(jc)
 
-             .. deprecated:: 3.0.0
-                 :class:`Column` as a parameter is deprecated.
+    # def __getattr__(self, item: Any) -> "Column":
+    #     """
+    #     An expression that gets an item at position ``ordinal`` out of a list,
+    #     or gets an item by key out of a dict.
+    #
+    #     .. versionadded:: 1.3.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     item
+    #         a literal value.
+    #
+    #     Returns
+    #     -------
+    #     :class:`Column`
+    #         Column representing the item got by key out of a dict.
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.createDataFrame([('abcedfg', {"key": "value"})], ["l", "d"])
+    #     >>> df.select(df.d.key).show()
+    #     +------+
+    #     |d[key]|
+    #     +------+
+    #     | value|
+    #     +------+
+    #     """
+    #     if item.startswith("__"):
+    #         raise PySparkAttributeError(
+    #             error_class="CANNOT_ACCESS_TO_DUNDER",
+    #             message_parameters={},
+    #         )
+    #     return self[item]
 
-        Returns
-        -------
-        :class:`Column`
-            Column representing the item(s) got at position out of a list or by key out of a dict.
-
-        Examples
-        --------
-        >>> df = spark.createDataFrame([([1, 2], {"key": "value"})], ["l", "d"])
-        >>> df.select(df.l.getItem(0), df.d.getItem("key")).show()
-        +----+------+
-        |l[0]|d[key]|
-        +----+------+
-        |   1| value|
-        +----+------+
-        """
-        if isinstance(key, Column):
-            warnings.warn(
-                "A column as 'key' in getItem is deprecated as of Spark 3.0, and will not "
-                "be supported in the future release. Use `column[key]` or `column.key` syntax "
-                "instead.",
-                FutureWarning,
-            )
-        return self[key]
-
-    def getField(self, name: Any) -> "Column":
-        """
-        An expression that gets a field by name in a :class:`StructType`.
-
-        .. versionadded:: 1.3.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        name
-            a literal value, or a :class:`Column` expression.
-            The result will only be true at a location if the field matches in the Column.
-
-             .. deprecated:: 3.0.0
-                 :class:`Column` as a parameter is deprecated.
-        Returns
-        -------
-        :class:`Column`
-            Column representing whether each element of Column got by name.
-
-        Examples
-        --------
-        >>> from polarspark.sql import Row
-        >>> df = spark.createDataFrame([Row(r=Row(a=1, b="b"))])
-        >>> df.select(df.r.getField("b")).show()
-        +---+
-        |r.b|
-        +---+
-        |  b|
-        +---+
-        >>> df.select(df.r.a).show()
-        +---+
-        |r.a|
-        +---+
-        |  1|
-        +---+
-        """
-        if isinstance(name, Column):
-            warnings.warn(
-                "A column as 'name' in getField is deprecated as of Spark 3.0, and will not "
-                "be supported in the future release. Use `column[name]` or `column.name` syntax "
-                "instead.",
-                FutureWarning,
-            )
-        return self[name]
-
-    def withField(self, fieldName: str, col: "Column") -> "Column":
-        """
-        An expression that adds/replaces a field in :class:`StructType` by name.
-
-        .. versionadded:: 3.1.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        fieldName : str
-            a literal value.
-            The result will only be true at a location if any field matches in the Column.
-        col : :class:`Column`
-            A :class:`Column` expression for the column with `fieldName`.
-
-        Returns
-        -------
-        :class:`Column`
-            Column representing whether each element of Column
-            which field was added/replaced by fieldName.
-
-        Examples
-        --------
-        >>> from polarspark.sql import Row
-        >>> from polarspark.sql.functions import lit
-        >>> df = spark.createDataFrame([Row(a=Row(b=1, c=2))])
-        >>> df.withColumn('a', df['a'].withField('b', lit(3))).select('a.b').show()
-        +---+
-        |  b|
-        +---+
-        |  3|
-        +---+
-        >>> df.withColumn('a', df['a'].withField('d', lit(4))).select('a.d').show()
-        +---+
-        |  d|
-        +---+
-        |  4|
-        +---+
-        """
-        if not isinstance(fieldName, str):
-            raise PySparkTypeError(
-                error_class="NOT_STR",
-                message_parameters={"arg_name": "fieldName", "arg_type": type(fieldName).__name__},
-            )
-
-        if not isinstance(col, Column):
-            raise PySparkTypeError(
-                error_class="NOT_COLUMN",
-                message_parameters={"arg_name": "col", "arg_type": type(col).__name__},
-            )
-
-        return Column(self._jc.withField(fieldName, col._jc))
-
-    def dropFields(self, *fieldNames: str) -> "Column":
-        """
-        An expression that drops fields in :class:`StructType` by name.
-        This is a no-op if the schema doesn't contain field name(s).
-
-        .. versionadded:: 3.1.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        fieldNames : str
-            Desired field names (collects all positional arguments passed)
-            The result will drop at a location if any field matches in the Column.
-
-        Returns
-        -------
-        :class:`Column`
-            Column representing whether each element of Column with field dropped by fieldName.
-
-        Examples
-        --------
-        >>> from polarspark.sql import Row
-        >>> from polarspark.sql.functions import col, lit
-        >>> df = spark.createDataFrame([
-        ...     Row(a=Row(b=1, c=2, d=3, e=Row(f=4, g=5, h=6)))])
-        >>> df.withColumn('a', df['a'].dropFields('b')).show()
-        +-----------------+
-        |                a|
-        +-----------------+
-        |{2, 3, {4, 5, 6}}|
-        +-----------------+
-
-        >>> df.withColumn('a', df['a'].dropFields('b', 'c')).show()
-        +--------------+
-        |             a|
-        +--------------+
-        |{3, {4, 5, 6}}|
-        +--------------+
-
-        This method supports dropping multiple nested fields directly e.g.
-
-        >>> df.withColumn("a", col("a").dropFields("e.g", "e.h")).show()
-        +--------------+
-        |             a|
-        +--------------+
-        |{1, 2, 3, {4}}|
-        +--------------+
-
-        However, if you are going to add/replace multiple nested fields,
-        it is preferred to extract out the nested struct before
-        adding/replacing multiple fields e.g.
-
-        >>> df.select(col("a").withField(
-        ...     "e", col("a.e").dropFields("g", "h")).alias("a")
-        ... ).show()
-        +--------------+
-        |             a|
-        +--------------+
-        |{1, 2, 3, {4}}|
-        +--------------+
-
-        """
-        sc = get_active_spark_context()
-        jc = self._jc.dropFields(_to_seq(sc, fieldNames))
-        return Column(jc)
-
-    def __getattr__(self, item: Any) -> "Column":
-        """
-        An expression that gets an item at position ``ordinal`` out of a list,
-        or gets an item by key out of a dict.
-
-        .. versionadded:: 1.3.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        item
-            a literal value.
-
-        Returns
-        -------
-        :class:`Column`
-            Column representing the item got by key out of a dict.
-
-        Examples
-        --------
-        >>> df = spark.createDataFrame([('abcedfg', {"key": "value"})], ["l", "d"])
-        >>> df.select(df.d.key).show()
-        +------+
-        |d[key]|
-        +------+
-        | value|
-        +------+
-        """
-        if item.startswith("__"):
-            raise PySparkAttributeError(
-                error_class="CANNOT_ACCESS_TO_DUNDER",
-                message_parameters={},
-            )
-        return self[item]
-
-    def __getitem__(self, k: Any) -> "Column":
-        """
-        An expression that gets an item at position ``ordinal`` out of a list,
-        or gets an item by key out of a dict.
-
-        .. versionadded:: 1.3.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        k
-            a literal value, or a slice object without step.
-
-        Returns
-        -------
-        :class:`Column`
-            Column representing the item got by key out of a dict, or substrings sliced by
-            the given slice object.
-
-        Examples
-        --------
-        >>> df = spark.createDataFrame([('abcedfg', {"key": "value"})], ["l", "d"])
-        >>> df.select(df.l[slice(1, 3)], df.d['key']).show()
-        +---------------+------+
-        |substr(l, 1, 3)|d[key]|
-        +---------------+------+
-        |            abc| value|
-        +---------------+------+
-        """
-        if isinstance(k, slice):
-            if k.step is not None:
-                raise PySparkValueError(
-                    error_class="SLICE_WITH_STEP",
-                    message_parameters={},
-                )
-            return self.substr(k.start, k.stop)
-        else:
-            return _bin_op("apply")(self, k)
+    # def __getitem__(self, k: Any) -> "Column":
+    #     """
+    #     An expression that gets an item at position ``ordinal`` out of a list,
+    #     or gets an item by key out of a dict.
+    #
+    #     .. versionadded:: 1.3.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     k
+    #         a literal value, or a slice object without step.
+    #
+    #     Returns
+    #     -------
+    #     :class:`Column`
+    #         Column representing the item got by key out of a dict, or substrings sliced by
+    #         the given slice object.
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.createDataFrame([('abcedfg', {"key": "value"})], ["l", "d"])
+    #     >>> df.select(df.l[slice(1, 3)], df.d['key']).show()
+    #     +---------------+------+
+    #     |substr(l, 1, 3)|d[key]|
+    #     +---------------+------+
+    #     |            abc| value|
+    #     +---------------+------+
+    #     """
+    #     if isinstance(k, slice):
+    #         if k.step is not None:
+    #             raise PySparkValueError(
+    #                 error_class="SLICE_WITH_STEP",
+    #                 message_parameters={},
+    #             )
+    #         return self.substr(k.start, k.stop)
+    #     else:
+    #         return _bin_op("apply")(self, k)
 
     def __iter__(self) -> None:
         raise PySparkTypeError(
@@ -794,9 +802,9 @@ class Column:
     []
     """
 
-    contains = _bin_op("contains", _contains_doc)
-    startswith = _bin_op("startsWith", _startswith_doc)
-    endswith = _bin_op("endsWith", _endswith_doc)
+    contains = _bin_op_str("contains", _contains_doc)
+    startswith = _bin_op_str("starts_with", _startswith_doc)
+    endswith = _bin_op_str("ends_with", _endswith_doc)
 
     def like(self: "Column", other: str) -> "Column":
         """
@@ -827,8 +835,9 @@ class Column:
         >>> df.filter(df.name.like('Al%')).collect()
         [Row(age=2, name='Alice')]
         """
-        njc = getattr(self._jc, "like")(other)
-        return Column(njc)
+        regex_pattern = _like_to_regex(other)
+
+        return self.contains(regex_pattern)
 
     def rlike(self: "Column", other: str) -> "Column":
         """
@@ -856,43 +865,42 @@ class Column:
         >>> df.filter(df.name.rlike('ice$')).collect()
         [Row(age=2, name='Alice')]
         """
-        njc = getattr(self._jc, "rlike")(other)
-        return Column(njc)
+        return self.contains(other)
 
-    def ilike(self: "Column", other: str) -> "Column":
-        """
-        SQL ILIKE expression (case insensitive LIKE). Returns a boolean :class:`Column`
-        based on a case insensitive match.
-
-        .. versionadded:: 3.3.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        other : str
-            a SQL LIKE pattern
-
-        See Also
-        --------
-        polarspark.sql.Column.rlike
-
-        Returns
-        -------
-        :class:`Column`
-            Column of booleans showing whether each element
-            in the Column is matched by SQL LIKE pattern.
-
-        Examples
-        --------
-        >>> df = spark.createDataFrame(
-        ...      [(2, "Alice"), (5, "Bob")], ["age", "name"])
-        >>> df.filter(df.name.ilike('%Ice')).collect()
-        [Row(age=2, name='Alice')]
-        """
-        njc = getattr(self._jc, "ilike")(other)
-        return Column(njc)
+    # def ilike(self: "Column", other: str) -> "Column":
+    #     """
+    #     SQL ILIKE expression (case insensitive LIKE). Returns a boolean :class:`Column`
+    #     based on a case insensitive match.
+    #
+    #     .. versionadded:: 3.3.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     other : str
+    #         a SQL LIKE pattern
+    #
+    #     See Also
+    #     --------
+    #     polarspark.sql.Column.rlike
+    #
+    #     Returns
+    #     -------
+    #     :class:`Column`
+    #         Column of booleans showing whether each element
+    #         in the Column is matched by SQL LIKE pattern.
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.createDataFrame(
+    #     ...      [(2, "Alice"), (5, "Bob")], ["age", "name"])
+    #     >>> df.filter(df.name.ilike('%Ice')).collect()
+    #     [Row(age=2, name='Alice')]
+    #     """
+    #     njc = getattr(self._jc, "ilike")(other)
+    #     return Column(njc)
 
     @overload
     def substr(self, startPos: int, length: int) -> "Column":
@@ -941,15 +949,15 @@ class Column:
                 },
             )
         if isinstance(startPos, int):
-            jc = self._jc.substr(startPos, length)
+            pc = self._expr.str.slice(startPos-1, length)
         elif isinstance(startPos, Column):
-            jc = self._jc.substr(startPos._jc, cast("Column", length)._jc)
+            pc = self._expr.str.slice(startPos._expr-1, cast("Column", length)._expr)
         else:
             raise PySparkTypeError(
                 error_class="NOT_COLUMN_OR_INT",
                 message_parameters={"arg_name": "startPos", "arg_type": type(startPos).__name__},
             )
-        return Column(jc)
+        return Column(pc)
 
     def isin(self, *cols: Any) -> "Column":
         """
@@ -1006,13 +1014,11 @@ class Column:
         """
         if len(cols) == 1 and isinstance(cols[0], (list, set)):
             cols = cast(Tuple, cols[0])
-        cols = cast(
-            Tuple,
-            [c._jc if isinstance(c, Column) else _create_column_from_literal(c) for c in cols],
-        )
-        sc = get_active_spark_context()
-        jc = getattr(self._jc, "isin")(_to_seq(sc, cols))
-        return Column(jc)
+        # cols = cast(
+        #     Tuple,
+        #     [c._expr if isinstance(c, Column) else _create_column_from_literal(c)._expr for c in cols],
+        # )
+        return Column(self._expr.is_in(cols))
 
     # order
     _asc_doc = """
@@ -1514,7 +1520,7 @@ class Column:
     __bool__ = __nonzero__
 
     def __repr__(self) -> str:
-        return "Column<'%s'>" % self._jc.toString()
+        return "Column<'%s'>" % str(self._expr)
 
 
 def _test() -> None:
