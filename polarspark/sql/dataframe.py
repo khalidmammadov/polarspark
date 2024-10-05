@@ -6017,43 +6017,43 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         return self._to_df(self._ldf.rename(colsMap))
 
-    def withMetadata(self, columnName: str, metadata: Dict[str, Any]) -> "DataFrame":
-        """Returns a new :class:`DataFrame` by updating an existing column with metadata.
-
-        .. versionadded:: 3.3.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Parameters
-        ----------
-        columnName : str
-            string, name of the existing column to update the metadata.
-        metadata : dict
-            dict, new metadata to be assigned to df.schema[columnName].metadata
-
-        Returns
-        -------
-        :class:`DataFrame`
-            DataFrame with updated metadata column.
-
-        Examples
-        --------
-        >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")], schema=["age", "name"])
-        >>> df_meta = df.withMetadata('age', {'foo': 'bar'})
-        >>> df_meta.schema['age'].metadata
-        {'foo': 'bar'}
-        """
-        if not isinstance(metadata, dict):
-            raise PySparkTypeError(
-                error_class="NOT_DICT",
-                message_parameters={"arg_name": "metadata", "arg_type": type(metadata).__name__},
-            )
-        sc = get_active_spark_context()
-        jmeta = cast(JVMView, sc._jvm).org.apache.spark.sql.types.Metadata.fromJson(
-            json.dumps(metadata)
-        )
-        return DataFrame(self._jdf.withMetadata(columnName, jmeta), self.sparkSession)
+    # def withMetadata(self, columnName: str, metadata: Dict[str, Any]) -> "DataFrame":
+    #     """Returns a new :class:`DataFrame` by updating an existing column with metadata.
+    #
+    #     .. versionadded:: 3.3.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Parameters
+    #     ----------
+    #     columnName : str
+    #         string, name of the existing column to update the metadata.
+    #     metadata : dict
+    #         dict, new metadata to be assigned to df.schema[columnName].metadata
+    #
+    #     Returns
+    #     -------
+    #     :class:`DataFrame`
+    #         DataFrame with updated metadata column.
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")], schema=["age", "name"])
+    #     >>> df_meta = df.withMetadata('age', {'foo': 'bar'})
+    #     >>> df_meta.schema['age'].metadata
+    #     {'foo': 'bar'}
+    #     """
+    #     if not isinstance(metadata, dict):
+    #         raise PySparkTypeError(
+    #             error_class="NOT_DICT",
+    #             message_parameters={"arg_name": "metadata", "arg_type": type(metadata).__name__},
+    #         )
+    #     sc = get_active_spark_context()
+    #     jmeta = cast(JVMView, sc._jvm).org.apache.spark.sql.types.Metadata.fromJson(
+    #         json.dumps(metadata)
+    #     )
+    #     return DataFrame(self._jdf.withMetadata(columnName, jmeta), self.sparkSession)
 
     @overload
     def drop(self, cols: "ColumnOrName") -> "DataFrame":
@@ -6193,28 +6193,19 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 16|  Bob|    1|
         +---+-----+-----+
         """
-        column_names: List[str] = []
-        java_columns: List[JavaObject] = []
-
+        columns: List[str, pl.Expr] = []
         for c in cols:
             if isinstance(c, str):
-                column_names.append(c)
+                columns.append(c)
             elif isinstance(c, Column):
-                java_columns.append(c._jc)
+                columns.append(c._expr)
             else:
                 raise PySparkTypeError(
                     error_class="NOT_COLUMN_OR_STR",
                     message_parameters={"arg_name": "col", "arg_type": type(c).__name__},
                 )
 
-        jdf = self._jdf
-        if len(java_columns) > 0:
-            first_column, *remaining_columns = java_columns
-            jdf = jdf.drop(first_column, self._jseq(remaining_columns))
-        if len(column_names) > 0:
-            jdf = jdf.drop(self._jseq(column_names))
-
-        return DataFrame(jdf, self.sparkSession)
+        return self._to_df(self._ldf.drop(*columns))
 
     def toDF(self, *cols: str) -> "DataFrame":
         """Returns a new :class:`DataFrame` that with new specified column names
@@ -6255,8 +6246,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                     error_class="NOT_LIST_OF_STR",
                     message_parameters={"arg_name": "cols", "arg_type": type(col).__name__},
                 )
-        jdf = self._jdf.toDF(self._jseq(cols))
-        return DataFrame(jdf, self.sparkSession)
+        mapping = dict(zip(self.columns, cols))
+
+        return self._to_df(self._ldf.rename(mapping))
 
     def transform(self, func: Callable[..., "DataFrame"], *args: Any, **kwargs: Any) -> "DataFrame":
         """Returns a new :class:`DataFrame`. Concise syntax for chaining custom transformations.
@@ -6319,84 +6311,84 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ), "Func returned an instance of type [%s], " "should have been DataFrame." % type(result)
         return result
 
-    def sameSemantics(self, other: "DataFrame") -> bool:
-        """
-        Returns `True` when the logical query plans inside both :class:`DataFrame`\\s are equal and
-        therefore return the same results.
+    # def sameSemantics(self, other: "DataFrame") -> bool:
+    #     """
+    #     Returns `True` when the logical query plans inside both :class:`DataFrame`\\s are equal and
+    #     therefore return the same results.
+    #
+    #     .. versionadded:: 3.1.0
+    #
+    #     .. versionchanged:: 3.5.0
+    #         Supports Spark Connect.
+    #
+    #     Notes
+    #     -----
+    #     The equality comparison here is simplified by tolerating the cosmetic differences
+    #     such as attribute names.
+    #
+    #     This API can compare both :class:`DataFrame`\\s very fast but can still return
+    #     `False` on the :class:`DataFrame` that return the same results, for instance, from
+    #     different plans. Such false negative semantic can be useful when caching as an example.
+    #
+    #     This API is a developer API.
+    #
+    #     Parameters
+    #     ----------
+    #     other : :class:`DataFrame`
+    #         The other DataFrame to compare against.
+    #
+    #     Returns
+    #     -------
+    #     bool
+    #         Whether these two DataFrames are similar.
+    #
+    #     Examples
+    #     --------
+    #     >>> df1 = spark.range(10)
+    #     >>> df2 = spark.range(10)
+    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id * 2))
+    #     True
+    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id + 2))
+    #     False
+    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col0", df2.id * 2))
+    #     True
+    #     """
+    #     if not isinstance(other, DataFrame):
+    #         raise PySparkTypeError(
+    #             error_class="NOT_STR",
+    #             message_parameters={"arg_name": "other", "arg_type": type(other).__name__},
+    #         )
+    #     return self._jdf.sameSemantics(other._jdf)
 
-        .. versionadded:: 3.1.0
-
-        .. versionchanged:: 3.5.0
-            Supports Spark Connect.
-
-        Notes
-        -----
-        The equality comparison here is simplified by tolerating the cosmetic differences
-        such as attribute names.
-
-        This API can compare both :class:`DataFrame`\\s very fast but can still return
-        `False` on the :class:`DataFrame` that return the same results, for instance, from
-        different plans. Such false negative semantic can be useful when caching as an example.
-
-        This API is a developer API.
-
-        Parameters
-        ----------
-        other : :class:`DataFrame`
-            The other DataFrame to compare against.
-
-        Returns
-        -------
-        bool
-            Whether these two DataFrames are similar.
-
-        Examples
-        --------
-        >>> df1 = spark.range(10)
-        >>> df2 = spark.range(10)
-        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id * 2))
-        True
-        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id + 2))
-        False
-        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col0", df2.id * 2))
-        True
-        """
-        if not isinstance(other, DataFrame):
-            raise PySparkTypeError(
-                error_class="NOT_STR",
-                message_parameters={"arg_name": "other", "arg_type": type(other).__name__},
-            )
-        return self._jdf.sameSemantics(other._jdf)
-
-    def semanticHash(self) -> int:
-        """
-        Returns a hash code of the logical query plan against this :class:`DataFrame`.
-
-        .. versionadded:: 3.1.0
-
-        .. versionchanged:: 3.5.0
-            Supports Spark Connect.
-
-        Notes
-        -----
-        Unlike the standard hash code, the hash is calculated against the query plan
-        simplified by tolerating the cosmetic differences such as attribute names.
-
-        This API is a developer API.
-
-        Returns
-        -------
-        int
-            Hash value.
-
-        Examples
-        --------
-        >>> spark.range(10).selectExpr("id as col0").semanticHash()  # doctest: +SKIP
-        1855039936
-        >>> spark.range(10).selectExpr("id as col1").semanticHash()  # doctest: +SKIP
-        1855039936
-        """
-        return self._jdf.semanticHash()
+    # def semanticHash(self) -> int:
+    #     """
+    #     Returns a hash code of the logical query plan against this :class:`DataFrame`.
+    #
+    #     .. versionadded:: 3.1.0
+    #
+    #     .. versionchanged:: 3.5.0
+    #         Supports Spark Connect.
+    #
+    #     Notes
+    #     -----
+    #     Unlike the standard hash code, the hash is calculated against the query plan
+    #     simplified by tolerating the cosmetic differences such as attribute names.
+    #
+    #     This API is a developer API.
+    #
+    #     Returns
+    #     -------
+    #     int
+    #         Hash value.
+    #
+    #     Examples
+    #     --------
+    #     >>> spark.range(10).selectExpr("id as col0").semanticHash()  # doctest: +SKIP
+    #     1855039936
+    #     >>> spark.range(10).selectExpr("id as col1").semanticHash()  # doctest: +SKIP
+    #     1855039936
+    #     """
+    #     return self._jdf.semanticHash()
 
     def inputFiles(self) -> List[str]:
         """
