@@ -92,11 +92,24 @@ def _get_jvm_function(name: str, sc: SparkContext) -> Callable:
 
 def _invoke_function(name: str, *args: Any) -> Column:
     """
-    Invokes JVM function identified by name with args
+    Invokes Polar function identified by name with args
     and wraps the result with :class:`~polarspark.sql.Column`.
     """
     func = getattr(pl, name)
     return Column(func(*args))
+
+
+def _invoke_function_over_column(name: str, col: Column) -> Column:
+    """
+    Invokes Polar function identified by name with args
+    and wraps the result with :class:`~polarspark.sql.Column`.
+    """
+    aliases = {
+        "count": "len",
+        "avg": "mean"
+    }
+    func = getattr(col._expr, aliases.get(name) or name)
+    return Column(func().alias(f"{name}({str(col._expr)})"))
 
 
 def _invoke_function_over_columns(name: str, *cols: "ColumnOrName") -> Column:
@@ -104,6 +117,7 @@ def _invoke_function_over_columns(name: str, *cols: "ColumnOrName") -> Column:
     Invokes n-ary JVM function identified by name
     and wraps the result with :class:`~polarspark.sql.Column`.
     """
+    # func = getattr(pl, name)
     return _invoke_function(name, *(_to_java_column(col) for col in cols))
 
 
@@ -893,7 +907,7 @@ def max(col: "ColumnOrName") -> Column:
     |       NaN|
     +----------+
     """
-    return _invoke_function_over_columns("max", col)
+    return _invoke_function_over_column("max", col)
 
 
 @_try_remote_functions
@@ -982,7 +996,7 @@ def min(col: "ColumnOrName") -> Column:
     |          1|        100|
     +-----------+-----------+
     """
-    return _invoke_function_over_columns("min", col)
+    return _invoke_function_over_column("min", col)
 
 
 @_try_remote_functions
@@ -1171,7 +1185,7 @@ def count(col: "ColumnOrName") -> Column:
     |       4|               3|
     +--------+----------------+
     """
-    return _invoke_function_over_columns("count", col)
+    return _invoke_function_over_column("counut", col)
 
 
 @_try_remote_functions
@@ -1204,7 +1218,7 @@ def sum(col: "ColumnOrName") -> Column:
     |     45|
     +-------+
     """
-    return _invoke_function_over_columns("sum", col)
+    return _invoke_function_over_column("sum", col)
 
 
 @_try_remote_functions
@@ -1237,7 +1251,7 @@ def avg(col: "ColumnOrName") -> Column:
     |    4.5|
     +-------+
     """
-    return _invoke_function_over_columns("avg", col)
+    return _invoke_function_over_column("avg", col)
 
 
 @_try_remote_functions
@@ -1271,7 +1285,7 @@ def mean(col: "ColumnOrName") -> Column:
     |    4.5|
     +-------+
     """
-    return _invoke_function_over_columns("mean", col)
+    return _invoke_function_over_column("mean", col)
 
 
 @_try_remote_functions
@@ -1310,7 +1324,7 @@ def median(col: "ColumnOrName") -> Column:
     |dotNET|         10000.0|
     +------+----------------+
     """
-    return _invoke_function_over_columns("median", col)
+    return _invoke_function_over_column("median", col)
 
 
 @_try_remote_functions
