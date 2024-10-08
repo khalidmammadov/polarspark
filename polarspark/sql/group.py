@@ -32,41 +32,38 @@ if TYPE_CHECKING:
 
 __all__ = ["GroupedData"]
 
+aliases = {
+    "avg": "mean",
+    "count": "len"
+}
 
-def dfapi(alias=None):
-    def wrapper(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
-        def _api(self: "GroupedData") -> DataFrame:
-            name = alias if alias else f.__name__
-            pdf = getattr(self._pgd, name)()
-            if alias:
-                pdf = pdf.rename({alias:f.__name__})
-            return DataFrame(pdf, self.session)
+def dfapi(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
+    def _api(self: "GroupedData") -> DataFrame:
+        alias = aliases.get(f.__name__)
+        name = alias or f.__name__
+        pdf = getattr(self._pgd, name)()
+        if alias:
+            pdf = pdf.rename({alias:f.__name__})
+        return DataFrame(pdf, self.session)
 
-        _api.__name__ = f.__name__
-        _api.__doc__ = f.__doc__
-        return _api
-    return wrapper
+    _api.__name__ = f.__name__
+    _api.__doc__ = f.__doc__
+    return _api
 
 
-def df_varargs_api(alias=None):
-    def wrapper(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
-        def _api(self: "GroupedData", *cols: str) -> DataFrame:
-            name = alias if alias and not callable(alias) else f.__name__
-            exprs = []
-            for c in cols:
-                e = getattr(pl.col(c), name)().alias(f"{f.__name__}({c})")
-                exprs.append(e)
-            pdf = self._pgd.agg(*exprs)
-            return DataFrame(pdf, self.session)
+def df_varargs_api(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
+    def _api(self: "GroupedData", *cols: str) -> DataFrame:
+        name = aliases.get(f.__name__) or f.__name__
+        exprs = []
+        for c in cols:
+            e = getattr(pl.col(c), name)().alias(f"{f.__name__}({c})")
+            exprs.append(e)
+        pdf = self._pgd.agg(*exprs)
+        return DataFrame(pdf, self.session)
 
-        _api.__name__ = f.__name__
-        _api.__doc__ = f.__doc__
-        return _api
-    # Check decorator without arguments
-    if callable(alias):
-        # alias is the func
-        return wrapper(alias)
-    return wrapper
+    _api.__name__ = f.__name__
+    _api.__doc__ = f.__doc__
+    return _api
 
 
 class GroupedData(PandasGroupedOpsMixin):
@@ -188,15 +185,22 @@ class GroupedData(PandasGroupedOpsMixin):
         """
         assert exprs, "exprs should not be empty"
         if len(exprs) == 1 and isinstance(exprs[0], dict):
-            jdf = self._pgd.agg(exprs[0])
+            _exprs = []
+            for k, v in exprs[0].items():
+                alias = aliases.get(v)
+                e = getattr(pl.col(k), alias or v)().alias(f"{v}({k})")
+                _exprs.append(e)
+            pdf = self._pgd.agg(*_exprs)
         else:
             # Columns
             assert all(isinstance(c, Column) for c in exprs), "all exprs should be Column"
-            exprs = cast(Tuple[Column, ...], exprs)
-            jdf = self._pgd.agg(exprs[0]._jc, _to_seq(self.session._sc, [c._jc for c in exprs[1:]]))
-        return DataFrame(jdf, self.session)
+            _exprs = []
+            for c in exprs:
+                _exprs.append(c._expr)
+            pdf = self._pgd.agg(*_exprs)
+        return DataFrame(pdf, self.session)
 
-    @dfapi(alias="len")
+    @dfapi
     def count(self) -> DataFrame:
         """Counts the number of records for each group.
 
@@ -247,7 +251,7 @@ class GroupedData(PandasGroupedOpsMixin):
             column names. Non-numeric columns are ignored.
         """
 
-    @df_varargs_api(alias="mean")
+    @df_varargs_api
     def avg(self, *cols: str) -> DataFrame:
         """Computes average values for each numeric columns for each group.
 
