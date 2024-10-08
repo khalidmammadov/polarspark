@@ -4014,10 +4014,20 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  Bob|  5|    1|
         +-----+---+-----+
         """
-        jgd = self._jdf.groupBy(self._jcols_ordinal(*cols))
+        by = []
+        for c in cols:
+            if isinstance(c, Column):
+                by.append(c._expr)
+            elif isinstance(c, str):
+                by.append(pl.col(c))
+            elif isinstance(c, int):
+                by.append(self[c]._expr)
+            else:
+                raise ValueError("NOT_COLUMN_STR_INT. Grouping column must be"
+                                 "either Column, str or int")
         from polarspark.sql.group import GroupedData
 
-        return GroupedData(jgd, self)
+        return GroupedData(self._ldf.group_by(by), self)
 
     @overload
     def rollup(self, *cols: "ColumnOrName") -> "GroupedData":
@@ -6390,40 +6400,40 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #     """
     #     return self._jdf.semanticHash()
 
-    def inputFiles(self) -> List[str]:
-        """
-        Returns a best-effort snapshot of the files that compose this :class:`DataFrame`.
-        This method simply asks each constituent BaseRelation for its respective files and
-        takes the union of all results. Depending on the source relations, this may not find
-        all input files. Duplicates are removed.
-
-        .. versionadded:: 3.1.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Returns
-        -------
-        list
-            List of file paths.
-
-        Examples
-        --------
-        >>> import tempfile
-        >>> with tempfile.TemporaryDirectory() as d:
-        ...     # Write a single-row DataFrame into a JSON file
-        ...     spark.createDataFrame(
-        ...         [{"age": 100, "name": "Hyukjin Kwon"}]
-        ...     ).repartition(1).write.json(d, mode="overwrite")
-        ...
-        ...     # Read the JSON file as a DataFrame.
-        ...     df = spark.read.format("json").load(d)
-        ...
-        ...     # Returns the number of input files.
-        ...     len(df.inputFiles())
-        1
-        """
-        return list(self._jdf.inputFiles())
+    # def inputFiles(self) -> List[str]:
+    #     """
+    #     Returns a best-effort snapshot of the files that compose this :class:`DataFrame`.
+    #     This method simply asks each constituent BaseRelation for its respective files and
+    #     takes the union of all results. Depending on the source relations, this may not find
+    #     all input files. Duplicates are removed.
+    #
+    #     .. versionadded:: 3.1.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Returns
+    #     -------
+    #     list
+    #         List of file paths.
+    #
+    #     Examples
+    #     --------
+    #     >>> import tempfile
+    #     >>> with tempfile.TemporaryDirectory() as d:
+    #     ...     # Write a single-row DataFrame into a JSON file
+    #     ...     spark.createDataFrame(
+    #     ...         [{"age": 100, "name": "Hyukjin Kwon"}]
+    #     ...     ).repartition(1).write.json(d, mode="overwrite")
+    #     ...
+    #     ...     # Read the JSON file as a DataFrame.
+    #     ...     df = spark.read.format("json").load(d)
+    #     ...
+    #     ...     # Returns the number of input files.
+    #     ...     len(df.inputFiles())
+    #     1
+    #     """
+    #     return self._ldf.collect().files()
 
     where = copy_func(filter, sinceversion=1.3, doc=":func:`where` is an alias for :func:`filter`.")
 
@@ -6476,83 +6486,83 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         return DataFrameWriterV2(self, table)
 
-    # Keep to_pandas_on_spark for backward compatibility for now.
-    def to_pandas_on_spark(
-        self, index_col: Optional[Union[str, List[str]]] = None
-    ) -> "PandasOnSparkDataFrame":
-        warnings.warn(
-            "DataFrame.to_pandas_on_spark is deprecated. Use DataFrame.pandas_api instead.",
-            FutureWarning,
-        )
-        return self.pandas_api(index_col)
-
-    def pandas_api(
-        self, index_col: Optional[Union[str, List[str]]] = None
-    ) -> "PandasOnSparkDataFrame":
-        """
-        Converts the existing DataFrame into a pandas-on-Spark DataFrame.
-
-        .. versionadded:: 3.2.0
-
-        .. versionchanged:: 3.5.0
-            Supports Spark Connect.
-
-        If a pandas-on-Spark DataFrame is converted to a Spark DataFrame and then back
-        to pandas-on-Spark, it will lose the index information and the original index
-        will be turned into a normal column.
-
-        This is only available if Pandas is installed and available.
-
-        Parameters
-        ----------
-        index_col: str or list of str, optional, default: None
-            Index column of table in Spark.
-
-        Returns
-        -------
-        :class:`PandasOnSparkDataFrame`
-
-        See Also
-        --------
-        polarspark.pandas.frame.DataFrame.to_spark
-
-        Examples
-        --------
-        >>> df = spark.createDataFrame(
-        ...     [(14, "Tom"), (23, "Alice"), (16, "Bob")], ["age", "name"])
-
-        >>> df.pandas_api()  # doctest: +SKIP
-           age   name
-        0   14    Tom
-        1   23  Alice
-        2   16    Bob
-
-        We can specify the index columns.
-
-        >>> df.pandas_api(index_col="age")  # doctest: +SKIP
-              name
-        age
-        14     Tom
-        23   Alice
-        16     Bob
-        """
-        from polarspark.pandas.namespace import _get_index_map
-        from polarspark.pandas.frame import DataFrame as PandasOnSparkDataFrame
-        from polarspark.pandas.internal import InternalFrame
-
-        index_spark_columns, index_names = _get_index_map(self, index_col)
-        internal = InternalFrame(
-            spark_frame=self,
-            index_spark_columns=index_spark_columns,
-            index_names=index_names,  # type: ignore[arg-type]
-        )
-        return PandasOnSparkDataFrame(internal)
-
-    # Keep to_koalas for backward compatibility for now.
-    def to_koalas(
-        self, index_col: Optional[Union[str, List[str]]] = None
-    ) -> "PandasOnSparkDataFrame":
-        return self.pandas_api(index_col)
+    # # Keep to_pandas_on_spark for backward compatibility for now.
+    # def to_pandas_on_spark(
+    #     self, index_col: Optional[Union[str, List[str]]] = None
+    # ) -> "PandasOnSparkDataFrame":
+    #     warnings.warn(
+    #         "DataFrame.to_pandas_on_spark is deprecated. Use DataFrame.pandas_api instead.",
+    #         FutureWarning,
+    #     )
+    #     return self.pandas_api(index_col)
+    #
+    # def pandas_api(
+    #     self, index_col: Optional[Union[str, List[str]]] = None
+    # ) -> "PandasOnSparkDataFrame":
+    #     """
+    #     Converts the existing DataFrame into a pandas-on-Spark DataFrame.
+    #
+    #     .. versionadded:: 3.2.0
+    #
+    #     .. versionchanged:: 3.5.0
+    #         Supports Spark Connect.
+    #
+    #     If a pandas-on-Spark DataFrame is converted to a Spark DataFrame and then back
+    #     to pandas-on-Spark, it will lose the index information and the original index
+    #     will be turned into a normal column.
+    #
+    #     This is only available if Pandas is installed and available.
+    #
+    #     Parameters
+    #     ----------
+    #     index_col: str or list of str, optional, default: None
+    #         Index column of table in Spark.
+    #
+    #     Returns
+    #     -------
+    #     :class:`PandasOnSparkDataFrame`
+    #
+    #     See Also
+    #     --------
+    #     polarspark.pandas.frame.DataFrame.to_spark
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.createDataFrame(
+    #     ...     [(14, "Tom"), (23, "Alice"), (16, "Bob")], ["age", "name"])
+    #
+    #     >>> df.pandas_api()  # doctest: +SKIP
+    #        age   name
+    #     0   14    Tom
+    #     1   23  Alice
+    #     2   16    Bob
+    #
+    #     We can specify the index columns.
+    #
+    #     >>> df.pandas_api(index_col="age")  # doctest: +SKIP
+    #           name
+    #     age
+    #     14     Tom
+    #     23   Alice
+    #     16     Bob
+    #     """
+    #     from polarspark.pandas.namespace import _get_index_map
+    #     from polarspark.pandas.frame import DataFrame as PandasOnSparkDataFrame
+    #     from polarspark.pandas.internal import InternalFrame
+    #
+    #     index_spark_columns, index_names = _get_index_map(self, index_col)
+    #     internal = InternalFrame(
+    #         spark_frame=self,
+    #         index_spark_columns=index_spark_columns,
+    #         index_names=index_names,  # type: ignore[arg-type]
+    #     )
+    #     return PandasOnSparkDataFrame(internal)
+    #
+    # # Keep to_koalas for backward compatibility for now.
+    # def to_koalas(
+    #     self, index_col: Optional[Union[str, List[str]]] = None
+    # ) -> "PandasOnSparkDataFrame":
+    #     return self.pandas_api(index_col)
 
     def _to_df(self, ldf: LazyFrame) -> "DataFrame":
         return DataFrame(ldf, self.sparkSession)

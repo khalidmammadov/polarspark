@@ -19,39 +19,54 @@ import sys
 
 from typing import Callable, List, Optional, TYPE_CHECKING, overload, Dict, Union, cast, Tuple
 
-from py4j.java_gateway import JavaObject
+from polarspark.sql.column import Column
+from polarspark.sql.session import SparkSession
+from polarspark.sql.dataframe import DataFrame
+from polarspark.sql.pandas.group_ops import PandasGroupedOpsMixin
 
-from pyspark.sql.column import Column, _to_seq
-from pyspark.sql.session import SparkSession
-from pyspark.sql.dataframe import DataFrame
-from pyspark.sql.pandas.group_ops import PandasGroupedOpsMixin
+import polars as pl
+from polars.lazyframe.group_by import LazyGroupBy
 
 if TYPE_CHECKING:
-    from pyspark.sql._typing import LiteralType
+    from polarspark.sql._typing import LiteralType
 
 __all__ = ["GroupedData"]
 
 
-def dfapi(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
-    def _api(self: "GroupedData") -> DataFrame:
-        name = f.__name__
-        jdf = getattr(self._jgd, name)()
-        return DataFrame(jdf, self.session)
+def dfapi(alias=None):
+    def wrapper(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
+        def _api(self: "GroupedData") -> DataFrame:
+            name = alias if alias else f.__name__
+            pdf = getattr(self._pgd, name)()
+            if alias:
+                pdf = pdf.rename({alias:f.__name__})
+            return DataFrame(pdf, self.session)
 
-    _api.__name__ = f.__name__
-    _api.__doc__ = f.__doc__
-    return _api
+        _api.__name__ = f.__name__
+        _api.__doc__ = f.__doc__
+        return _api
+    return wrapper
 
 
-def df_varargs_api(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
-    def _api(self: "GroupedData", *cols: str) -> DataFrame:
-        name = f.__name__
-        jdf = getattr(self._jgd, name)(_to_seq(self.session._sc, cols))
-        return DataFrame(jdf, self.session)
+def df_varargs_api(alias=None):
+    def wrapper(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
+        def _api(self: "GroupedData", *cols: str) -> DataFrame:
+            name = alias if alias and not callable(alias) else f.__name__
+            exprs = []
+            for c in cols:
+                e = getattr(pl.col(c), name)().alias(f"{f.__name__}({c})")
+                exprs.append(e)
+            pdf = self._pgd.agg(*exprs)
+            return DataFrame(pdf, self.session)
 
-    _api.__name__ = f.__name__
-    _api.__doc__ = f.__doc__
-    return _api
+        _api.__name__ = f.__name__
+        _api.__doc__ = f.__doc__
+        return _api
+    # Check decorator without arguments
+    if callable(alias):
+        # alias is the func
+        return wrapper(alias)
+    return wrapper
 
 
 class GroupedData(PandasGroupedOpsMixin):
@@ -65,18 +80,13 @@ class GroupedData(PandasGroupedOpsMixin):
         Supports Spark Connect.
     """
 
-    def __init__(self, jgd: JavaObject, df: DataFrame):
-        self._jgd = jgd
+    def __init__(self, pgd: LazyGroupBy, df: DataFrame):
+        self._pgd = pgd
         self._df = df
         self.session: SparkSession = df.sparkSession
 
     def __repr__(self) -> str:
-        index = 26  # index to truncate string from the JVM side
-        jvm_string = self._jgd.toString()
-        if jvm_string is not None and len(jvm_string) > index and jvm_string[index] == "[":
-            return f"GroupedData{jvm_string[index:]}"
-        else:
-            return super().__repr__()
+        return f"GroupedData{self._pgd}"
 
     @overload
     def agg(self, *exprs: Column) -> DataFrame:
@@ -93,14 +103,14 @@ class GroupedData(PandasGroupedOpsMixin):
 
         1. built-in aggregation functions, such as `avg`, `max`, `min`, `sum`, `count`
 
-        2. group aggregate pandas UDFs, created with :func:`pyspark.sql.functions.pandas_udf`
+        2. group aggregate pandas UDFs, created with :func:`polarspark.sql.functions.pandas_udf`
 
            .. note:: There is no partial aggregation with group aggregate UDFs, i.e.,
                a full shuffle is required. Also, all the data of a group will be loaded into
                memory, so the user should be aware of the potential OOM risk if data is skewed
                and certain groups are too large to fit in memory.
 
-           .. seealso:: :func:`pyspark.sql.functions.pandas_udf`
+           .. seealso:: :func:`polarspark.sql.functions.pandas_udf`
 
         If ``exprs`` is a single :class:`dict` mapping from string to string, then the key
         is the column to perform aggregation on, and the value is the aggregate function.
@@ -125,8 +135,8 @@ class GroupedData(PandasGroupedOpsMixin):
 
         Examples
         --------
-        >>> from pyspark.sql import functions as sf
-        >>> from pyspark.sql.functions import pandas_udf, PandasUDFType
+        >>> from polarspark.sql import functions as sf
+        >>> from polarspark.sql.functions import pandas_udf, PandasUDFType
         >>> df = spark.createDataFrame(
         ...      [(2, "Alice"), (3, "Alice"), (5, "Bob"), (10, "Bob")], ["age", "name"])
         >>> df.show()
@@ -178,15 +188,15 @@ class GroupedData(PandasGroupedOpsMixin):
         """
         assert exprs, "exprs should not be empty"
         if len(exprs) == 1 and isinstance(exprs[0], dict):
-            jdf = self._jgd.agg(exprs[0])
+            jdf = self._pgd.agg(exprs[0])
         else:
             # Columns
             assert all(isinstance(c, Column) for c in exprs), "all exprs should be Column"
             exprs = cast(Tuple[Column, ...], exprs)
-            jdf = self._jgd.agg(exprs[0]._jc, _to_seq(self.session._sc, [c._jc for c in exprs[1:]]))
+            jdf = self._pgd.agg(exprs[0]._jc, _to_seq(self.session._sc, [c._jc for c in exprs[1:]]))
         return DataFrame(jdf, self.session)
 
-    @dfapi
+    @dfapi(alias="len")
     def count(self) -> DataFrame:
         """Counts the number of records for each group.
 
@@ -237,7 +247,7 @@ class GroupedData(PandasGroupedOpsMixin):
             column names. Non-numeric columns are ignored.
         """
 
-    @df_varargs_api
+    @df_varargs_api(alias="mean")
     def avg(self, *cols: str) -> DataFrame:
         """Computes average values for each numeric columns for each group.
 
@@ -452,7 +462,7 @@ class GroupedData(PandasGroupedOpsMixin):
 
         Examples
         --------
-        >>> from pyspark.sql import Row
+        >>> from polarspark.sql import Row
         >>> df1 = spark.createDataFrame([
         ...     Row(course="dotNET", year=2012, earnings=10000),
         ...     Row(course="Java", year=2012, earnings=20000),
@@ -517,23 +527,23 @@ class GroupedData(PandasGroupedOpsMixin):
         +----+-----+------+
         """
         if values is None:
-            jgd = self._jgd.pivot(pivot_col)
+            jgd = self._pgd.pivot(pivot_col)
         else:
-            jgd = self._jgd.pivot(pivot_col, values)
+            jgd = self._pgd.pivot(pivot_col, values)
         return GroupedData(jgd, self._df)
 
 
 def _test() -> None:
     import doctest
-    from pyspark.sql import SparkSession
-    import pyspark.sql.group
+    from polarspark.sql import SparkSession
+    import polarspark.sql.group
 
-    globs = pyspark.sql.group.__dict__.copy()
+    globs = polarspark.sql.group.__dict__.copy()
     spark = SparkSession.builder.master("local[4]").appName("sql.group tests").getOrCreate()
     globs["spark"] = spark
 
     (failure_count, test_count) = doctest.testmod(
-        pyspark.sql.group,
+        polarspark.sql.group,
         globs=globs,
         optionflags=doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE | doctest.REPORT_NDIFF,
     )
