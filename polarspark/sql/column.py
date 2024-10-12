@@ -237,7 +237,8 @@ class Column:
     Column<...>
     """
 
-    def __init__(self, expr: pl.Expr) -> None:
+    def __init__(self, expr: pl.Expr, if_sorted: bool = False) -> None:
+        self._sorted = if_sorted
         self._expr: pl.Expr = expr
 
     # arithmetic operators
@@ -1021,138 +1022,150 @@ class Column:
         return Column(self._expr.is_in(cols))
 
     # order
-    _asc_doc = """
-    Returns a sort expression based on the ascending order of the column.
+    def asc(self):
+        """
+        Returns a sort expression based on the ascending order of the column.
 
-    .. versionchanged:: 3.4.0
-        Supports Spark Connect.
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
-    Examples
-    --------
-    >>> from polarspark.sql import Row
-    >>> df = spark.createDataFrame([('Tom', 80), ('Alice', None)], ["name", "height"])
-    >>> df.select(df.name).orderBy(df.name.asc()).collect()
-    [Row(name='Alice'), Row(name='Tom')]
-    """
-    _asc_nulls_first_doc = """
-    Returns a sort expression based on ascending order of the column, and null values
-    return before non-null values.
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> df = spark.createDataFrame([('Tom', 80), ('Alice', None)], ["name", "height"])
+        >>> df.select(df.name).orderBy(df.name.asc()).collect()
+        [Row(name='Alice'), Row(name='Tom')]
+        """
+        return Column(self._expr.sort(), if_sorted=True)
 
-    .. versionadded:: 2.4.0
+    def asc_nulls_first(self):
+        """
+        Returns a sort expression based on ascending order of the column, and null values
+        return before non-null values.
 
-    .. versionchanged:: 3.4.0
-        Supports Spark Connect.
+        .. versionadded:: 2.4.0
 
-    Examples
-    --------
-    >>> from polarspark.sql import Row
-    >>> df = spark.createDataFrame([('Tom', 80), (None, 60), ('Alice', None)], ["name", "height"])
-    >>> df.select(df.name).orderBy(df.name.asc_nulls_first()).collect()
-    [Row(name=None), Row(name='Alice'), Row(name='Tom')]
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
-    """
-    _asc_nulls_last_doc = """
-    Returns a sort expression based on ascending order of the column, and null values
-    appear after non-null values.
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> df = spark.createDataFrame([('Tom', 80), (None, 60), ('Alice', None)], ["name", "height"])
+        >>> df.select(df.name).orderBy(df.name.asc_nulls_first()).collect()
+        [Row(name=None), Row(name='Alice'), Row(name='Tom')]
 
-    .. versionadded:: 2.4.0
+        """
+        return Column(self._expr.sort(nulls_last=False))
 
-    .. versionchanged:: 3.4.0
-        Supports Spark Connect.
+    def asc_nulls_last(self):
+        """
+        Returns a sort expression based on ascending order of the column, and null values
+        appear after non-null values.
 
-    Examples
-    --------
-    >>> from polarspark.sql import Row
-    >>> df = spark.createDataFrame([('Tom', 80), (None, 60), ('Alice', None)], ["name", "height"])
-    >>> df.select(df.name).orderBy(df.name.asc_nulls_last()).collect()
-    [Row(name='Alice'), Row(name='Tom'), Row(name=None)]
+        .. versionadded:: 2.4.0
 
-    """
-    _desc_doc = """
-    Returns a sort expression based on the descending order of the column.
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
-    .. versionadded:: 2.4.0
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> df = spark.createDataFrame([('Tom', 80), (None, 60), ('Alice', None)], ["name", "height"])
+        >>> df.select(df.name).orderBy(df.name.asc_nulls_last()).collect()
+        [Row(name='Alice'), Row(name='Tom'), Row(name=None)]
 
-    .. versionchanged:: 3.4.0
-        Supports Spark Connect.
+        """
+        return Column(self._expr.sort(nulls_last=True), if_sorted=True)
 
-    Examples
-    --------
-    >>> from polarspark.sql import Row
-    >>> df = spark.createDataFrame([('Tom', 80), ('Alice', None)], ["name", "height"])
-    >>> df.select(df.name).orderBy(df.name.desc()).collect()
-    [Row(name='Tom'), Row(name='Alice')]
-    """
-    _desc_nulls_first_doc = """
-    Returns a sort expression based on the descending order of the column, and null values
-    appear before non-null values.
+    def desc(self):
+        """
+        Returns a sort expression based on the descending order of the column.
 
-    .. versionadded:: 2.4.0
+        .. versionadded:: 2.4.0
 
-    .. versionchanged:: 3.4.0
-        Supports Spark Connect.
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
-    Examples
-    --------
-    >>> from polarspark.sql import Row
-    >>> df = spark.createDataFrame([('Tom', 80), (None, 60), ('Alice', None)], ["name", "height"])
-    >>> df.select(df.name).orderBy(df.name.desc_nulls_first()).collect()
-    [Row(name=None), Row(name='Tom'), Row(name='Alice')]
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> df = spark.createDataFrame([('Tom', 80), ('Alice', None)], ["name", "height"])
+        >>> df.select(df.name).orderBy(df.name.desc()).collect()
+        [Row(name='Tom'), Row(name='Alice')]
+        """
+        return Column(self._expr.sort(descending=True), if_sorted=True)
 
-    """
-    _desc_nulls_last_doc = """
-    Returns a sort expression based on the descending order of the column, and null values
-    appear after non-null values.
+    def desc_nulls_first(self):
+        """
+        Returns a sort expression based on the descending order of the column, and null values
+        appear before non-null values.
 
-    .. versionadded:: 2.4.0
+        .. versionadded:: 2.4.0
 
-    .. versionchanged:: 3.4.0
-        Supports Spark Connect.
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
-    Examples
-    --------
-    >>> from polarspark.sql import Row
-    >>> df = spark.createDataFrame([('Tom', 80), (None, 60), ('Alice', None)], ["name", "height"])
-    >>> df.select(df.name).orderBy(df.name.desc_nulls_last()).collect()
-    [Row(name='Tom'), Row(name='Alice'), Row(name=None)]
-    """
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> df = spark.createDataFrame([('Tom', 80), (None, 60), ('Alice', None)], ["name", "height"])
+        >>> df.select(df.name).orderBy(df.name.desc_nulls_first()).collect()
+        [Row(name=None), Row(name='Tom'), Row(name='Alice')]
 
-    asc = _unary_op("asc", _asc_doc)
-    asc_nulls_first = _unary_op("asc_nulls_first", _asc_nulls_first_doc)
-    asc_nulls_last = _unary_op("asc_nulls_last", _asc_nulls_last_doc)
-    desc = _unary_op("desc", _desc_doc)
-    desc_nulls_first = _unary_op("desc_nulls_first", _desc_nulls_first_doc)
-    desc_nulls_last = _unary_op("desc_nulls_last", _desc_nulls_last_doc)
+        """
+        return Column(self._expr.sort(descending=True, nulls_last=False), if_sorted=True)
 
-    _isNull_doc = """
-    True if the current expression is null.
+    def desc_nulls_last(self):
+        """
+        Returns a sort expression based on the descending order of the column, and null values
+        appear after non-null values.
 
-    .. versionchanged:: 3.4.0
-        Supports Spark Connect.
+        .. versionadded:: 2.4.0
 
-    Examples
-    --------
-    >>> from polarspark.sql import Row
-    >>> df = spark.createDataFrame([Row(name='Tom', height=80), Row(name='Alice', height=None)])
-    >>> df.filter(df.height.isNull()).collect()
-    [Row(name='Alice', height=None)]
-    """
-    _isNotNull_doc = """
-    True if the current expression is NOT null.
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
-    .. versionchanged:: 3.4.0
-        Supports Spark Connect.
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> df = spark.createDataFrame([('Tom', 80), (None, 60), ('Alice', None)], ["name", "height"])
+        >>> df.select(df.name).orderBy(df.name.desc_nulls_last()).collect()
+        [Row(name='Tom'), Row(name='Alice'), Row(name=None)]
+        """
+        return Column(self._expr.sort(descending=True, nulls_last=True), if_sorted=True)
 
-    Examples
-    --------
-    >>> from polarspark.sql import Row
-    >>> df = spark.createDataFrame([Row(name='Tom', height=80), Row(name='Alice', height=None)])
-    >>> df.filter(df.height.isNotNull()).collect()
-    [Row(name='Tom', height=80)]
-    """
+    def isNull(self):
+        """
+        True if the current expression is null.
 
-    isNull = _unary_op("isNull", _isNull_doc)
-    isNotNull = _unary_op("isNotNull", _isNotNull_doc)
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> df = spark.createDataFrame([Row(name='Tom', height=80), Row(name='Alice', height=None)])
+        >>> df.filter(df.height.isNull()).collect()
+        [Row(name='Alice', height=None)]
+        """
+        return Column(self._expr.is_null())
+
+    def isNotNull(self):
+        """
+        True if the current expression is NOT null.
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
+        Examples
+        --------
+        >>> from polarspark.sql import Row
+        >>> df = spark.createDataFrame([Row(name='Tom', height=80), Row(name='Alice', height=None)])
+        >>> df.filter(df.height.isNotNull()).collect()
+        [Row(name='Tom', height=80)]
+        """
+        return Column(self._expr.is_not_null())
 
     def alias(self, *alias: str, **kwargs: Any) -> "Column":
         """
