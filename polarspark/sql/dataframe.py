@@ -3015,8 +3015,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  2|Alice|
         +---+-----+
         """
-        jdf = self._jdf.sortWithinPartitions(self._sort_cols(cols, kwargs))
-        return DataFrame(jdf, self.sparkSession)
+        # Since there is only one partition
+        return self.sort(*cols, **kwargs)
 
     def sort(
         self,
@@ -3175,32 +3175,53 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  2|Alice|
         +---+-----+
         """
-        jdf = self._jdf.sort(self._sort_cols(cols, kwargs))
-        return DataFrame(jdf, self.sparkSession)
+        if not cols:
+            raise PySparkValueError(
+                error_class="CANNOT_BE_EMPTY",
+                message_parameters={"item": "column"},
+            )
+        if len(cols) == 1 and isinstance(cols[0], list):
+            cols = cols[0]
+
+        by = []
+        for c in cols:
+            if isinstance(c, Column):
+                if c._sorted:
+                    by.append(c)
+                else:
+                    by.append(c.asc())
+            elif isinstance(c, str):
+                by.append(self[c].asc())
+            elif isinstance(c, int):
+                if c > 0:
+                    by.append(self[c - 1].asc())
+                elif c < 0:
+                    by.append(self[c - 1].desc())
+                else:
+                    raise IndexError("Column ordinal must not be zero!")
+            else:
+                raise ValueError("NOT_COLUMN_STR_INT. Grouping column must be"
+                                 "either Column, str or int")
+
+        ascending = kwargs.get("ascending", True)
+        if isinstance(ascending, (bool, int)):
+            if not ascending:
+                by = [b.desc() for b in by]
+        elif isinstance(ascending, list):
+            by = [b if asc else b.desc() for asc, b in zip(ascending, by)]
+        else:
+            raise PySparkTypeError(
+                error_class="NOT_BOOL_OR_LIST",
+                message_parameters={"arg_name": "ascending", "arg_type": type(ascending).__name__},
+            )
+
+        by = [b._expr for b in by]
+
+        # We use by as expression based sort is done in projection
+        return self._to_df(self._ldf.with_columns(*by))
 
     orderBy = sort
 
-    # def _jseq(
-    #     self,
-    #     cols: Sequence,
-    #     converter: Optional[Callable[..., Union["PrimitiveType", JavaObject]]] = None,
-    # ) -> JavaObject:
-    #     """Return a JVM Seq of Columns from a list of Column or names"""
-    #     return _to_seq(self.sparkSession._sc, cols, converter)
-    #
-    # def _jmap(self, jm: Dict) -> JavaObject:
-    #     """Return a JVM Scala Map from a dict"""
-    #     return _to_scala_map(self.sparkSession._sc, jm)
-    #
-    # def _jcols(self, *cols: "ColumnOrName") -> JavaObject:
-    #     """Return a JVM Seq of Columns from a list of Column or column names
-    #
-    #     If `cols` has only one list in it, cols[0] will be used as the list.
-    #     """
-    #     if len(cols) == 1 and isinstance(cols[0], list):
-    #         cols = cols[0]
-    #     return self._jseq(cols, _to_java_column)
-    #
     # def _jcols_ordinal(self, *cols: "ColumnOrNameOrOrdinal") -> JavaObject:
     #     """Return a JVM Seq of Columns from a list of Column or column names or column ordinals.
     #
@@ -3220,49 +3241,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #         else:
     #             _cols.append(c)  # type: ignore[arg-type]
     #     return self._jseq(_cols, _to_java_column)
-
-    # def _sort_cols(
-    #     self,
-    #     cols: Sequence[Union[int, str, Column, List[Union[int, str, Column]]]],
-    #     kwargs: Dict[str, Any],
-    # ) -> JavaObject:
-    #     """Return a JVM Seq of Columns that describes the sort order"""
-    #     if not cols:
-    #         raise PySparkValueError(
-    #             error_class="CANNOT_BE_EMPTY",
-    #             message_parameters={"item": "column"},
-    #         )
-    #     if len(cols) == 1 and isinstance(cols[0], list):
-    #         cols = cols[0]
-    #
-    #     jcols = []
-    #     for c in cols:
-    #         if isinstance(c, int) and not isinstance(c, bool):
-    #             # TODO: should introduce dedicated error class
-    #             # ordinal is 1-based
-    #             if c > 0:
-    #                 _c = self[c - 1]
-    #             # negative ordinal means sort by desc
-    #             elif c < 0:
-    #                 _c = self[-c - 1].desc()
-    #             else:
-    #                 raise IndexError("Column ordinal must not be zero!")
-    #         else:
-    #             _c = c  # type: ignore[assignment]
-    #         jcols.append(_to_java_column(cast("ColumnOrName", _c)))
-    #
-    #     ascending = kwargs.get("ascending", True)
-    #     if isinstance(ascending, (bool, int)):
-    #         if not ascending:
-    #             jcols = [jc.desc() for jc in jcols]
-    #     elif isinstance(ascending, list):
-    #         jcols = [jc if asc else jc.desc() for asc, jc in zip(ascending, jcols)]
-    #     else:
-    #         raise PySparkTypeError(
-    #             error_class="NOT_BOOL_OR_LIST",
-    #             message_parameters={"arg_name": "ascending", "arg_type": type(ascending).__name__},
-    #         )
-    #     return self._jseq(jcols)
 
     def describe(self, *cols: Union[str, List[str]]) -> "DataFrame":
         """Computes basic statistics for numeric and string columns.
