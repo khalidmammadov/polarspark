@@ -22,6 +22,7 @@ from typing import Callable, List, Optional, TYPE_CHECKING, overload, Dict, Unio
 from polarspark.sql.column import Column
 from polarspark.sql.session import SparkSession
 from polarspark.sql.dataframe import DataFrame
+from polarspark.sql.functions import col
 from polarspark.sql.pandas.group_ops import PandasGroupedOpsMixin
 
 import polars as pl
@@ -56,8 +57,13 @@ def df_varargs_api(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
         name = aliases.get(f.__name__) or f.__name__
         exprs = []
         for c in cols:
-            e = getattr(pl.col(c), name)().alias(f"{f.__name__}({c})")
-            exprs.append(e)
+            if self._pivot_col:
+                for value in self._pivot_values:
+                    e = pl.col(c).filter(pl.col(self._pivot_col) == value).sum().alias(value)
+                    exprs.append(e)
+            else:
+                e = getattr(pl.col(c), name)().alias(f"{f.__name__}({c})")
+                exprs.append(e)
         pdf = self._pgd.agg(*exprs)
         return DataFrame(pdf, self.session)
 
@@ -77,9 +83,16 @@ class GroupedData(PandasGroupedOpsMixin):
         Supports Spark Connect.
     """
 
-    def __init__(self, pgd: LazyGroupBy, df: DataFrame):
+    def __init__(self,
+                 pgd: LazyGroupBy,
+                 df: DataFrame,
+                 pivot_col: str=None,
+                 pivot_values: List[str] = None ):#, by: list[pl.Expr] = None):
         self._pgd = pgd
         self._df = df
+        self._pivot_col = pivot_col
+        self._pivot_values = pivot_values
+        # self._by = by
         self.session: SparkSession = df.sparkSession
 
     def __repr__(self) -> str:
@@ -529,12 +542,12 @@ class GroupedData(PandasGroupedOpsMixin):
         |2012|20000| 15000|
         |2013|30000| 48000|
         +----+-----+------+
-        """
+        # """
         if values is None:
-            jgd = self._pgd.pivot(pivot_col)
-        else:
-            jgd = self._pgd.pivot(pivot_col, values)
-        return GroupedData(jgd, self._df)
+            values = [r[0]
+                      for r in
+                      self._df.select(col(pivot_col)).distinct().collect()]
+        return GroupedData(self._pgd, self._df, pivot_col = pivot_col, pivot_values = values)
 
 
 def _test() -> None:
