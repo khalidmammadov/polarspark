@@ -21,6 +21,7 @@ import sys
 import random
 import warnings
 from collections.abc import Iterable
+from collections import OrderedDict
 from functools import reduce
 from typing import (
     Any,
@@ -139,6 +140,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self,
         ldf: LazyFrame,
         sql_ctx: Union["SQLContext", "SparkSession"],
+        alias: Optional[str] = None
     ):
         from polarspark.sql.context import SQLContext
 
@@ -158,7 +160,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self._session: "SparkSession" = session
 
         self._sc: SparkContext = sql_ctx._sc
-        # self._jdf: JavaObject = jdf
         self._ldf: LazyFrame = ldf
         self.is_cached = False
         # initialized lazily
@@ -167,6 +168,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         # Check whether _repr_html is supported or not, we use it to avoid calling _jdf twice
         # by __repr__ and _repr_html_ while eager evaluation opens.
         self._support_repr_html = False
+        self._alias = alias
 
     @property
     def sql_ctx(self) -> "SQLContext":
@@ -224,59 +226,59 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #         )
     #     return self._lazy_rdd
 
-    @property
-    def na(self) -> "DataFrameNaFunctions":
-        """Returns a :class:`DataFrameNaFunctions` for handling missing values.
+    # @property
+    # def na(self) -> "DataFrameNaFunctions":
+    #     """Returns a :class:`DataFrameNaFunctions` for handling missing values.
+    #
+    #     .. versionadded:: 1.3.1
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Returns
+    #     -------
+    #     :class:`DataFrameNaFunctions`
+    #
+    #     Examples
+    #     --------
+    #     >>> df = spark.sql("SELECT 1 AS c1, int(NULL) AS c2")
+    #     >>> type(df.na)
+    #     <class '...dataframe.DataFrameNaFunctions'>
+    #
+    #     Replace the missing values as 2.
+    #
+    #     >>> df.na.fill(2).show()
+    #     +---+---+
+    #     | c1| c2|
+    #     +---+---+
+    #     |  1|  2|
+    #     +---+---+
+    #     """
+    #     return DataFrameNaFunctions(self)
 
-        .. versionadded:: 1.3.1
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Returns
-        -------
-        :class:`DataFrameNaFunctions`
-
-        Examples
-        --------
-        >>> df = spark.sql("SELECT 1 AS c1, int(NULL) AS c2")
-        >>> type(df.na)
-        <class '...dataframe.DataFrameNaFunctions'>
-
-        Replace the missing values as 2.
-
-        >>> df.na.fill(2).show()
-        +---+---+
-        | c1| c2|
-        +---+---+
-        |  1|  2|
-        +---+---+
-        """
-        return DataFrameNaFunctions(self)
-
-    @property
-    def stat(self) -> "DataFrameStatFunctions":
-        """Returns a :class:`DataFrameStatFunctions` for statistic functions.
-
-        .. versionadded:: 1.4.0
-
-        .. versionchanged:: 3.4.0
-            Supports Spark Connect.
-
-        Returns
-        -------
-        :class:`DataFrameStatFunctions`
-
-        Examples
-        --------
-        >>> import polarspark.sql.functions as f
-        >>> df = spark.range(3).withColumn("c", f.expr("id + 1"))
-        >>> type(df.stat)
-        <class '...dataframe.DataFrameStatFunctions'>
-        >>> df.stat.corr("id", "c")
-        1.0
-        """
-        return DataFrameStatFunctions(self)
+    # @property
+    # def stat(self) -> "DataFrameStatFunctions":
+    #     """Returns a :class:`DataFrameStatFunctions` for statistic functions.
+    #
+    #     .. versionadded:: 1.4.0
+    #
+    #     .. versionchanged:: 3.4.0
+    #         Supports Spark Connect.
+    #
+    #     Returns
+    #     -------
+    #     :class:`DataFrameStatFunctions`
+    #
+    #     Examples
+    #     --------
+    #     >>> import polarspark.sql.functions as f
+    #     >>> df = spark.range(3).withColumn("c", f.expr("id + 1"))
+    #     >>> type(df.stat)
+    #     <class '...dataframe.DataFrameStatFunctions'>
+    #     >>> df.stat.corr("id", "c")
+    #     1.0
+    #     """
+    #     return DataFrameStatFunctions(self)
 
     # def toJSON(self, use_unicode: bool = True) -> RDD[str]:
     #     """Converts a :class:`DataFrame` into a :class:`RDD` of string.
@@ -785,7 +787,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         """
         raise NotImplementedError()
-        # return self._to_df(self._ldf.exceptAll(other._ldf))
 
     def isLocal(self) -> bool:
         """Returns ``True`` if the :func:`collect` and :func:`take` methods can be run locally
@@ -1018,6 +1019,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         by 'spark.sql.repl.eagerEval.enabled', this only called by REPL you are
         using support eager evaluation with HTML.
         """
+        # TODO: check LazyFrame's repr_html
         return None
 
     def checkpoint(self, eager: bool = True) -> "DataFrame":
@@ -1052,8 +1054,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ...     df.checkpoint(False)
         DataFrame[age: bigint, name: string]
         """
-        # ldf = self._ldf.checkpoint(eager)
-        # return DataFrame(jdf, self.sparkSession)
+        # Nothing to checkpoint, so return just self
         return self
 
     def localCheckpoint(self, eager: bool = True) -> "DataFrame":
@@ -1085,8 +1086,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.localCheckpoint(False)
         DataFrame[age: bigint, name: string]
         """
-        # jdf = self._jdf.localCheckpoint(eager)
-        # return DataFrame(jdf, self.sparkSession)
+        # Nothing to checkpoint, so return just self
         return self
 
     def withWatermark(self, eventTime: str, delayThreshold: str) -> "DataFrame":
@@ -1152,22 +1152,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> time.sleep(3)
         >>> query.stop()
         """
-    #     if not eventTime or type(eventTime) is not str:
-    #         raise PySparkTypeError(
-    #             error_class="NOT_STR",
-    #             message_parameters={"arg_name": "eventTime", "arg_type": type(eventTime).__name__},
-    #         )
-    #     if not delayThreshold or type(delayThreshold) is not str:
-    #         raise PySparkTypeError(
-    #             error_class="NOT_STR",
-    #             message_parameters={
-    #                 "arg_name": "delayThreshold",
-    #                 "arg_type": type(delayThreshold).__name__,
-    #             },
-    #         )
-    #     jdf = self._jdf.withWatermark(eventTime, delayThreshold)
-    #     return DataFrame(jdf, self.sparkSession)
-        raise NotImplementedError()
+        raise NotImplementedError("Streaming not implemented")
 
     def hint(
         self, name: str, *parameters: Union["PrimitiveType", "Column", List["PrimitiveType"]]
@@ -1209,65 +1194,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ... +- BroadcastHashJoin ...
         ...
         """
-    #     if len(parameters) == 1 and isinstance(parameters[0], list):
-    #         parameters = parameters[0]  # type: ignore[assignment]
-    #
-    #     if not isinstance(name, str):
-    #         raise PySparkTypeError(
-    #             error_class="NOT_STR",
-    #             message_parameters={"arg_name": "name", "arg_type": type(name).__name__},
-    #         )
-    #
-    #     allowed_types = (str, float, int, Column, list)
-    #     allowed_primitive_types = (str, float, int)
-    #     allowed_types_repr = ", ".join(
-    #         [t.__name__ for t in allowed_types[:-1]]
-    #         + ["list[" + t.__name__ + "]" for t in allowed_primitive_types]
-    #     )
-    #     for p in parameters:
-    #         if not isinstance(p, allowed_types):
-    #             raise PySparkTypeError(
-    #                 error_class="DISALLOWED_TYPE_FOR_CONTAINER",
-    #                 message_parameters={
-    #                     "arg_name": "parameters",
-    #                     "allowed_types": allowed_types_repr,
-    #                     "item_type": type(p).__name__,
-    #                 },
-    #             )
-    #         if isinstance(p, list):
-    #             if not all(isinstance(e, allowed_primitive_types) for e in p):
-    #                 raise PySparkTypeError(
-    #                     error_class="DISALLOWED_TYPE_FOR_CONTAINER",
-    #                     message_parameters={
-    #                         "arg_name": "parameters",
-    #                         "allowed_types": allowed_types_repr,
-    #                         "item_type": type(p).__name__ + "[" + type(p[0]).__name__ + "]",
-    #                     },
-    #                 )
-    #
-    #     def _converter(parameter: Union[str, list, float, int, Column]) -> Any:
-    #         if isinstance(parameter, Column):
-    #             return _to_java_column(parameter)
-    #         elif isinstance(parameter, list):
-    #             # for list input, we are assuming only one element type exist in the list.
-    #             # for empty list, we are converting it into an empty long[] in the JVM side.
-    #             gateway = self._sc._gateway
-    #             assert gateway is not None
-    #             jclass = gateway.jvm.long
-    #             if len(parameter) >= 1:
-    #                 mapping = {
-    #                     str: gateway.jvm.java.lang.String,
-    #                     float: gateway.jvm.double,
-    #                     int: gateway.jvm.long,
-    #                 }
-    #                 jclass = mapping[type(parameter[0])]
-    #             return toJArray(gateway, jclass, parameter)
-    #         else:
-    #             return parameter
-    #
-    #     jdf = self._jdf.hint(name, self._jseq(parameters, _converter))
-    #     return DataFrame(jdf, self.sparkSession)
-        raise NotImplementedError()
+        raise NotImplementedError("Hints not implemented yet")
 
     def count(self) -> int:
         """Returns the number of rows in this :class:`DataFrame`.
@@ -2178,47 +2105,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.sample(False, fraction=1.0).count()
         10
         """
-
-        # # For the cases below:
-        # #   sample(True, 0.5 [, seed])
-        # #   sample(True, fraction=0.5 [, seed])
-        # #   sample(withReplacement=False, fraction=0.5 [, seed])
-        # is_withReplacement_set = type(withReplacement) == bool and isinstance(fraction, float)
-        #
-        # # For the case below:
-        # #   sample(faction=0.5 [, seed])
-        # is_withReplacement_omitted_kwargs = withReplacement is None and isinstance(fraction, float)
-        #
-        # # For the case below:
-        # #   sample(0.5 [, seed])
-        # is_withReplacement_omitted_args = isinstance(withReplacement, float)
-        #
-        # if not (
-        #     is_withReplacement_set
-        #     or is_withReplacement_omitted_kwargs
-        #     or is_withReplacement_omitted_args
-        # ):
-        #     argtypes = [type(arg).__name__ for arg in [withReplacement, fraction, seed]]
-        #     raise PySparkTypeError(
-        #         error_class="NOT_BOOL_OR_FLOAT_OR_INT",
-        #         message_parameters={
-        #             "arg_name": "withReplacement (optional), "
-        #             + "fraction (required) and seed (optional)",
-        #             "arg_type": ", ".join(argtypes),
-        #         },
-        #     )
-        #
-        # if is_withReplacement_omitted_args:
-        #     if fraction is not None:
-        #         seed = cast(int, fraction)
-        #     fraction = withReplacement
-        #     withReplacement = None
-        #
-        # seed = int(seed) if seed is not None else None
-        # args = [arg for arg in [withReplacement, fraction, seed] if arg is not None]
-        # jdf = self._jdf.sample(*args)
-        # return DataFrame(jdf, self.sparkSession)
-
         # This is not optimum but at least makes use of Polars sample method
         pdf: pl.DataFrame = self._ldf.collect()
         if not fraction:
@@ -2270,36 +2156,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> dataset.sampleBy(col("key"), fractions={2: 1.0}, seed=0).count()
         33
         """
-        # if isinstance(col, str):
-        #     col = Column(col)
-        # elif not isinstance(col, Column):
-        #     raise PySparkTypeError(
-        #         error_class="NOT_COLUMN_OR_STR",
-        #         message_parameters={"arg_name": "col", "arg_type": type(col).__name__},
-        #     )
-        # if not isinstance(fractions, dict):
-        #     raise PySparkTypeError(
-        #         error_class="NOT_DICT",
-        #         message_parameters={"arg_name": "fractions", "arg_type": type(fractions).__name__},
-        #     )
-        # for k, v in fractions.items():
-        #     if not isinstance(k, (float, int, str)):
-        #         raise PySparkTypeError(
-        #             error_class="DISALLOWED_TYPE_FOR_CONTAINER",
-        #             message_parameters={
-        #                 "arg_name": "fractions",
-        #                 "arg_type": type(fractions).__name__,
-        #                 "allowed_types": "float, int, str",
-        #                 "return_type": type(k).__name__,
-        #             },
-        #         )
-        #     fractions[k] = float(v)
-        # col = col._jc
-        # seed = seed if seed is not None else random.randint(0, sys.maxsize)
-        # return DataFrame(
-        #     self._jdf.stat().sampleBy(col, self._jmap(fractions), seed), self.sparkSession
-        # )
-        # This is not optimum but at least makes use of Polars sample method
         return self.sample()
 
     def randomSplit(self, weights: List[float], seed: Optional[int] = None) -> List["DataFrame"]:
@@ -2339,17 +2195,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> splits[1].count()
         2
         """
-        # for w in weights:
-        #     if w < 0.0:
-        #         raise PySparkValueError(
-        #             error_class="VALUE_NOT_POSITIVE",
-        #             message_parameters={"arg_name": "weights", "arg_value": str(w)},
-        #         )
-        # seed = seed if seed is not None else random.randint(0, sys.maxsize)
-        # df_array = self._jdf.randomSplit(
-        #     _to_list(self.sparkSession._sc, cast(List["ColumnOrName"], weights)), int(seed)
-        # )
-        # return [DataFrame(df, self.sparkSession) for df in df_array]
         raise NotImplementedError()
 
     @property
@@ -2483,13 +2328,15 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |   3|
         +----+
         """
-        if not isinstance(colName, str):
-            raise PySparkTypeError(
-                error_class="NOT_STR",
-                message_parameters={"arg_name": "colName", "arg_type": type(colName).__name__},
-            )
-        jc = self._jdf.colRegex(colName)
-        return Column(jc)
+        # if not isinstance(colName, str):
+        #     raise PySparkTypeError(
+        #         error_class="NOT_STR",
+        #         message_parameters={"arg_name": "colName", "arg_type": type(colName).__name__},
+        #     )
+        # jc = self._jdf.colRegex(colName)
+        # return Column(jc)
+        # Try to use Polars selectors
+        raise NotImplementedError()
 
     def to(self, schema: StructType) -> "DataFrame":
         """
@@ -2546,9 +2393,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  1|  a|
         +---+---+
         """
-        assert schema is not None
-        jschema = self._jdf.sparkSession().parseDataType(schema.json())
-        return DataFrame(self._jdf.to(jschema), self.sparkSession)
+        raise NotImplementedError()
 
     def alias(self, alias: str) -> "DataFrame":
         """Returns a new :class:`DataFrame` with an alias set.
@@ -2587,7 +2432,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         +-----+-----+---+
         """
         assert isinstance(alias, str), "alias should be a string"
-        return DataFrame(getattr(self._jdf, "as")(alias), self.sparkSession)
+        return DataFrame(self._ldf, self.sparkSession, alias=alias)
 
     def crossJoin(self, other: "DataFrame") -> "DataFrame":
         """Returns the cartesian product with another :class:`DataFrame`.
@@ -2626,9 +2471,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 16|  Bob|    85|
         +---+-----+------+
         """
-
-        jdf = self._jdf.crossJoin(other._jdf)
-        return DataFrame(jdf, self.sparkSession)
+        return self.join(other, how="cross")
 
     def join(
         self,
@@ -2809,28 +2652,62 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |Alice|  2|
         +-----+---+
         """
+        how_map = {
+            "outer": "full",
+            "fullouter": "full",
+            "full_outer": "full",
+            "leftouter": "left",
+            "left_outer": "left",
+            "rightouter": "right",
+            "right_outer": "right",
+            "leftsemi": "semi",
+            "left_semi": "semi",
+            "leftanti": "anti",
+            "left_anti": "anti"
+        }
+        how = how_map.get(how, how)
 
         if on is not None and not isinstance(on, list):
             on = [on]  # type: ignore[assignment]
 
+        left_on = []
+        right_on = []
+
         if on is not None:
             if isinstance(on[0], str):
-                on = self._jseq(cast(List[str], on))
+                on = cast(List[str], on)
             else:
                 assert isinstance(on[0], Column), "on should be Column or list of Column"
-                on = reduce(lambda x, y: x.__and__(y), cast(List[Column], on))
-                on = on._jc
+                on = cast(List[Column], on)
+                # on = reduce(lambda x, y: x.__and__(y), cast(List[Column], on))
+                # on = on._expr
+                for c in on:
+                    expr: List = c._col_expr
+                    if expr and len(expr) == 3:
+                        left, op, right, *_ = expr
+                        if op == "__eq__":
+                            left_on.append(left._name)
+                            right_on.append(right._name)
+                        else:
+                            raise NotImplementedError(
+                                f"Join with {op} condition not implemented yet"
+                            )
 
         if on is None and how is None:
-            jdf = self._jdf.join(other._jdf)
+            ldf = self._ldf.join(other._ldf)
         else:
             if how is None:
                 how = "inner"
-            if on is None:
-                on = self._jseq([])
             assert isinstance(how, str), "how should be a string"
-            jdf = self._jdf.join(other._jdf, on, how)
-        return DataFrame(jdf, self.sparkSession)
+            if left_on and right_on:
+                ldf = self._ldf.join(other._ldf, how=how, left_on=left_on, right_on=right_on)
+            else:
+                _on = [o if isinstance(o, str) else o._name for o in on]
+                # coalesce= (how == "full")
+                ldf = self._ldf.join(other._ldf, _on, how, coalesce=True)
+                if how == "right":
+                    ldf = ldf.select(list(OrderedDict.fromkeys(self.columns + other.columns)))
+        return self._to_df(ldf)
 
     # TODO(SPARK-22947): Fix the DataFrame API.
     def _joinAsOf(
@@ -3303,10 +3180,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         --------
         DataFrame.summary
         """
-        if len(cols) == 1 and isinstance(cols[0], list):
-            cols = cols[0]  # type: ignore[assignment]
-        jdf = self._jdf.describe(self._jseq(cols))
-        return DataFrame(jdf, self.sparkSession)
+        raise NotImplementedError()
 
     def summary(self, *statistics: str) -> "DataFrame":
         """Computes specified statistics for numeric and string columns. Available statistics are:
@@ -3376,10 +3250,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         --------
         DataFrame.display
         """
-        if len(statistics) == 1 and isinstance(statistics[0], list):
-            statistics = statistics[0]
-        jdf = self._jdf.summary(self._jseq(statistics))
-        return DataFrame(jdf, self.sparkSession)
+        raise NotImplementedError()
 
     @overload
     def head(self) -> Optional[Row]:
@@ -3676,8 +3547,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  Bob| 15|
         +-----+---+
         """
-        # jdf = self._jdf.select(self._jcols(*cols))
-        # return DataFrame(jdf, self.sparkSession)
         pl_cols = [c._expr if isinstance(c, Column) else c for c in cols]
         return self._to_df(self._ldf.select(*pl_cols))
 
@@ -3716,10 +3585,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |       10|       5|
         +---------+--------+
         """
-        if len(expr) == 1 and isinstance(expr[0], list):
-            expr = expr[0]  # type: ignore[assignment]
-        jdf = self._jdf.selectExpr(self._jseq(expr))
-        return DataFrame(jdf, self.sparkSession)
+        # if len(expr) == 1 and isinstance(expr[0], list):
+        #     expr = expr[0]  # type: ignore[assignment]
+        # jdf = self._jdf.selectExpr(self._jseq(expr))
+        # return DataFrame(jdf, self.sparkSession)
+        raise NotImplementedError()
 
     def filter(self, condition: "ColumnOrName") -> "DataFrame":
         """Filters rows using the given condition.
@@ -4087,10 +3957,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  Bob|   5|    1|
         +-----+----+-----+
         """
-        jgd = self._jdf.rollup(self._jcols_ordinal(*cols))
-        from polarspark.sql.group import GroupedData
-
-        return GroupedData(jgd, self)
+        # jgd = self._jdf.rollup(self._jcols_ordinal(*cols))
+        # from polarspark.sql.group import GroupedData
+        #
+        # return GroupedData(jgd, self)
+        raise NotImplementedError()
 
     @overload
     def cube(self, *cols: "ColumnOrName") -> "GroupedData":
@@ -4177,10 +4048,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  Bob|   5|    1|
         +-----+----+-----+
         """
-        jgd = self._jdf.cube(self._jcols_ordinal(*cols))
-        from polarspark.sql.group import GroupedData
-
-        return GroupedData(jgd, self)
+        # jgd = self._jdf.cube(self._jcols_ordinal(*cols))
+        # from polarspark.sql.group import GroupedData
+        #
+        # return GroupedData(jgd, self)
+        raise NotImplementedError()
 
     def unpivot(
         self,
@@ -4263,25 +4135,26 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         --------
         DataFrame.melt
         """
-        assert ids is not None, "ids must not be None"
-
-        def to_jcols(
-            cols: Union["ColumnOrName", List["ColumnOrName"], Tuple["ColumnOrName", ...]]
-        ) -> JavaObject:
-            if isinstance(cols, list):
-                return self._jcols(*cols)
-            if isinstance(cols, tuple):
-                return self._jcols(*list(cols))
-            return self._jcols(cols)
-
-        jids = to_jcols(ids)
-        if values is None:
-            jdf = self._jdf.unpivotWithSeq(jids, variableColumnName, valueColumnName)
-        else:
-            jvals = to_jcols(values)
-            jdf = self._jdf.unpivotWithSeq(jids, jvals, variableColumnName, valueColumnName)
-
-        return DataFrame(jdf, self.sparkSession)
+        # assert ids is not None, "ids must not be None"
+        #
+        # def to_jcols(
+        #     cols: Union["ColumnOrName", List["ColumnOrName"], Tuple["ColumnOrName", ...]]
+        # ) -> JavaObject:
+        #     if isinstance(cols, list):
+        #         return self._jcols(*cols)
+        #     if isinstance(cols, tuple):
+        #         return self._jcols(*list(cols))
+        #     return self._jcols(cols)
+        #
+        # jids = to_jcols(ids)
+        # if values is None:
+        #     jdf = self._jdf.unpivotWithSeq(jids, variableColumnName, valueColumnName)
+        # else:
+        #     jvals = to_jcols(values)
+        #     jdf = self._jdf.unpivotWithSeq(jids, jvals, variableColumnName, valueColumnName)
+        #
+        # return DataFrame(jdf, self.sparkSession)
+        raise NotImplementedError()
 
     def melt(
         self,
@@ -4463,36 +4336,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ...     count(col("error")).alias("erc"))  # doctest: +SKIP
         >>> observed_ds.writeStream.format("console").start()  # doctest: +SKIP
         """
-        from polarspark.sql import Observation
-
-        if len(exprs) == 0:
-            raise PySparkValueError(
-                error_class="CANNOT_BE_EMPTY",
-                message_parameters={"item": "exprs"},
-            )
-        if not all(isinstance(c, Column) for c in exprs):
-            raise PySparkTypeError(
-                error_class="NOT_LIST_OF_COLUMN",
-                message_parameters={"arg_name": "exprs"},
-            )
-
-        if isinstance(observation, Observation):
-            return observation._on(self, *exprs)
-        elif isinstance(observation, str):
-            return DataFrame(
-                self._jdf.observe(
-                    observation, exprs[0]._jc, _to_seq(self._sc, [c._jc for c in exprs[1:]])
-                ),
-                self.sparkSession,
-            )
-        else:
-            raise PySparkTypeError(
-                error_class="NOT_LIST_OF_COLUMN",
-                message_parameters={
-                    "arg_name": "observation",
-                    "arg_type": type(observation).__name__,
-                },
-            )
+        raise NotImplementedError()
 
     def union(self, other: "DataFrame") -> "DataFrame":
         """Return a new :class:`DataFrame` containing the union of rows in this and another
@@ -4590,7 +4434,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  4|    D|
         +---+-----+
         """
-        return DataFrame(self._jdf.union(other._jdf), self.sparkSession)
+        # return DataFrame(self._jdf.union(other._jdf), self.sparkSession)
+        raise NotImplementedError()
 
     def unionAll(self, other: "DataFrame") -> "DataFrame":
         """Return a new :class:`DataFrame` containing the union of rows in this and another
@@ -4704,7 +4549,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |NULL|NULL|NULL|   3|   4|   5|
         +----+----+----+----+----+----+
         """
-        return DataFrame(self._jdf.unionByName(other._jdf, allowMissingColumns), self.sparkSession)
+        # return DataFrame(self._jdf.unionByName(other._jdf, allowMissingColumns), self.sparkSession)
+        raise NotImplementedError()
 
     def intersect(self, other: "DataFrame") -> "DataFrame":
         """Return a new :class:`DataFrame` containing rows only in
@@ -4743,7 +4589,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  a|  1|
         +---+---+
         """
-        return DataFrame(self._jdf.intersect(other._jdf), self.sparkSession)
+        # return DataFrame(self._jdf.intersect(other._jdf), self.sparkSession)
+        raise NotImplementedError()
 
     def intersectAll(self, other: "DataFrame") -> "DataFrame":
         """Return a new :class:`DataFrame` containing rows in both this :class:`DataFrame`
@@ -4780,7 +4627,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  b|  3|
         +---+---+
         """
-        return DataFrame(self._jdf.intersectAll(other._jdf), self.sparkSession)
+        # return DataFrame(self._jdf.intersectAll(other._jdf), self.sparkSession)
+        raise NotImplementedError()
 
     def subtract(self, other: "DataFrame") -> "DataFrame":
         """Return a new :class:`DataFrame` containing rows in this :class:`DataFrame`
@@ -4816,7 +4664,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  c|  4|
         +---+---+
         """
-        return DataFrame(getattr(self._jdf, "except")(other._jdf), self.sparkSession)
+        # return DataFrame(getattr(self._jdf, "except")(other._jdf), self.sparkSession)
+        raise NotImplementedError()
 
     def dropDuplicates(self, subset: Optional[List[str]] = None) -> "DataFrame":
         """Return a new :class:`DataFrame` with duplicate rows removed,
@@ -4873,17 +4722,18 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |Alice|  5|    80|
         +-----+---+------+
         """
-        if subset is not None and (not isinstance(subset, Iterable) or isinstance(subset, str)):
-            raise PySparkTypeError(
-                error_class="NOT_LIST_OR_TUPLE",
-                message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-            )
-
-        if subset is None:
-            jdf = self._jdf.dropDuplicates()
-        else:
-            jdf = self._jdf.dropDuplicates(self._jseq(subset))
-        return DataFrame(jdf, self.sparkSession)
+        # if subset is not None and (not isinstance(subset, Iterable) or isinstance(subset, str)):
+        #     raise PySparkTypeError(
+        #         error_class="NOT_LIST_OR_TUPLE",
+        #         message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
+        #     )
+        #
+        # if subset is None:
+        #     jdf = self._jdf.dropDuplicates()
+        # else:
+        #     jdf = self._jdf.dropDuplicates(self._jseq(subset))
+        # return DataFrame(jdf, self.sparkSession)
+        raise NotImplementedError()
 
     def dropDuplicatesWithinWatermark(self, subset: Optional[List[str]] = None) -> "DataFrame":
         """Return a new :class:`DataFrame` with duplicate rows removed,
@@ -4933,17 +4783,18 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
          >>> df.dropDuplicatesWithinWatermark(['value'])  # doctest: +SKIP
         """
-        if subset is not None and (not isinstance(subset, Iterable) or isinstance(subset, str)):
-            raise PySparkTypeError(
-                error_class="NOT_LIST_OR_TUPLE",
-                message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-            )
-
-        if subset is None:
-            jdf = self._jdf.dropDuplicatesWithinWatermark()
-        else:
-            jdf = self._jdf.dropDuplicatesWithinWatermark(self._jseq(subset))
-        return DataFrame(jdf, self.sparkSession)
+        # if subset is not None and (not isinstance(subset, Iterable) or isinstance(subset, str)):
+        #     raise PySparkTypeError(
+        #         error_class="NOT_LIST_OR_TUPLE",
+        #         message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
+        #     )
+        #
+        # if subset is None:
+        #     jdf = self._jdf.dropDuplicatesWithinWatermark()
+        # else:
+        #     jdf = self._jdf.dropDuplicatesWithinWatermark(self._jseq(subset))
+        # return DataFrame(jdf, self.sparkSession)
+        raise NotImplementedError()
 
     def dropna(
         self,
@@ -4993,26 +4844,27 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 10|    80|Alice|
         +---+------+-----+
         """
-        if how is not None and how not in ["any", "all"]:
-            raise PySparkValueError(
-                error_class="VALUE_NOT_ANY_OR_ALL",
-                message_parameters={"arg_name": "how", "arg_type": how},
-            )
-
-        if subset is None:
-            subset = self.columns
-        elif isinstance(subset, str):
-            subset = [subset]
-        elif not isinstance(subset, (list, tuple)):
-            raise PySparkTypeError(
-                error_class="NOT_LIST_OR_STR_OR_TUPLE",
-                message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-            )
-
-        if thresh is None:
-            thresh = len(subset) if how == "any" else 1
-
-        return DataFrame(self._jdf.na().drop(thresh, self._jseq(subset)), self.sparkSession)
+        # if how is not None and how not in ["any", "all"]:
+        #     raise PySparkValueError(
+        #         error_class="VALUE_NOT_ANY_OR_ALL",
+        #         message_parameters={"arg_name": "how", "arg_type": how},
+        #     )
+        #
+        # if subset is None:
+        #     subset = self.columns
+        # elif isinstance(subset, str):
+        #     subset = [subset]
+        # elif not isinstance(subset, (list, tuple)):
+        #     raise PySparkTypeError(
+        #         error_class="NOT_LIST_OR_STR_OR_TUPLE",
+        #         message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
+        #     )
+        #
+        # if thresh is None:
+        #     thresh = len(subset) if how == "any" else 1
+        #
+        # return DataFrame(self._jdf.na().drop(thresh, self._jseq(subset)), self.sparkSession)
+        raise NotImplementedError()
 
     @overload
     def fillna(
@@ -5102,32 +4954,33 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 50|  NULL|unknown|true|
         +---+------+-------+----+
         """
-        if not isinstance(value, (float, int, str, bool, dict)):
-            raise PySparkTypeError(
-                error_class="NOT_BOOL_OR_DICT_OR_FLOAT_OR_INT_OR_STR",
-                message_parameters={"arg_name": "value", "arg_type": type(value).__name__},
-            )
-
-        # Note that bool validates isinstance(int), but we don't want to
-        # convert bools to floats
-
-        if not isinstance(value, bool) and isinstance(value, int):
-            value = float(value)
-
-        if isinstance(value, dict):
-            return DataFrame(self._jdf.na().fill(value), self.sparkSession)
-        elif subset is None:
-            return DataFrame(self._jdf.na().fill(value), self.sparkSession)
-        else:
-            if isinstance(subset, str):
-                subset = [subset]
-            elif not isinstance(subset, (list, tuple)):
-                raise PySparkTypeError(
-                    error_class="NOT_LIST_OR_TUPLE",
-                    message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-                )
-
-            return DataFrame(self._jdf.na().fill(value, self._jseq(subset)), self.sparkSession)
+        # if not isinstance(value, (float, int, str, bool, dict)):
+        #     raise PySparkTypeError(
+        #         error_class="NOT_BOOL_OR_DICT_OR_FLOAT_OR_INT_OR_STR",
+        #         message_parameters={"arg_name": "value", "arg_type": type(value).__name__},
+        #     )
+        #
+        # # Note that bool validates isinstance(int), but we don't want to
+        # # convert bools to floats
+        #
+        # if not isinstance(value, bool) and isinstance(value, int):
+        #     value = float(value)
+        #
+        # if isinstance(value, dict):
+        #     return DataFrame(self._jdf.na().fill(value), self.sparkSession)
+        # elif subset is None:
+        #     return DataFrame(self._jdf.na().fill(value), self.sparkSession)
+        # else:
+        #     if isinstance(subset, str):
+        #         subset = [subset]
+        #     elif not isinstance(subset, (list, tuple)):
+        #         raise PySparkTypeError(
+        #             error_class="NOT_LIST_OR_TUPLE",
+        #             message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
+        #         )
+        #
+        #     return DataFrame(self._jdf.na().fill(value, self._jseq(subset)), self.sparkSession)
+        raise NotImplementedError()
 
     @overload
     def replace(
@@ -5354,13 +5207,14 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 message_parameters={},
             )
 
-        if subset is None:
-            return DataFrame(self._jdf.na().replace("*", rep_dict), self.sparkSession)
-        else:
-            return DataFrame(
-                self._jdf.na().replace(self._jseq(subset), self._jmap(rep_dict)),
-                self.sparkSession,
-            )
+        # if subset is None:
+        #     return DataFrame(self._jdf.na().replace("*", rep_dict), self.sparkSession)
+        # else:
+        #     return DataFrame(
+        #         self._jdf.na().replace(self._jseq(subset), self._jmap(rep_dict)),
+        #         self.sparkSession,
+        #     )
+        raise NotImplementedError()
 
     @overload
     def approxQuantile(
@@ -5542,9 +5396,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             )
         relativeError = float(relativeError)
 
-        jaq = self._jdf.stat().approxQuantile(col, probabilities, relativeError)
-        jaq_list = [list(j) for j in jaq]
-        return jaq_list[0] if isStr else jaq_list
+        # jaq = self._jdf.stat().approxQuantile(col, probabilities, relativeError)
+        # jaq_list = [list(j) for j in jaq]
+        # return jaq_list[0] if isStr else jaq_list
+        raise NotImplementedError()
 
     def corr(self, col1: str, col2: str, method: Optional[str] = None) -> float:
         """
@@ -5598,7 +5453,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="VALUE_NOT_PEARSON",
                 message_parameters={"arg_name": "method", "arg_value": method},
             )
-        return self._jdf.stat().corr(col1, col2, method)
+        # return self._jdf.stat().corr(col1, col2, method)
+        raise NotImplementedError()
 
     def cov(self, col1: str, col2: str) -> float:
         """
@@ -5642,7 +5498,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="NOT_STR",
                 message_parameters={"arg_name": "col2", "arg_type": type(col2).__name__},
             )
-        return self._jdf.stat().cov(col1, col2)
+        # return self._jdf.stat().cov(col1, col2)
+        raise NotImplementedError()
 
     def crosstab(self, col1: str, col2: str) -> "DataFrame":
         """
@@ -5695,7 +5552,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="NOT_STR",
                 message_parameters={"arg_name": "col2", "arg_type": type(col2).__name__},
             )
-        return DataFrame(self._jdf.stat().crosstab(col1, col2), self.sparkSession)
+        # return DataFrame(self._jdf.stat().crosstab(col1, col2), self.sparkSession)
+        raise NotImplementedError()
 
     def freqItems(
         self, cols: Union[List[str], Tuple[str]], support: Optional[float] = None
@@ -5750,9 +5608,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             )
         if not support:
             support = 0.01
-        return DataFrame(
-            self._jdf.stat().freqItems(_to_seq(self._sc, cols), support), self.sparkSession
-        )
+        # return DataFrame(
+        #     self._jdf.stat().freqItems(_to_seq(self._sc, cols), support), self.sparkSession
+        # )
+        raise NotImplementedError()
 
     def _ipython_key_completions_(self) -> List[str]:
         """Returns the names of columns in this :class:`DataFrame`.
@@ -6462,7 +6321,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ...     "catalog.db.table"
         ... ).partitionedBy("col").createOrReplace()
         """
-        return DataFrameWriterV2(self, table)
+        # return DataFrameWriterV2(self, table)
+        raise NotImplementedError()
 
     # # Keep to_pandas_on_spark for backward compatibility for now.
     # def to_pandas_on_spark(
@@ -6543,7 +6403,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #     return self.pandas_api(index_col)
 
     def _to_df(self, ldf: LazyFrame) -> "DataFrame":
-        return DataFrame(ldf, self.sparkSession)
+        return DataFrame(ldf, self.sparkSession, alias=self._alias)
 
 
 class DataFrameNaFunctions:

@@ -51,90 +51,6 @@ def _create_column_from_literal(literal: Union["LiteralType", "DecimalLiteral"])
     return Column(pl.lit(literal))
 
 
-def _create_column_from_name(name: str) -> "Column":
-    sc = get_active_spark_context()
-    return cast(JVMView, sc._jvm).functions.col(name)
-
-
-# def _to_java_column(col: "ColumnOrName") -> JavaObject:
-#     if isinstance(col, Column):
-#         jcol = col._jc
-#     elif isinstance(col, str):
-#         jcol = _create_column_from_name(col)
-#     else:
-#         raise PySparkTypeError(
-#             error_class="NOT_COLUMN_OR_STR",
-#             message_parameters={"arg_name": "col", "arg_type": type(col).__name__},
-#         )
-#     return jcol
-#
-#
-# def _to_java_expr(col: "ColumnOrName") -> JavaObject:
-#     return _to_java_column(col).expr()
-#
-#
-# @overload
-# def _to_seq(sc: SparkContext, cols: Iterable[JavaObject]) -> JavaObject:
-#     pass
-#
-#
-# @overload
-# def _to_seq(
-#     sc: SparkContext,
-#     cols: Iterable["ColumnOrName"],
-#     converter: Optional[Callable[["ColumnOrName"], JavaObject]],
-# ) -> JavaObject:
-#     pass
-#
-#
-# def _to_seq(
-#     sc: SparkContext,
-#     cols: Union[Iterable["ColumnOrName"], Iterable[JavaObject]],
-#     converter: Optional[Callable[["ColumnOrName"], JavaObject]] = None,
-# ) -> JavaObject:
-#     """
-#     Convert a list of Columns (or names) into a JVM Seq of Column.
-#
-#     An optional `converter` could be used to convert items in `cols`
-#     into JVM Column objects.
-#     """
-#     if converter:
-#         cols = [converter(c) for c in cols]
-#     assert sc._jvm is not None
-#     return sc._jvm.PythonUtils.toSeq(cols)
-#
-#
-# def _to_list(
-#     sc: SparkContext,
-#     cols: List["ColumnOrName"],
-#     converter: Optional[Callable[["ColumnOrName"], JavaObject]] = None,
-# ) -> JavaObject:
-#     """
-#     Convert a list of Columns (or names) into a JVM (Scala) List of Columns.
-#
-#     An optional `converter` could be used to convert items in `cols`
-#     into JVM Column objects.
-#     """
-#     if converter:
-#         cols = [converter(c) for c in cols]
-#     assert sc._jvm is not None
-#     return sc._jvm.PythonUtils.toList(cols)
-
-
-def _unary_op(
-    name: str,
-    doc: str = "unary operator",
-) -> Callable[["Column"], "Column"]:
-    """Create a method for given unary operator"""
-
-    def _(self: "Column") -> "Column":
-        jc = getattr(self._jc, name)()
-        return Column(jc)
-
-    _.__doc__ = doc
-    return _
-
-
 def _func_op(name: str, doc: str = "") -> Callable[["Column"], "Column"]:
     def _(self: "Column") -> "Column":
         new_expr = getattr(self._expr, name)()
@@ -158,10 +74,11 @@ def _bin_op(
     ) -> "Column":
         oc = other._expr if isinstance(other, Column) else other
         new_expr = getattr(self._expr, name)(oc)
-        return Column(new_expr)
+        return Column(new_expr, col_expr=[self, name, other])
 
     _.__doc__ = doc
     return _
+
 
 def _bin_op_str(
     name: str,
@@ -181,6 +98,7 @@ def _bin_op_str(
 
     _.__doc__ = doc
     return _
+
 
 def _reverse_op(
     name: str,
@@ -237,9 +155,12 @@ class Column:
     Column<...>
     """
 
-    def __init__(self, expr: pl.Expr, if_sorted: bool = False) -> None:
+    def __init__(self, expr: pl.Expr, name: str = None,
+                 col_expr: Optional[List[Union[str, "Column"]]] = None, if_sorted: bool = False) -> None:
         self._sorted = if_sorted
         self._expr: pl.Expr = expr
+        self._name = name
+        self._col_expr = col_expr
 
     # arithmetic operators
     __neg__ = _func_op("__neg__")
@@ -958,7 +879,7 @@ class Column:
                 error_class="NOT_COLUMN_OR_INT",
                 message_parameters={"arg_name": "startPos", "arg_type": type(startPos).__name__},
             )
-        return Column(pc)
+        return self._to_col(pc)
 
     def isin(self, *cols: Any) -> "Column":
         """
@@ -1015,11 +936,7 @@ class Column:
         """
         if len(cols) == 1 and isinstance(cols[0], (list, set)):
             cols = cast(Tuple, cols[0])
-        # cols = cast(
-        #     Tuple,
-        #     [c._expr if isinstance(c, Column) else _create_column_from_literal(c)._expr for c in cols],
-        # )
-        return Column(self._expr.is_in(cols))
+        return self._to_col(self._expr.is_in(cols))
 
     # order
     def asc(self):
@@ -1036,7 +953,7 @@ class Column:
         >>> df.select(df.name).orderBy(df.name.asc()).collect()
         [Row(name='Alice'), Row(name='Tom')]
         """
-        return Column(self._expr.sort(), if_sorted=True)
+        return self._to_col(self._expr.sort(), if_sorted=True)
 
     def asc_nulls_first(self):
         """
@@ -1056,7 +973,7 @@ class Column:
         [Row(name=None), Row(name='Alice'), Row(name='Tom')]
 
         """
-        return Column(self._expr.sort(nulls_last=False))
+        return self._to_col(self._expr.sort(nulls_last=False), if_sorted=True)
 
     def asc_nulls_last(self):
         """
@@ -1076,7 +993,7 @@ class Column:
         [Row(name='Alice'), Row(name='Tom'), Row(name=None)]
 
         """
-        return Column(self._expr.sort(nulls_last=True), if_sorted=True)
+        return self._to_col(self._expr.sort(nulls_last=True), if_sorted=True)
 
     def desc(self):
         """
@@ -1094,7 +1011,7 @@ class Column:
         >>> df.select(df.name).orderBy(df.name.desc()).collect()
         [Row(name='Tom'), Row(name='Alice')]
         """
-        return Column(self._expr.sort(descending=True), if_sorted=True)
+        return self._to_col(self._expr.sort(descending=True), if_sorted=True)
 
     def desc_nulls_first(self):
         """
@@ -1114,7 +1031,7 @@ class Column:
         [Row(name=None), Row(name='Tom'), Row(name='Alice')]
 
         """
-        return Column(self._expr.sort(descending=True, nulls_last=False), if_sorted=True)
+        return self._to_col(self._expr.sort(descending=True, nulls_last=False), if_sorted=True)
 
     def desc_nulls_last(self):
         """
@@ -1133,7 +1050,7 @@ class Column:
         >>> df.select(df.name).orderBy(df.name.desc_nulls_last()).collect()
         [Row(name='Tom'), Row(name='Alice'), Row(name=None)]
         """
-        return Column(self._expr.sort(descending=True, nulls_last=True), if_sorted=True)
+        return self._to_col(self._expr.sort(descending=True, nulls_last=True), if_sorted=True)
 
     def isNull(self):
         """
@@ -1149,7 +1066,7 @@ class Column:
         >>> df.filter(df.height.isNull()).collect()
         [Row(name='Alice', height=None)]
         """
-        return Column(self._expr.is_null())
+        return self._to_col(self._expr.is_null())
 
     def isNotNull(self):
         """
@@ -1165,7 +1082,7 @@ class Column:
         >>> df.filter(df.height.isNotNull()).collect()
         [Row(name='Tom', height=80)]
         """
-        return Column(self._expr.is_not_null())
+        return self._to_col(self._expr.is_not_null())
 
     def alias(self, *alias: str, **kwargs: Any) -> "Column":
         """
@@ -1225,7 +1142,7 @@ class Column:
         #             message_parameters={"arg_name": "metadata"},
         #         )
         #     return Column(getattr(self._jc, "as")(_to_seq(sc, list(alias))))
-        return Column(self._expr.alias(alias[0]))
+        return self._to_col(self._expr.alias(alias[0]))
 
     name = copy_func(alias, sinceversion=2.0, doc=":func:`name` is an alias for :func:`alias`.")
 
@@ -1259,20 +1176,7 @@ class Column:
         >>> df.select(df.age.cast(StringType()).alias('ages')).collect()
         [Row(ages='2'), Row(ages='5')]
         """
-        if isinstance(dataType, str):
-            jc = self._jc.cast(dataType)
-        elif isinstance(dataType, DataType):
-            from polarspark.sql import SparkSession
-
-            spark = SparkSession._getActiveSessionOrCreate()
-            jdt = spark._jsparkSession.parseDataType(dataType.json())
-            jc = self._jc.cast(jdt)
-        else:
-            raise PySparkTypeError(
-                error_class="NOT_DATATYPE_OR_STR",
-                message_parameters={"arg_name": "dataType", "arg_type": type(dataType).__name__},
-            )
-        return Column(jc)
+        raise NotImplementedError()
 
     astype = copy_func(cast, sinceversion=1.4, doc=":func:`astype` is an alias for :func:`cast`.")
 
@@ -1534,6 +1438,10 @@ class Column:
 
     def __repr__(self) -> str:
         return "Column<'%s'>" % str(self._expr)
+
+    def _to_col(self, expr: pl.Expr, name: str = None, if_sorted: bool = False):
+        _name = name or self._name
+        return Column(expr, name=_name, if_sorted=if_sorted)
 
 
 def _test() -> None:
