@@ -236,7 +236,7 @@ def col(col: str) -> Column:
     >>> column('x')
     Column<'x'>
     """
-    return _invoke_function("col", col)
+    return Column(pl.col(col), name=col)
 
 
 column = col
