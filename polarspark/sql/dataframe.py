@@ -4554,8 +4554,18 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |NULL|NULL|NULL|   3|   4|   5|
         +----+----+----+----+----+----+
         """
-        # return DataFrame(self._jdf.unionByName(other._jdf, allowMissingColumns), self.sparkSession)
-        raise NotImplementedError()
+        if not allowMissingColumns:
+            self_cols = set(self._ldf.collect_schema().names())
+            other_cols = set(other._ldf.collect_schema().names())
+            diff = self_cols.difference(other_cols)
+            if diff:
+                cols = ", ".join(other_cols)
+                raise PySparkValueError(
+                    error_class="CANNOT_RESOLVE_COLUMN_AMONG",
+                    message_parameters={"col": diff.pop(), "cols": cols},
+                )
+
+        return self._to_df(pl.concat([self._ldf, other._ldf], how="diagonal"))
 
     def intersect(self, other: "DataFrame") -> "DataFrame":
         """Return a new :class:`DataFrame` containing rows only in
@@ -4594,7 +4604,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  a|  1|
         +---+---+
         """
-        # return DataFrame(self._jdf.intersect(other._jdf), self.sparkSession)
         raise NotImplementedError()
 
     def intersectAll(self, other: "DataFrame") -> "DataFrame":
