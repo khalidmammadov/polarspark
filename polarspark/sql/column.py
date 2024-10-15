@@ -156,8 +156,8 @@ class Column:
     """
 
     def __init__(self, expr: pl.Expr, name: str = None,
-                 col_expr: Optional[List[Union[str, "Column"]]] = None, if_sorted: bool = False) -> None:
-        self._sorted = if_sorted
+                 col_expr: Optional[List[Union[str, "Column"]]] = None, desc: bool = False) -> None:
+        self._desc = desc
         self._expr: pl.Expr = expr
         self._name = name
         self._col_expr = col_expr
@@ -953,7 +953,7 @@ class Column:
         >>> df.select(df.name).orderBy(df.name.asc()).collect()
         [Row(name='Alice'), Row(name='Tom')]
         """
-        return self._to_col(self._expr.sort(), if_sorted=True)
+        return self._to_col(self._expr.sort())
 
     def asc_nulls_first(self):
         """
@@ -973,7 +973,7 @@ class Column:
         [Row(name=None), Row(name='Alice'), Row(name='Tom')]
 
         """
-        return self._to_col(self._expr.sort(nulls_last=False), if_sorted=True)
+        return self._to_col(self._expr.sort(nulls_last=False))
 
     def asc_nulls_last(self):
         """
@@ -993,7 +993,7 @@ class Column:
         [Row(name='Alice'), Row(name='Tom'), Row(name=None)]
 
         """
-        return self._to_col(self._expr.sort(nulls_last=True), if_sorted=True)
+        return self._to_col(self._expr.sort(nulls_last=True))
 
     def desc(self):
         """
@@ -1011,7 +1011,7 @@ class Column:
         >>> df.select(df.name).orderBy(df.name.desc()).collect()
         [Row(name='Tom'), Row(name='Alice')]
         """
-        return self._to_col(self._expr.sort(descending=True), if_sorted=True)
+        return self._to_col(self._expr.sort(descending=True), desc=True)
 
     def desc_nulls_first(self):
         """
@@ -1031,7 +1031,7 @@ class Column:
         [Row(name=None), Row(name='Tom'), Row(name='Alice')]
 
         """
-        return self._to_col(self._expr.sort(descending=True, nulls_last=False), if_sorted=True)
+        return self._to_col(self._expr.sort(descending=True, nulls_last=False), desc=True)
 
     def desc_nulls_last(self):
         """
@@ -1050,7 +1050,7 @@ class Column:
         >>> df.select(df.name).orderBy(df.name.desc_nulls_last()).collect()
         [Row(name='Tom'), Row(name='Alice'), Row(name=None)]
         """
-        return self._to_col(self._expr.sort(descending=True, nulls_last=True), if_sorted=True)
+        return self._to_col(self._expr.sort(descending=True, nulls_last=True), desc=True)
 
     def isNull(self):
         """
@@ -1439,9 +1439,9 @@ class Column:
     def __repr__(self) -> str:
         return "Column<'%s'>" % str(self._expr)
 
-    def _to_col(self, expr: pl.Expr, name: str = None, if_sorted: bool = False):
+    def _to_col(self, expr: pl.Expr, name: str = None, desc: bool = False):
         _name = name or self._name
-        return Column(expr, name=_name, if_sorted=if_sorted)
+        return Column(expr, name=_name, desc=desc)
 
 
 def _test() -> None:

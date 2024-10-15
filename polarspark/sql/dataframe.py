@@ -2703,7 +2703,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 ldf = self._ldf.join(other._ldf, how=how, left_on=left_on, right_on=right_on)
             else:
                 _on = [o if isinstance(o, str) else o._name for o in on]
-                # coalesce= (how == "full")
                 ldf = self._ldf.join(other._ldf, _on, how, coalesce=True)
                 if how == "right":
                     ldf = ldf.select(list(OrderedDict.fromkeys(self.columns + other.columns)))
@@ -3061,19 +3060,20 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             cols = cols[0]
 
         by = []
+        desc = []
         for c in cols:
             if isinstance(c, Column):
-                if c._sorted:
-                    by.append(c)
-                else:
-                    by.append(c.asc())
+                by.append(c._name)
+                desc.append(c._desc)
             elif isinstance(c, str):
-                by.append(self[c].asc())
+                by.append(c)
+                desc.append(False)
             elif isinstance(c, int):
+                by.append(self[c - 1]._name)
                 if c > 0:
-                    by.append(self[c - 1].asc())
+                    desc.append(False)
                 elif c < 0:
-                    by.append(self[c - 1].desc())
+                    desc.append(True)
                 else:
                     raise IndexError("Column ordinal must not be zero!")
             else:
@@ -3083,19 +3083,20 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ascending = kwargs.get("ascending", True)
         if isinstance(ascending, (bool, int)):
             if not ascending:
-                by = [b.desc() for b in by]
+                desc = [True]*len(by)
         elif isinstance(ascending, list):
-            by = [b if asc else b.desc() for asc, b in zip(ascending, by)]
+            desc = [not a for a in ascending]
         else:
             raise PySparkTypeError(
                 error_class="NOT_BOOL_OR_LIST",
                 message_parameters={"arg_name": "ascending", "arg_type": type(ascending).__name__},
             )
 
-        by = [b._expr for b in by]
+        # This is a bug in polars side, suggested a fix as PR
+        if len(by) == 1 and isinstance(by[0], str):
+            desc = desc[0]
 
-        # We use by as expression based sort is done in projection
-        return self._to_df(self._ldf.with_columns(*by))
+        return self._to_df(self._ldf.sort(by[0], *by[1:], descending=desc))
 
     orderBy = sort
 
@@ -4434,8 +4435,12 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  4|    D|
         +---+-----+
         """
-        # return DataFrame(self._jdf.union(other._jdf), self.sparkSession)
-        raise NotImplementedError()
+        self_cols = self._ldf.collect_schema().names()
+        other_cols = other._ldf.collect_schema().names()
+        if self_cols != other_cols:
+            for f, t in zip(other_cols, self_cols):
+                other = other.withColumnRenamed(f, t)
+        return self._to_df(pl.concat([self._ldf, other._ldf], how="vertical"))
 
     def unionAll(self, other: "DataFrame") -> "DataFrame":
         """Return a new :class:`DataFrame` containing the union of rows in this and another

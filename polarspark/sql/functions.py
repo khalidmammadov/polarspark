@@ -318,7 +318,7 @@ def asc(col: "ColumnOrName") -> Column:
     |  4|    B|
     +---+-----+
     """
-    return col.asc() if isinstance(col, Column) else _invoke_function("col", col).asc()
+    return col.asc() if isinstance(col, Column) else column(col).asc()
 
 
 @_try_remote_functions
@@ -397,7 +397,7 @@ def desc(col: "ColumnOrName") -> Column:
     |  2|    C|
     +---+-----+
     """
-    return col.desc() if isinstance(col, Column) else _invoke_function("col", col).desc()
+    return col.desc() if isinstance(col, Column) else column(col).desc()
 
 
 @_try_remote_functions
