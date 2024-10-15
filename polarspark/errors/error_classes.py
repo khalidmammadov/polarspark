@@ -139,6 +139,11 @@ ERROR_CLASSES_JSON = """
       "metadata can only be provided for a single column."
     ]
   },
+  "CANNOT_RESOLVE_COLUMN_AMONG": {
+    "message": [
+      "Cannot resolve column name '<col>' among (<cols>)."
+    ]
+  },
   "CANNOT_SET_TOGETHER": {
     "message": [
       "<arg_list> should not be set together."
