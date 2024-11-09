@@ -226,35 +226,35 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #         )
     #     return self._lazy_rdd
 
-    # @property
-    # def na(self) -> "DataFrameNaFunctions":
-    #     """Returns a :class:`DataFrameNaFunctions` for handling missing values.
-    #
-    #     .. versionadded:: 1.3.1
-    #
-    #     .. versionchanged:: 3.4.0
-    #         Supports Spark Connect.
-    #
-    #     Returns
-    #     -------
-    #     :class:`DataFrameNaFunctions`
-    #
-    #     Examples
-    #     --------
-    #     >>> df = spark.sql("SELECT 1 AS c1, int(NULL) AS c2")
-    #     >>> type(df.na)
-    #     <class '...dataframe.DataFrameNaFunctions'>
-    #
-    #     Replace the missing values as 2.
-    #
-    #     >>> df.na.fill(2).show()
-    #     +---+---+
-    #     | c1| c2|
-    #     +---+---+
-    #     |  1|  2|
-    #     +---+---+
-    #     """
-    #     return DataFrameNaFunctions(self)
+    @property
+    def na(self) -> "DataFrameNaFunctions":
+        """Returns a :class:`DataFrameNaFunctions` for handling missing values.
+
+        .. versionadded:: 1.3.1
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
+        Returns
+        -------
+        :class:`DataFrameNaFunctions`
+
+        Examples
+        --------
+        >>> df = spark.sql("SELECT 1 AS c1, int(NULL) AS c2")
+        >>> type(df.na)
+        <class '...dataframe.DataFrameNaFunctions'>
+
+        Replace the missing values as 2.
+
+        >>> df.na.fill(2).show()
+        +---+---+
+        | c1| c2|
+        +---+---+
+        |  1|  2|
+        +---+---+
+        """
+        return DataFrameNaFunctions(self)
 
     # @property
     # def stat(self) -> "DataFrameStatFunctions":
@@ -4858,27 +4858,29 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 10|    80|Alice|
         +---+------+-----+
         """
-        # if how is not None and how not in ["any", "all"]:
-        #     raise PySparkValueError(
-        #         error_class="VALUE_NOT_ANY_OR_ALL",
-        #         message_parameters={"arg_name": "how", "arg_type": how},
-        #     )
-        #
-        # if subset is None:
-        #     subset = self.columns
-        # elif isinstance(subset, str):
-        #     subset = [subset]
-        # elif not isinstance(subset, (list, tuple)):
-        #     raise PySparkTypeError(
-        #         error_class="NOT_LIST_OR_STR_OR_TUPLE",
-        #         message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-        #     )
-        #
-        # if thresh is None:
-        #     thresh = len(subset) if how == "any" else 1
-        #
-        # return DataFrame(self._jdf.na().drop(thresh, self._jseq(subset)), self.sparkSession)
-        raise NotImplementedError()
+        if how is not None and how not in ["any", "all"]:
+            raise PySparkValueError(
+                error_class="VALUE_NOT_ANY_OR_ALL",
+                message_parameters={"arg_name": "how", "arg_type": how},
+            )
+
+        if thresh is not None:
+            raise NotImplementedError("Thresh parameter is not implemented yet")
+        if how == "all":
+            raise NotImplementedError("'all' is not implemented yet")
+
+        _df = None
+        if subset:
+            if not isinstance(subset, (str, list, tuple)):
+                raise PySparkTypeError(
+                    error_class="NOT_LIST_OR_STR_OR_TUPLE",
+                    message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
+                )
+            _df = self._ldf.drop_nulls(subset)
+        else:
+            _df = self._ldf.drop_nulls()
+
+        return self._to_df(_df)
 
     @overload
     def fillna(
