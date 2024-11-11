@@ -4970,33 +4970,33 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 50|  NULL|unknown|true|
         +---+------+-------+----+
         """
-        # if not isinstance(value, (float, int, str, bool, dict)):
-        #     raise PySparkTypeError(
-        #         error_class="NOT_BOOL_OR_DICT_OR_FLOAT_OR_INT_OR_STR",
-        #         message_parameters={"arg_name": "value", "arg_type": type(value).__name__},
-        #     )
-        #
-        # # Note that bool validates isinstance(int), but we don't want to
-        # # convert bools to floats
-        #
+        if not isinstance(value, (float, int, str, bool, dict)):
+            raise PySparkTypeError(
+                error_class="NOT_BOOL_OR_DICT_OR_FLOAT_OR_INT_OR_STR",
+                message_parameters={"arg_name": "value", "arg_type": type(value).__name__},
+            )
+
+        # Note that bool validates isinstance(int), but we don't want to
+        # convert bools to floats
+
         # if not isinstance(value, bool) and isinstance(value, int):
         #     value = float(value)
-        #
-        # if isinstance(value, dict):
-        #     return DataFrame(self._jdf.na().fill(value), self.sparkSession)
-        # elif subset is None:
-        #     return DataFrame(self._jdf.na().fill(value), self.sparkSession)
-        # else:
-        #     if isinstance(subset, str):
-        #         subset = [subset]
-        #     elif not isinstance(subset, (list, tuple)):
-        #         raise PySparkTypeError(
-        #             error_class="NOT_LIST_OR_TUPLE",
-        #             message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-        #         )
-        #
-        #     return DataFrame(self._jdf.na().fill(value, self._jseq(subset)), self.sparkSession)
-        raise NotImplementedError()
+
+        if subset:
+            raise NotImplementedError("`subset` param is not implemented yet.")
+
+        # Warning: Eager execution
+        if isinstance(value, dict):
+            _df: pl.DataFrame = self._ldf.collect()
+            sers: Dict[str, pl.Series] = {}
+            for c in _df.columns:
+                if c in value:
+                    sers[c] = _df[c].fill_null(value[c])
+                else:
+                    sers[c] = _df[c]
+            return self._to_df(pl.DataFrame(sers).lazy())
+
+        return self._to_df(self._ldf.fill_null(value))
 
     @overload
     def replace(
