@@ -4983,7 +4983,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         #     value = float(value)
 
         if subset:
-            raise NotImplementedError("`subset` param is not implemented yet.")
+            return self._to_df(self._ldf.with_columns(pl.col(subset).fill_null(value)))
 
         # Warning: Eager execution
         if isinstance(value, dict):
