@@ -42,7 +42,7 @@ from typing import (
 from polarspark import copy_func, _NoValue
 from polarspark._globals import _NoValueType
 from polarspark.context import SparkContext
-from polarspark.errors import PySparkTypeError, PySparkValueError
+from polarspark.errors import PySparkTypeError, PySparkValueError, AnalysisException
 from polarspark.rdd import (
     RDD,
     _load_from_socket,
@@ -3402,6 +3402,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         from polarspark.sql.functions import col
         if isinstance(item, str):
+            if item not in self._ldf.collect_schema().names():
+                raise AnalysisException(f"Column {item} does not exists")
             return col(item)
         elif isinstance(item, Column):
             return self.filter(item)
