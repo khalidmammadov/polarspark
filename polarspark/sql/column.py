@@ -74,9 +74,14 @@ def _bin_op(
         self: "Column",
         other: Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"],
     ) -> "Column":
-        oc = other._expr if isinstance(other, Column) else other
+        if isinstance(other, Column):
+            oc = other._expr
+            ostr = other._name
+        else:
+            oc = other
+            ostr = str(other)
         new_expr = getattr(self._expr, name)(oc)
-        return Column(new_expr, col_expr=[self, name, other]).alias(f"({self._name} {alias} {other._name})")
+        return Column(new_expr, col_expr=[self, name, other]).alias(f"({self._name} {alias} {ostr})")
 
     _.__doc__ = doc
     return _
@@ -117,13 +122,26 @@ def _reverse_op(
     return _
 
 
-def _like_to_regex(like_expression):
+def _like_to_regex(like_expression, case_insensitive=False):
     # Escape all regex metacharacters except for '%' and '_'
     escaped = re.escape(like_expression)
     # Replace escaped '%' with regex '.*' and escaped '_' with regex '.'
     regex_pattern = escaped.replace(r'%', '.*').replace(r'_', '.')
 
+    if case_insensitive:
+        regex_pattern = _expand_case_insensitivity(regex_pattern)
+
     return f"^{regex_pattern}$"
+
+
+def _expand_case_insensitivity(pattern):
+    # Replace each alphabetic character with a case-insensitive set [aA]
+    def replace_case_insensitive(match):
+        char = match.group(0)
+        return f"[{char.lower()}{char.upper()}]"
+
+    # Use re.sub to find all alphabetic characters and replace them
+    return re.sub(r'[a-zA-Z]', replace_case_insensitive, pattern)
 
 
 class Column:
@@ -620,46 +638,46 @@ class Column:
     #         )
     #     return self[item]
 
-    # def __getitem__(self, k: Any) -> "Column":
-    #     """
-    #     An expression that gets an item at position ``ordinal`` out of a list,
-    #     or gets an item by key out of a dict.
-    #
-    #     .. versionadded:: 1.3.0
-    #
-    #     .. versionchanged:: 3.4.0
-    #         Supports Spark Connect.
-    #
-    #     Parameters
-    #     ----------
-    #     k
-    #         a literal value, or a slice object without step.
-    #
-    #     Returns
-    #     -------
-    #     :class:`Column`
-    #         Column representing the item got by key out of a dict, or substrings sliced by
-    #         the given slice object.
-    #
-    #     Examples
-    #     --------
-    #     >>> df = spark.createDataFrame([('abcedfg', {"key": "value"})], ["l", "d"])
-    #     >>> df.select(df.l[slice(1, 3)], df.d['key']).show()
-    #     +---------------+------+
-    #     |substr(l, 1, 3)|d[key]|
-    #     +---------------+------+
-    #     |            abc| value|
-    #     +---------------+------+
-    #     """
-    #     if isinstance(k, slice):
-    #         if k.step is not None:
-    #             raise PySparkValueError(
-    #                 error_class="SLICE_WITH_STEP",
-    #                 message_parameters={},
-    #             )
-    #         return self.substr(k.start, k.stop)
-    #     else:
-    #         return _bin_op("apply")(self, k)
+    def __getitem__(self, k: Any) -> "Column":
+        """
+        An expression that gets an item at position ``ordinal`` out of a list,
+        or gets an item by key out of a dict.
+
+        .. versionadded:: 1.3.0
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
+        Parameters
+        ----------
+        k
+            a literal value, or a slice object without step.
+
+        Returns
+        -------
+        :class:`Column`
+            Column representing the item got by key out of a dict, or substrings sliced by
+            the given slice object.
+
+        Examples
+        --------
+        >>> df = spark.createDataFrame([('abcedfg', {"key": "value"})], ["l", "d"])
+        >>> df.select(df.l[slice(1, 3)], df.d['key']).show()
+        +---------------+------+
+        |substr(l, 1, 3)|d[key]|
+        +---------------+------+
+        |            abc| value|
+        +---------------+------+
+        """
+        if isinstance(k, slice):
+            if k.step is not None:
+                raise PySparkValueError(
+                    error_class="SLICE_WITH_STEP",
+                    message_parameters={},
+                )
+            return self.substr(k.start, k.stop)
+        else:
+            return self._to_col(self._expr.list[k])
 
     def __iter__(self) -> None:
         raise PySparkTypeError(
@@ -791,40 +809,41 @@ class Column:
         """
         return self.contains(other)
 
-    # def ilike(self: "Column", other: str) -> "Column":
-    #     """
-    #     SQL ILIKE expression (case insensitive LIKE). Returns a boolean :class:`Column`
-    #     based on a case insensitive match.
-    #
-    #     .. versionadded:: 3.3.0
-    #
-    #     .. versionchanged:: 3.4.0
-    #         Supports Spark Connect.
-    #
-    #     Parameters
-    #     ----------
-    #     other : str
-    #         a SQL LIKE pattern
-    #
-    #     See Also
-    #     --------
-    #     polarspark.sql.Column.rlike
-    #
-    #     Returns
-    #     -------
-    #     :class:`Column`
-    #         Column of booleans showing whether each element
-    #         in the Column is matched by SQL LIKE pattern.
-    #
-    #     Examples
-    #     --------
-    #     >>> df = spark.createDataFrame(
-    #     ...      [(2, "Alice"), (5, "Bob")], ["age", "name"])
-    #     >>> df.filter(df.name.ilike('%Ice')).collect()
-    #     [Row(age=2, name='Alice')]
-    #     """
-    #     njc = getattr(self._jc, "ilike")(other)
-    #     return Column(njc)
+    def ilike(self: "Column", other: str) -> "Column":
+        """
+        SQL ILIKE expression (case insensitive LIKE). Returns a boolean :class:`Column`
+        based on a case insensitive match.
+
+        .. versionadded:: 3.3.0
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
+        Parameters
+        ----------
+        other : str
+            a SQL LIKE pattern
+
+        See Also
+        --------
+        polarspark.sql.Column.rlike
+
+        Returns
+        -------
+        :class:`Column`
+            Column of booleans showing whether each element
+            in the Column is matched by SQL LIKE pattern.
+
+        Examples
+        --------
+        >>> df = spark.createDataFrame(
+        ...      [(2, "Alice"), (5, "Bob")], ["age", "name"])
+        >>> df.filter(df.name.ilike('%Ice')).collect()
+        [Row(age=2, name='Alice')]
+        """
+        regex_pattern = _like_to_regex(other)
+
+        return self.contains(regex_pattern)
 
     @overload
     def substr(self, startPos: int, length: int) -> "Column":
