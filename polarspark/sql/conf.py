@@ -16,11 +16,12 @@
 #
 
 import sys
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Mapping
 
 from polarspark import since, _NoValue
 from polarspark._globals import _NoValueType
-
+from polarspark.errors import IllegalArgumentException
+from polarspark.utils.spark_file_utils import resolve_uri
 
 class RuntimeConfig:
     """User-facing configuration API, accessible through `SparkSession.conf`.
@@ -31,7 +32,15 @@ class RuntimeConfig:
         Supports Spark Connect.
     """
 
-    _conf: dict
+    _defaults = {
+        "spark.sql.sources.partitionOverwriteMode": "STATIC"
+    }
+
+    _non_mutable = {
+        "spark.sql.warehouse.dir" : resolve_uri("spark-warehouse")
+    }
+
+    _conf: Mapping
 
     # def __init__(self, jconf: JavaObject) -> None:
     def __init__(self, conf: dict) -> None:
@@ -41,7 +50,14 @@ class RuntimeConfig:
     @since(2.0)
     def set(self, key: str, value: Union[str, int, bool]) -> None:
         """Sets the given Spark runtime configuration property."""
-        self._conf.set(key, value)
+        if value is None:
+          raise IllegalArgumentException("value can not be None")
+        elif isinstance(value, (bool, int)):
+            value = str(value).lower()
+        if isinstance(value, str):
+            self._conf[key] = value
+        else:
+            raise ValueError(f"Value type: {type(value)} is not supported")
 
     @since(2.0)
     def get(
@@ -51,7 +67,13 @@ class RuntimeConfig:
         assuming it is set.
         """
         self._checkType(key, "key")
+
         if default is _NoValue:
+            if not key in self._conf:
+                if key in self._defaults:
+                    return self._defaults.get(key)
+                else:
+                    raise KeyError(f"{key} is not set")
             return self._conf.get(key)
         else:
             if default is not None:
@@ -62,7 +84,7 @@ class RuntimeConfig:
     def unset(self, key: str) -> None:
         """Resets the configuration property for the given key."""
         # FIX
-        self._conf.unset(key)
+        del(self._conf[key])
 
     def _checkType(self, obj: Any, identifier: str) -> None:
         """Assert that an object is of type str."""
@@ -76,7 +98,7 @@ class RuntimeConfig:
         """Indicates whether the configuration property with the given key
         is modifiable in the current session.
         """
-        return self._jconf.isModifiable(key)
+        return key not in self._non_mutable
 
 
 def _test() -> None:
