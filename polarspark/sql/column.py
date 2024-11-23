@@ -63,18 +63,20 @@ def _func_op(name: str, doc: str = "") -> Callable[["Column"], "Column"]:
 def _bin_op(
     name: str,
     doc: str = "binary operator",
+    alias: str = None
 ) -> Callable[
     ["Column", Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"]], "Column"
 ]:
     """Create a method for given binary operator"""
 
+    alias = alias or name
     def _(
         self: "Column",
         other: Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"],
     ) -> "Column":
         oc = other._expr if isinstance(other, Column) else other
         new_expr = getattr(self._expr, name)(oc)
-        return Column(new_expr, col_expr=[self, name, other])
+        return Column(new_expr, col_expr=[self, name, other]).alias(f"({self._name} {alias} {other._name})")
 
     _.__doc__ = doc
     return _
@@ -290,11 +292,12 @@ class Column:
 
     # `and`, `or`, `not` cannot be overloaded in Python,
     # so use bitwise operators as boolean operators
-    __and__ = _bin_op("and")
-    __or__ = _bin_op("or")
-    __invert__ = _func_op("not")
-    __rand__ = _bin_op("and")
-    __ror__ = _bin_op("or")
+    __and__ = _bin_op("__and__")
+    __or__ = _bin_op("__or__")
+    __invert__ = _func_op("__invert__")
+    __not__ = _func_op("__invert__")
+    __rand__ = _bin_op("__rand__")
+    __ror__ = _bin_op("__ror__")
 
     # container operators
     def __contains__(self, item: Any) -> None:
@@ -362,10 +365,9 @@ class Column:
     [Row((a ^ b)=225)]
     """
 
-    bitwiseOR = _bin_op("or_", _bitwiseOR_doc)
-    bitwiseAND = _bin_op("and_", _bitwiseAND_doc)
-    # Polars does not support XOR yet
-    # bitwiseXOR = _bin_op("bitwiseXOR", _bitwiseXOR_doc)
+    bitwiseOR = _bin_op("or_", _bitwiseOR_doc, "|")
+    bitwiseAND = _bin_op("and_", _bitwiseAND_doc, "&")
+    bitwiseXOR = _bin_op("xor", _bitwiseXOR_doc, "^")
 
     # def getItem(self, key: Any) -> "Column":
     #     """

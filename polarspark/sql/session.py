@@ -547,10 +547,10 @@ class SparkSession(SparkConversionMixin):
             sc_HTML=self.sparkContext._repr_html_(),
         )
 
-    @property
-    def _jconf(self) -> "JavaObject":
-        """Accessor for the JVM SQL-specific configurations"""
-        return self._jsparkSession.sessionState().conf()
+    # @property
+    # def _jconf(self) -> "JavaObject":
+    #     """Accessor for the JVM SQL-specific configurations"""
+    #     return self._jsparkSession.sessionState().conf()
 
     def newSession(self) -> "SparkSession":
         """
@@ -570,7 +570,7 @@ class SparkSession(SparkConversionMixin):
         >>> spark.newSession()
         <...SparkSession object ...>
         """
-        return self.__class__(self._sc, self._jsparkSession.newSession())
+        return self.__class__(self._sc)
 
     @classmethod
     @try_remote_session_classmethod
@@ -712,7 +712,7 @@ class SparkSession(SparkConversionMixin):
         'value'
         """
         if not hasattr(self, "_conf"):
-            self._conf = RuntimeConfig(self._jsparkSession.conf())
+            self._conf = RuntimeConfig({})
         return self._conf
 
     @property
@@ -1752,10 +1752,6 @@ class SparkSession(SparkConversionMixin):
         from polarspark.sql.context import SQLContext
 
         self._sc.stop()
-        # We should clean the default session up. See SPARK-23228.
-        assert self._jvm is not None
-        self._jvm.SparkSession.clearDefaultSession()
-        self._jvm.SparkSession.clearActiveSession()
         SparkSession._instantiatedSession = None
         SparkSession._activeSession = None
         SQLContext._instantiatedContext = None

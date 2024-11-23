@@ -28,10 +28,13 @@ import typing
 from types import TracebackType
 from typing import Any, Callable, IO, Iterator, List, Optional, TextIO, Tuple, Union
 
+# from py4j.clientserver import ClientServer
 
 from polarspark.errors import PySparkRuntimeError
 
-__all__: List[str] = []
+__all__: List[str] = ["print_exec"]
+
+# from py4j.java_gateway import JavaObject
 
 if typing.TYPE_CHECKING:
     from polarspark.sql import SparkSession
@@ -355,28 +358,28 @@ def inheritable_thread_target(f: Optional[Union[Callable, "SparkSession"]] = Non
         return outer
 
     # Non Spark Connect
-    from pyspark import SparkContext
-
-    if isinstance(SparkContext._gateway, ClientServer):
-        # Here's when the pinned-thread mode (PYSPARK_PIN_THREAD) is on.
-
-        # NOTICE the internal difference vs `InheritableThread`. `InheritableThread`
-        # copies local properties when the thread starts but `inheritable_thread_target`
-        # copies when the function is wrapped.
-        assert SparkContext._active_spark_context is not None
-        properties = SparkContext._active_spark_context._jsc.sc().getLocalProperties().clone()
-        assert callable(f)
-
-        @functools.wraps(f)
-        def wrapped(*args: Any, **kwargs: Any) -> Any:
-            # Set local properties in child thread.
-            assert SparkContext._active_spark_context is not None
-            SparkContext._active_spark_context._jsc.sc().setLocalProperties(properties)
-            return f(*args, **kwargs)  # type: ignore[misc, operator]
-
-        return wrapped
-    else:
-        return f  # type: ignore[return-value]
+    # from pyspark import SparkContext
+    #
+    # if isinstance(SparkContext._gateway, ClientServer):
+    #     # Here's when the pinned-thread mode (PYSPARK_PIN_THREAD) is on.
+    #
+    #     # NOTICE the internal difference vs `InheritableThread`. `InheritableThread`
+    #     # copies local properties when the thread starts but `inheritable_thread_target`
+    #     # copies when the function is wrapped.
+    #     assert SparkContext._active_spark_context is not None
+    #     properties = SparkContext._active_spark_context._jsc.sc().getLocalProperties().clone()
+    #     assert callable(f)
+    #
+    #     @functools.wraps(f)
+    #     def wrapped(*args: Any, **kwargs: Any) -> Any:
+    #         # Set local properties in child thread.
+    #         assert SparkContext._active_spark_context is not None
+    #         SparkContext._active_spark_context._jsc.sc().setLocalProperties(properties)
+    #         return f(*args, **kwargs)  # type: ignore[misc, operator]
+    #
+    #     return wrapped
+    # else:
+    return f  # type: ignore[return-value]
 
 
 def handle_worker_exception(e: BaseException, outfile: IO) -> None:
@@ -433,7 +436,7 @@ class InheritableThread(threading.Thread):
     def __init__(
         self, target: Callable, *args: Any, session: Optional["SparkSession"] = None, **kwargs: Any
     ):
-        from polarspark.sql import is_remote
+        from pyspark.sql import is_remote
 
         # Spark Connect
         if is_remote():
@@ -459,7 +462,7 @@ class InheritableThread(threading.Thread):
                     # self._props is set before starting the thread to match the behavior with JVM.
                     assert hasattr(self, "_props")
                     assert SparkContext._active_spark_context is not None
-                    SparkContext._active_spark_context._jsc.sc().setLocalProperties(self._props)
+                    # SparkContext._active_spark_context._jsc.sc().setLocalProperties(self._props)
                     return target(*a, **k)
 
                 super(InheritableThread, self).__init__(

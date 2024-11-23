@@ -104,12 +104,16 @@ def _invoke_function_over_column(name: str, col: Column) -> Column:
     Invokes Polar function identified by name with args
     and wraps the result with :class:`~polarspark.sql.Column`.
     """
-    aliases = {
+    name_map = {
         "count": "len",
         "avg": "mean"
     }
-    func = getattr(col._expr, aliases.get(name) or name)
-    return Column(func().alias(f"{name}({str(col._expr)})"))
+    alias = {
+        "__invert__": f"~{str(col._name)}"
+    }
+    alias_str = alias.get(name) or f"{name}({str(col._expr)})"
+    func = getattr(col._expr, name_map.get(name) or name)
+    return Column(func().alias(alias_str))
 
 
 def _invoke_function_over_columns(name: str, *cols: "ColumnOrName") -> Column:
@@ -2536,7 +2540,8 @@ def bitwise_not(col: "ColumnOrName") -> Column:
     | -2|
     +---+
     """
-    return _invoke_function_over_columns("bitwise_not", col)
+    # return Column(~col._expr, f"~{col.name}")
+    return _invoke_function_over_column("__invert__", col)
 
 
 @_try_remote_functions
