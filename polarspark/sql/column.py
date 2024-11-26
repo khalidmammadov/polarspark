@@ -676,8 +676,10 @@ class Column:
                     message_parameters={},
                 )
             return self.substr(k.start, k.stop)
-        else:
+        elif isinstance(k, int):
             return self._to_col(self._expr.list[k])
+        else:
+            raise NotImplementedError("Accessing nested fields are not supported yet")
 
     def __iter__(self) -> None:
         raise PySparkTypeError(
