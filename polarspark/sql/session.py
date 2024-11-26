@@ -57,6 +57,7 @@ from polarspark.sql.types import (
     DataType,
     StructField,
     StructType,
+    Row,
     _make_type_verifier,
     _infer_schema,
     _has_nulltype,
@@ -65,6 +66,7 @@ from polarspark.sql.types import (
     _parse_datatype_string,
     _from_numpy_type,
 )
+
 from polarspark.errors.exceptions.captured import install_exception_handler
 from polarspark.sql.utils import is_timestamp_ntz_preferred, to_str, try_remote_session_classmethod
 from polarspark.errors import PySparkValueError, PySparkTypeError, PySparkRuntimeError
@@ -1392,6 +1394,8 @@ class SparkSession(SparkConversionMixin):
             return super(SparkSession, self).createDataFrame(  # type: ignore[call-overload]
                 data, schema, samplingRatio, verifySchema
             )
+        if isinstance(data, list) and isinstance(data[0], Row):
+            data = [r.asDict(True) for r in data]
         return self._create_dataframe(
             data, schema, samplingRatio, verifySchema  # type: ignore[arg-type]
         )
