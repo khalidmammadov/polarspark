@@ -502,41 +502,14 @@ class SparkSession(SparkConversionMixin):
     ):
         self._sc = sparkContext
         self._pl_ctx = pl.SQLContext()
-        # self._jsc = self._sc._jsc
-        # self._jvm = self._sc._jvm
-
-        # assert self._jvm is not None
-
-        # if jsparkSession is None:
-        #     if (
-        #         self._jvm.SparkSession.getDefaultSession().isDefined()
-        #         and not self._jvm.SparkSession.getDefaultSession().get().sparkContext().isStopped()
-        #     ):
-        #         jsparkSession = self._jvm.SparkSession.getDefaultSession().get()
-        #         getattr(getattr(self._jvm, "SparkSession$"), "MODULE$").applyModifiableSettings(
-        #             jsparkSession, options
-        #         )
-        #     else:
-        #         jsparkSession = self._jvm.SparkSession(self._jsc.sc(), options)
-        # else:
-        #     getattr(getattr(self._jvm, "SparkSession$"), "MODULE$").applyModifiableSettings(
-        #         jsparkSession, options
-        #     )
-        # self._jsparkSession = jsparkSession
-        # _monkey_patch_RDD(self)
-        # install_exception_handler()
         # If we had an instantiated SparkSession attached with a SparkContext
         # which is stopped now, we need to renew the instantiated SparkSession.
         # Otherwise, we will use invalid SparkSession when we call Builder.getOrCreate.
         if (
             SparkSession._instantiatedSession is None
-            # or SparkSession._instantiatedSession._sc._jsc is None
         ):
             SparkSession._instantiatedSession = self
             SparkSession._activeSession = self
-            # assert self._jvm is not None
-            # self._jvm.SparkSession.setDefaultSession(self._jsparkSession)
-            # self._jvm.SparkSession.setActiveSession(self._jsparkSession)
 
     def _repr_html_(self) -> str:
         return """

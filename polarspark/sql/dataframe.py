@@ -170,6 +170,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self._support_repr_html = False
         self._alias = alias
 
+        self._storage_level = StorageLevel.NONE
+
     @property
     def sql_ctx(self) -> "SQLContext":
         from polarspark.sql.context import SQLContext
@@ -1552,7 +1554,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         +- InMemoryTableScan ...
         """
         self.is_cached = True
-        return self._to_df(self._ldf.cache())
+        return self.persist()
 
     def persist(
         self,
@@ -1599,10 +1601,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.persist(StorageLevel.DISK_ONLY)
         DataFrame[id: bigint]
         """
-        # self.is_cached = True
-        # javaStorageLevel = self._sc._getJavaStorageLevel(storageLevel)
-        # self._jdf.persist(javaStorageLevel)
-        return self.cache()
+        self.is_cached = True
+        self._storage_level = storageLevel
+        return self._to_df(self._ldf.cache())
 
     @property
     def storageLevel(self) -> StorageLevel:
@@ -1630,14 +1631,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df2.persist(StorageLevel.DISK_ONLY_2).storageLevel
         StorageLevel(True, False, False, False, 2)
         """
-        storage_level = StorageLevel(
-            False,
-            True,
-            False,
-            True,
-            1,
-        )
-        return storage_level
+        return self._storage_level
 
     def unpersist(self, blocking: bool = False) -> "DataFrame":
         """Marks the :class:`DataFrame` as non-persistent, and remove all blocks for it from
@@ -1673,8 +1667,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.unpersist(True)
         DataFrame[id: bigint]
         """
-        # self.is_cached = False
-        # self._jdf.unpersist(blocking)
+        self.is_cached = False
+        self._storage_level = StorageLevel.NONE
         return self
 
     def coalesce(self, numPartitions: int) -> "DataFrame":
