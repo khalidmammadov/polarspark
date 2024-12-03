@@ -1042,7 +1042,7 @@ class DataFrameTestsMixin:
         self.assertEqual(observation2.get, dict(cnt=100))
 
     def test_sample(self):
-        with self.assertRaises(polarsparkTypeError) as pe:
+        with self.assertRaises(PySparkTypeError) as pe:
             self.spark.range(1).sample()
 
         self.check_error(
@@ -1813,7 +1813,7 @@ class DataFrameTestsMixin:
         )
 
     def test_where(self):
-        with self.assertRaises(polarsparkTypeError) as pe:
+        with self.assertRaises(PySparkTypeError) as pe:
             self.spark.range(10).where(10)
 
         self.check_error(

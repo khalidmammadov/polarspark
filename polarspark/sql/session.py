@@ -837,15 +837,12 @@ class SparkSession(SparkConversionMixin):
         |  2|
         +---+
         """
-        if numPartitions is None:
-            numPartitions = self._sc.defaultParallelism
-
         if end is None:
-            jdf = self._jsparkSession.range(0, int(start), int(step), int(numPartitions))
+            ldf = pl.LazyFrame(pl.int_range(0, int(start), int(step), eager=True))
         else:
-            jdf = self._jsparkSession.range(int(start), int(end), int(step), int(numPartitions))
+            ldf = pl.LazyFrame(pl.int_range(int(start), int(end), int(step), eager=True))
 
-        return DataFrame(jdf, self)
+        return DataFrame(ldf, self)
 
     def _inferSchemaFromList(
         self, data: Iterable[Any], names: Optional[List[str]] = None

@@ -42,7 +42,7 @@ from typing import (
 from polarspark import copy_func, _NoValue
 from polarspark._globals import _NoValueType
 from polarspark.context import SparkContext
-from polarspark.errors import PySparkTypeError, PySparkValueError, AnalysisException
+from polarspark.errors import PySparkTypeError, PySparkValueError, AnalysisException, IllegalArgumentException
 from polarspark.rdd import (
     RDD,
     _load_from_socket,
@@ -2099,6 +2099,41 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.sample(False, fraction=1.0).count()
         10
         """
+
+        # For the cases below:
+        #   sample(True, 0.5 [, seed])
+        #   sample(True, fraction=0.5 [, seed])
+        #   sample(withReplacement=False, fraction=0.5 [, seed])
+        is_withReplacement_set = type(withReplacement) == bool and isinstance(fraction, float)
+
+        # For the case below:
+        #   sample(faction=0.5 [, seed])
+        is_withReplacement_omitted_kwargs = withReplacement is None and isinstance(fraction, float)
+
+        # For the case below:
+        #   sample(0.5 [, seed])
+        is_withReplacement_omitted_args = isinstance(withReplacement, float)
+
+        if not (
+            is_withReplacement_set
+            or is_withReplacement_omitted_kwargs
+            or is_withReplacement_omitted_args
+        ):
+            argtypes = [type(arg).__name__ for arg in [withReplacement, fraction, seed]]
+            raise PySparkTypeError(
+                error_class="NOT_BOOL_OR_FLOAT_OR_INT",
+                message_parameters={
+                    "arg_name": "withReplacement (optional), "
+                    + "fraction (required) and seed (optional)",
+                    "arg_type": ", ".join(argtypes),
+                },
+            )
+
+        seed = int(seed) if seed is not None else None
+
+        if withReplacement and isinstance(withReplacement, float) and withReplacement < 0:
+            raise IllegalArgumentException("Sample size can not be negative")
+
         # This is not optimum but at least makes use of Polars sample method
         pdf: pl.DataFrame = self._ldf.collect()
         if not fraction:
