@@ -2722,19 +2722,27 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                                 f"Join with {op} condition not implemented yet"
                             )
 
-        if on is None and how is None:
-            ldf = self._ldf.join(other._ldf)
-        else:
-            if how is None:
-                how = "inner"
-            assert isinstance(how, str), "how should be a string"
-            if left_on and right_on:
-                ldf = self._ldf.join(other._ldf, how=how, left_on=left_on, right_on=right_on)
+        if on is None:
+            if self.sparkSession.conf.get("spark.sql.crossJoin.enabled"):
+                how = "cross"
             else:
-                _on = [o if isinstance(o, str) else o._name for o in on]
-                ldf = self._ldf.join(other._ldf, _on, how, coalesce=True)
-                if how == "right":
-                    ldf = ldf.select(list(OrderedDict.fromkeys(self.columns + other.columns)))
+                raise AnalysisException("on clause is missing and cross joins are disabled")
+
+        # if on is None and how is None:
+        #     ldf = self._ldf.join(other._ldf)
+        # else:
+        if how is None:
+            how = "inner"
+        assert isinstance(how, str), "how should be a string"
+        if left_on and right_on:
+            ldf = self._ldf.join(other._ldf, how=how, left_on=left_on, right_on=right_on)
+        elif on is not None:
+            _on = [o if isinstance(o, str) else o._name for o in on]
+            ldf = self._ldf.join(other._ldf, _on, how, coalesce=True)
+            if how == "right":
+                ldf = ldf.select(list(OrderedDict.fromkeys(self.columns + other.columns)))
+        else:
+            ldf = self._ldf.join(other._ldf, how=how)
         return self._to_df(ldf)
 
     # TODO(SPARK-22947): Fix the DataFrame API.
