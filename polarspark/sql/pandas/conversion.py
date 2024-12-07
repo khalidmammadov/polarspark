@@ -80,169 +80,170 @@ class PandasConversionMixin:
         0    2  Alice
         1    5    Bob
         """
-        from pyspark.sql.dataframe import DataFrame
+        from polarspark.sql.dataframe import DataFrame
 
         assert isinstance(self, DataFrame)
 
-        from pyspark.sql.pandas.types import _create_converter_to_pandas
-        from pyspark.sql.pandas.utils import require_minimum_pandas_version
+        from polarspark.sql.pandas.types import _create_converter_to_pandas
+        from polarspark.sql.pandas.utils import require_minimum_pandas_version
 
         require_minimum_pandas_version()
 
         import pandas as pd
 
-        jconf = self.sparkSession._jconf
+        # jconf = self.sparkSession._jconf
 
-        if jconf.arrowPySparkEnabled():
-            use_arrow = True
-            try:
-                from pyspark.sql.pandas.types import to_arrow_schema
-                from pyspark.sql.pandas.utils import require_minimum_pyarrow_version
-
-                require_minimum_pyarrow_version()
-                to_arrow_schema(self.schema)
-            except Exception as e:
-                if jconf.arrowPySparkFallbackEnabled():
-                    msg = (
-                        "toPandas attempted Arrow optimization because "
-                        "'spark.sql.execution.arrow.pyspark.enabled' is set to true; however, "
-                        "failed by the reason below:\n  %s\n"
-                        "Attempting non-optimization as "
-                        "'spark.sql.execution.arrow.pyspark.fallback.enabled' is set to "
-                        "true." % str(e)
-                    )
-                    warn(msg)
-                    use_arrow = False
-                else:
-                    msg = (
-                        "toPandas attempted Arrow optimization because "
-                        "'spark.sql.execution.arrow.pyspark.enabled' is set to true, but has "
-                        "reached the error below and will not continue because automatic fallback "
-                        "with 'spark.sql.execution.arrow.pyspark.fallback.enabled' has been set to "
-                        "false.\n  %s" % str(e)
-                    )
-                    warn(msg)
-                    raise
-
-            # Try to use Arrow optimization when the schema is supported and the required version
-            # of PyArrow is found, if 'spark.sql.execution.arrow.pyspark.enabled' is enabled.
-            if use_arrow:
-                try:
-                    import pyarrow as pa
-
-                    self_destruct = jconf.arrowPySparkSelfDestructEnabled()
-                    batches = self._collect_as_arrow(split_batches=self_destruct)
-                    if len(batches) > 0:
-                        table = pa.Table.from_batches(batches)
-                        # Ensure only the table has a reference to the batches, so that
-                        # self_destruct (if enabled) is effective
-                        del batches
-                        # Pandas DataFrame created from PyArrow uses datetime64[ns] for date type
-                        # values, but we should use datetime.date to match the behavior with when
-                        # Arrow optimization is disabled.
-                        pandas_options = {"date_as_object": True}
-
-                        if LooseVersion(pa.__version__) >= LooseVersion("13.0.0"):
-                            # A legacy option to coerce date32, date64, duration, and timestamp
-                            # time units to nanoseconds when converting to pandas.
-                            # This option can only be added since 13.0.0.
-                            pandas_options.update(
-                                {
-                                    "coerce_temporal_nanoseconds": True,
-                                }
-                            )
-
-                        if self_destruct:
-                            # Configure PyArrow to use as little memory as possible:
-                            # self_destruct - free columns as they are converted
-                            # split_blocks - create a separate Pandas block for each column
-                            # use_threads - convert one column at a time
-                            pandas_options.update(
-                                {
-                                    "self_destruct": True,
-                                    "split_blocks": True,
-                                    "use_threads": False,
-                                }
-                            )
-                        # Rename columns to avoid duplicated column names.
-                        pdf = table.rename_columns(
-                            [f"col_{i}" for i in range(table.num_columns)]
-                        ).to_pandas(**pandas_options)
-
-                        # Rename back to the original column names.
-                        pdf.columns = self.columns
-                    else:
-                        pdf = pd.DataFrame(columns=self.columns)
-
-                    if len(pdf.columns) > 0:
-                        timezone = jconf.sessionLocalTimeZone()
-                        struct_in_pandas = jconf.pandasStructHandlingMode()
-
-                        error_on_duplicated_field_names = False
-                        if struct_in_pandas == "legacy":
-                            error_on_duplicated_field_names = True
-                            struct_in_pandas = "dict"
-
-                        return pd.concat(
-                            [
-                                _create_converter_to_pandas(
-                                    field.dataType,
-                                    field.nullable,
-                                    timezone=timezone,
-                                    struct_in_pandas=struct_in_pandas,
-                                    error_on_duplicated_field_names=error_on_duplicated_field_names,
-                                )(pser)
-                                for (_, pser), field in zip(pdf.items(), self.schema.fields)
-                            ],
-                            axis="columns",
-                        )
-                    else:
-                        return pdf
-                except Exception as e:
-                    # We might have to allow fallback here as well but multiple Spark jobs can
-                    # be executed. So, simply fail in this case for now.
-                    msg = (
-                        "toPandas attempted Arrow optimization because "
-                        "'spark.sql.execution.arrow.pyspark.enabled' is set to true, but has "
-                        "reached the error below and can not continue. Note that "
-                        "'spark.sql.execution.arrow.pyspark.fallback.enabled' does not have an "
-                        "effect on failures in the middle of "
-                        "computation.\n  %s" % str(e)
-                    )
-                    warn(msg)
-                    raise
-
-        # Below is toPandas without Arrow optimization.
-        rows = self.collect()
-        if len(rows) > 0:
-            pdf = pd.DataFrame.from_records(
-                rows, index=range(len(rows)), columns=self.columns  # type: ignore[arg-type]
-            )
-        else:
-            pdf = pd.DataFrame(columns=self.columns)
-
-        if len(pdf.columns) > 0:
-            timezone = jconf.sessionLocalTimeZone()
-            struct_in_pandas = jconf.pandasStructHandlingMode()
-
-            return pd.concat(
-                [
-                    _create_converter_to_pandas(
-                        field.dataType,
-                        field.nullable,
-                        timezone=timezone,
-                        struct_in_pandas=(
-                            "row" if struct_in_pandas == "legacy" else struct_in_pandas
-                        ),
-                        error_on_duplicated_field_names=False,
-                        timestamp_utc_localized=False,
-                    )(pser)
-                    for (_, pser), field in zip(pdf.items(), self.schema.fields)
-                ],
-                axis="columns",
-            )
-        else:
-            return pdf
+        # if jconf.arrowPySparkEnabled():
+        #     use_arrow = True
+        #     try:
+        #         from pyspark.sql.pandas.types import to_arrow_schema
+        #         from pyspark.sql.pandas.utils import require_minimum_pyarrow_version
+        #
+        #         require_minimum_pyarrow_version()
+        #         to_arrow_schema(self.schema)
+        #     except Exception as e:
+        #         if jconf.arrowPySparkFallbackEnabled():
+        #             msg = (
+        #                 "toPandas attempted Arrow optimization because "
+        #                 "'spark.sql.execution.arrow.pyspark.enabled' is set to true; however, "
+        #                 "failed by the reason below:\n  %s\n"
+        #                 "Attempting non-optimization as "
+        #                 "'spark.sql.execution.arrow.pyspark.fallback.enabled' is set to "
+        #                 "true." % str(e)
+        #             )
+        #             warn(msg)
+        #             use_arrow = False
+        #         else:
+        #             msg = (
+        #                 "toPandas attempted Arrow optimization because "
+        #                 "'spark.sql.execution.arrow.pyspark.enabled' is set to true, but has "
+        #                 "reached the error below and will not continue because automatic fallback "
+        #                 "with 'spark.sql.execution.arrow.pyspark.fallback.enabled' has been set to "
+        #                 "false.\n  %s" % str(e)
+        #             )
+        #             warn(msg)
+        #             raise
+        #
+        #     # Try to use Arrow optimization when the schema is supported and the required version
+        #     # of PyArrow is found, if 'spark.sql.execution.arrow.pyspark.enabled' is enabled.
+        #     if use_arrow:
+        #         try:
+        #             import pyarrow as pa
+        #
+        #             self_destruct = jconf.arrowPySparkSelfDestructEnabled()
+        #             batches = self._collect_as_arrow(split_batches=self_destruct)
+        #             if len(batches) > 0:
+        #                 table = pa.Table.from_batches(batches)
+        #                 # Ensure only the table has a reference to the batches, so that
+        #                 # self_destruct (if enabled) is effective
+        #                 del batches
+        #                 # Pandas DataFrame created from PyArrow uses datetime64[ns] for date type
+        #                 # values, but we should use datetime.date to match the behavior with when
+        #                 # Arrow optimization is disabled.
+        #                 pandas_options = {"date_as_object": True}
+        #
+        #                 if LooseVersion(pa.__version__) >= LooseVersion("13.0.0"):
+        #                     # A legacy option to coerce date32, date64, duration, and timestamp
+        #                     # time units to nanoseconds when converting to pandas.
+        #                     # This option can only be added since 13.0.0.
+        #                     pandas_options.update(
+        #                         {
+        #                             "coerce_temporal_nanoseconds": True,
+        #                         }
+        #                     )
+        #
+        #                 if self_destruct:
+        #                     # Configure PyArrow to use as little memory as possible:
+        #                     # self_destruct - free columns as they are converted
+        #                     # split_blocks - create a separate Pandas block for each column
+        #                     # use_threads - convert one column at a time
+        #                     pandas_options.update(
+        #                         {
+        #                             "self_destruct": True,
+        #                             "split_blocks": True,
+        #                             "use_threads": False,
+        #                         }
+        #                     )
+        #                 # Rename columns to avoid duplicated column names.
+        #                 pdf = table.rename_columns(
+        #                     [f"col_{i}" for i in range(table.num_columns)]
+        #                 ).to_pandas(**pandas_options)
+        #
+        #                 # Rename back to the original column names.
+        #                 pdf.columns = self.columns
+        #             else:
+        #                 pdf = pd.DataFrame(columns=self.columns)
+        #
+        #             if len(pdf.columns) > 0:
+        #                 timezone = jconf.sessionLocalTimeZone()
+        #                 struct_in_pandas = jconf.pandasStructHandlingMode()
+        #
+        #                 error_on_duplicated_field_names = False
+        #                 if struct_in_pandas == "legacy":
+        #                     error_on_duplicated_field_names = True
+        #                     struct_in_pandas = "dict"
+        #
+        #                 return pd.concat(
+        #                     [
+        #                         _create_converter_to_pandas(
+        #                             field.dataType,
+        #                             field.nullable,
+        #                             timezone=timezone,
+        #                             struct_in_pandas=struct_in_pandas,
+        #                             error_on_duplicated_field_names=error_on_duplicated_field_names,
+        #                         )(pser)
+        #                         for (_, pser), field in zip(pdf.items(), self.schema.fields)
+        #                     ],
+        #                     axis="columns",
+        #                 )
+        #             else:
+        #                 return pdf
+        #         except Exception as e:
+        #             # We might have to allow fallback here as well but multiple Spark jobs can
+        #             # be executed. So, simply fail in this case for now.
+        #             msg = (
+        #                 "toPandas attempted Arrow optimization because "
+        #                 "'spark.sql.execution.arrow.pyspark.enabled' is set to true, but has "
+        #                 "reached the error below and can not continue. Note that "
+        #                 "'spark.sql.execution.arrow.pyspark.fallback.enabled' does not have an "
+        #                 "effect on failures in the middle of "
+        #                 "computation.\n  %s" % str(e)
+        #             )
+        #             warn(msg)
+        #             raise
+        #
+        # # Below is toPandas without Arrow optimization.
+        # rows = self.collect()
+        # if len(rows) > 0:
+        #     pdf = pd.DataFrame.from_records(
+        #         rows, index=range(len(rows)), columns=self.columns  # type: ignore[arg-type]
+        #     )
+        # else:
+        #     pdf = pd.DataFrame(columns=self.columns)
+        #
+        # if len(pdf.columns) > 0:
+        #     timezone = jconf.sessionLocalTimeZone()
+        #     struct_in_pandas = jconf.pandasStructHandlingMode()
+        #
+        #     return pd.concat(
+        #         [
+        #             _create_converter_to_pandas(
+        #                 field.dataType,
+        #                 field.nullable,
+        #                 timezone=timezone,
+        #                 struct_in_pandas=(
+        #                     "row" if struct_in_pandas == "legacy" else struct_in_pandas
+        #                 ),
+        #                 error_on_duplicated_field_names=False,
+        #                 timestamp_utc_localized=False,
+        #             )(pser)
+        #             for (_, pser), field in zip(pdf.items(), self.schema.fields)
+        #         ],
+        #         axis="columns",
+        #     )
+        # else:
+        #     return pdf
+        return self._ldf.collect().to_pandas()
 
     def _collect_as_arrow(self, split_batches: bool = False) -> List["pa.RecordBatch"]:
         """

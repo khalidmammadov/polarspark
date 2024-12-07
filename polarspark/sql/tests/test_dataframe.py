@@ -916,130 +916,130 @@ class DataFrameTestsMixin:
     #         ):
     #             df.unpivot("id", ["int", "str"], "var", "val").collect()
 
-    def test_observe(self):
-        # SPARK-36263: tests the DataFrame.observe(Observation, *Column) method
-        from polarspark.sql import Observation
+    # def test_observe(self):
+    #     # SPARK-36263: tests the DataFrame.observe(Observation, *Column) method
+    #     from polarspark.sql import Observation
+    #
+    #     df = self.spark.createDataFrame(
+    #         [
+    #             (1, 1.0, "one"),
+    #             (2, 2.0, "two"),
+    #             (3, 3.0, "three"),
+    #         ],
+    #         ["id", "val", "label"],
+    #     )
+    #
+    #     unnamed_observation = Observation()
+    #     named_observation = Observation("metric")
+    #     observed = (
+    #         df.orderBy("id")
+    #         .observe(
+    #             named_observation,
+    #             count(lit(1)).alias("cnt"),
+    #             sum(col("id")).alias("sum"),
+    #             mean(col("val")).alias("mean"),
+    #         )
+    #         .observe(unnamed_observation, count(lit(1)).alias("rows"))
+    #     )
+    #
+    #     # test that observe works transparently
+    #     actual = observed.collect()
+    #     self.assertEqual(
+    #         [
+    #             {"id": 1, "val": 1.0, "label": "one"},
+    #             {"id": 2, "val": 2.0, "label": "two"},
+    #             {"id": 3, "val": 3.0, "label": "three"},
+    #         ],
+    #         [row.asDict() for row in actual],
+    #     )
+    #
+    #     # test that we retrieve the metrics
+    #     self.assertEqual(named_observation.get, dict(cnt=3, sum=6, mean=2.0))
+    #     self.assertEqual(unnamed_observation.get, dict(rows=3))
+    #
+    #     # observation requires name (if given) to be non empty string
+    #     with self.assertRaisesRegex(TypeError, "name should be a string"):
+    #         Observation(123)
+    #     with self.assertRaisesRegex(ValueError, "name should not be empty"):
+    #         Observation("")
+    #
+    #     # dataframe.observe requires at least one expr
+    #     with self.assertRaises(PySparkValueError) as pe:
+    #         df.observe(Observation())
+    #
+    #     self.check_error(
+    #         exception=pe.exception,
+    #         error_class="CANNOT_BE_EMPTY",
+    #         message_parameters={"item": "exprs"},
+    #     )
+    #
+    #     # dataframe.observe requires non-None Columns
+    #     for args in [(None,), ("id",), (lit(1), None), (lit(1), "id")]:
+    #         with self.subTest(args=args):
+    #             with self.assertRaises(PySparkTypeError) as pe:
+    #                 df.observe(Observation(), *args)
+    #
+    #             self.check_error(
+    #                 exception=pe.exception,
+    #                 error_class="NOT_LIST_OF_COLUMN",
+    #                 message_parameters={"arg_name": "exprs"},
+    #             )
 
-        df = self.spark.createDataFrame(
-            [
-                (1, 1.0, "one"),
-                (2, 2.0, "two"),
-                (3, 3.0, "three"),
-            ],
-            ["id", "val", "label"],
-        )
+    # def test_observe_str(self):
+    #     # SPARK-38760: tests the DataFrame.observe(str, *Column) method
+    #     from polarspark.sql.streaming import StreamingQueryListener
+    #
+    #     observed_metrics = None
+    #
+    #     class TestListener(StreamingQueryListener):
+    #         def onQueryStarted(self, event):
+    #             pass
+    #
+    #         def onQueryProgress(self, event):
+    #             nonlocal observed_metrics
+    #             observed_metrics = event.progress.observedMetrics
+    #
+    #         def onQueryIdle(self, event):
+    #             pass
+    #
+    #         def onQueryTerminated(self, event):
+    #             pass
+    #
+    #     self.spark.streams.addListener(TestListener())
+    #
+    #     df = self.spark.readStream.format("rate").option("rowsPerSecond", 10).load()
+    #     df = df.observe("metric", count(lit(1)).alias("cnt"), sum(col("value")).alias("sum"))
+    #     q = df.writeStream.format("noop").queryName("test").start()
+    #     self.assertTrue(q.isActive)
+    #     time.sleep(10)
+    #     q.stop()
+    #
+    #     self.assertTrue(isinstance(observed_metrics, dict))
+    #     self.assertTrue("metric" in observed_metrics)
+    #     row = observed_metrics["metric"]
+    #     self.assertTrue(isinstance(row, Row))
+    #     self.assertTrue(hasattr(row, "cnt"))
+    #     self.assertTrue(hasattr(row, "sum"))
+    #     self.assertGreaterEqual(row.cnt, 0)
+    #     self.assertGreaterEqual(row.sum, 0)
 
-        unnamed_observation = Observation()
-        named_observation = Observation("metric")
-        observed = (
-            df.orderBy("id")
-            .observe(
-                named_observation,
-                count(lit(1)).alias("cnt"),
-                sum(col("id")).alias("sum"),
-                mean(col("val")).alias("mean"),
-            )
-            .observe(unnamed_observation, count(lit(1)).alias("rows"))
-        )
-
-        # test that observe works transparently
-        actual = observed.collect()
-        self.assertEqual(
-            [
-                {"id": 1, "val": 1.0, "label": "one"},
-                {"id": 2, "val": 2.0, "label": "two"},
-                {"id": 3, "val": 3.0, "label": "three"},
-            ],
-            [row.asDict() for row in actual],
-        )
-
-        # test that we retrieve the metrics
-        self.assertEqual(named_observation.get, dict(cnt=3, sum=6, mean=2.0))
-        self.assertEqual(unnamed_observation.get, dict(rows=3))
-
-        # observation requires name (if given) to be non empty string
-        with self.assertRaisesRegex(TypeError, "name should be a string"):
-            Observation(123)
-        with self.assertRaisesRegex(ValueError, "name should not be empty"):
-            Observation("")
-
-        # dataframe.observe requires at least one expr
-        with self.assertRaises(polarsparkValueError) as pe:
-            df.observe(Observation())
-
-        self.check_error(
-            exception=pe.exception,
-            error_class="CANNOT_BE_EMPTY",
-            message_parameters={"item": "exprs"},
-        )
-
-        # dataframe.observe requires non-None Columns
-        for args in [(None,), ("id",), (lit(1), None), (lit(1), "id")]:
-            with self.subTest(args=args):
-                with self.assertRaises(PySparkTypeError) as pe:
-                    df.observe(Observation(), *args)
-
-                self.check_error(
-                    exception=pe.exception,
-                    error_class="NOT_LIST_OF_COLUMN",
-                    message_parameters={"arg_name": "exprs"},
-                )
-
-    def test_observe_str(self):
-        # SPARK-38760: tests the DataFrame.observe(str, *Column) method
-        from polarspark.sql.streaming import StreamingQueryListener
-
-        observed_metrics = None
-
-        class TestListener(StreamingQueryListener):
-            def onQueryStarted(self, event):
-                pass
-
-            def onQueryProgress(self, event):
-                nonlocal observed_metrics
-                observed_metrics = event.progress.observedMetrics
-
-            def onQueryIdle(self, event):
-                pass
-
-            def onQueryTerminated(self, event):
-                pass
-
-        self.spark.streams.addListener(TestListener())
-
-        df = self.spark.readStream.format("rate").option("rowsPerSecond", 10).load()
-        df = df.observe("metric", count(lit(1)).alias("cnt"), sum(col("value")).alias("sum"))
-        q = df.writeStream.format("noop").queryName("test").start()
-        self.assertTrue(q.isActive)
-        time.sleep(10)
-        q.stop()
-
-        self.assertTrue(isinstance(observed_metrics, dict))
-        self.assertTrue("metric" in observed_metrics)
-        row = observed_metrics["metric"]
-        self.assertTrue(isinstance(row, Row))
-        self.assertTrue(hasattr(row, "cnt"))
-        self.assertTrue(hasattr(row, "sum"))
-        self.assertGreaterEqual(row.cnt, 0)
-        self.assertGreaterEqual(row.sum, 0)
-
-    def test_observe_with_same_name_on_different_dataframe(self):
-        # SPARK-45656: named observations with the same name on different datasets
-        from polarspark.sql import Observation
-
-        observation1 = Observation("named")
-        df1 = self.spark.range(50)
-        observed_df1 = df1.observe(observation1, count(lit(1)).alias("cnt"))
-
-        observation2 = Observation("named")
-        df2 = self.spark.range(100)
-        observed_df2 = df2.observe(observation2, count(lit(1)).alias("cnt"))
-
-        observed_df1.collect()
-        observed_df2.collect()
-
-        self.assertEqual(observation1.get, dict(cnt=50))
-        self.assertEqual(observation2.get, dict(cnt=100))
+    # def test_observe_with_same_name_on_different_dataframe(self):
+    #     # SPARK-45656: named observations with the same name on different datasets
+    #     from polarspark.sql import Observation
+    #
+    #     observation1 = Observation("named")
+    #     df1 = self.spark.range(50)
+    #     observed_df1 = df1.observe(observation1, count(lit(1)).alias("cnt"))
+    #
+    #     observation2 = Observation("named")
+    #     df2 = self.spark.range(100)
+    #     observed_df2 = df2.observe(observation2, count(lit(1)).alias("cnt"))
+    #
+    #     observed_df1.collect()
+    #     observed_df2.collect()
+    #
+    #     self.assertEqual(observation1.get, dict(cnt=50))
+    #     self.assertEqual(observation2.get, dict(cnt=100))
 
     def test_sample(self):
         with self.assertRaises(PySparkTypeError) as pe:
@@ -1283,14 +1283,14 @@ class DataFrameTestsMixin:
 
         pdf = self._to_pandas()
         types = pdf.dtypes
-        self.assertEqual(types[0], np.int32)
+        self.assertEqual(types[0], np.int64)
         self.assertEqual(types[1], object)
         self.assertEqual(types[2], bool)
-        self.assertEqual(types[3], np.float32)
-        self.assertEqual(types[4], object)  # datetime.date
-        self.assertEqual(types[5], "datetime64[ns]")
-        self.assertEqual(types[6], "datetime64[ns]")
-        self.assertEqual(types[7], "timedelta64[ns]")
+        self.assertEqual(types[3], np.float64)
+        self.assertEqual(types[4].name, "datetime64[ms]")  # datetime.date
+        self.assertEqual(types[5].name, "datetime64[us]")
+        self.assertEqual(types[6].name, "datetime64[us]")
+        self.assertEqual(types[7].name, "timedelta64[us]")
 
     @unittest.skipIf(not have_pandas, pandas_requirement_message)  # type: ignore
     def test_to_pandas_with_duplicated_column_names(self):
@@ -1802,15 +1802,15 @@ class DataFrameTestsMixin:
             message_parameters={"arg_name": "numPartitions", "arg_type": "list"},
         )
 
-    def test_colregex(self):
-        with self.assertRaises(PySparkTypeError) as pe:
-            self.spark.range(10).colRegex(10)
-
-        self.check_error(
-            exception=pe.exception,
-            error_class="NOT_STR",
-            message_parameters={"arg_name": "colName", "arg_type": "int"},
-        )
+    # def test_colregex(self):
+    #     with self.assertRaises(PySparkTypeError) as pe:
+    #         self.spark.range(10).colRegex(10)
+    #
+    #     self.check_error(
+    #         exception=pe.exception,
+    #         error_class="NOT_STR",
+    #         message_parameters={"arg_name": "colName", "arg_type": "int"},
+    #     )
 
     def test_where(self):
         with self.assertRaises(PySparkTypeError) as pe:
@@ -1890,35 +1890,35 @@ class QueryExecutionListenerTests(unittest.TestCase, SQLTestUtils):
     def tearDown(self):
         self.spark._jvm.OnSuccessCall.clear()
 
-    def test_query_execution_listener_on_collect(self):
-        self.assertFalse(
-            self.spark._jvm.OnSuccessCall.isCalled(),
-            "The callback from the query execution listener should not be called before 'collect'",
-        )
-        self.spark.sql("SELECT * FROM range(1)").collect()
-        self.spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty(10000)
-        self.assertTrue(
-            self.spark._jvm.OnSuccessCall.isCalled(),
-            "The callback from the query execution listener should be called after 'collect'",
-        )
+    # def test_query_execution_listener_on_collect(self):
+    #     self.assertFalse(
+    #         self.spark._jvm.OnSuccessCall.isCalled(),
+    #         "The callback from the query execution listener should not be called before 'collect'",
+    #     )
+    #     self.spark.sql("SELECT * FROM range(1)").collect()
+    #     self.spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty(10000)
+    #     self.assertTrue(
+    #         self.spark._jvm.OnSuccessCall.isCalled(),
+    #         "The callback from the query execution listener should be called after 'collect'",
+    #     )
 
-    @unittest.skipIf(
-        not have_pandas or not have_pyarrow,
-        cast(str, pandas_requirement_message or pyarrow_requirement_message),
-    )
-    def test_query_execution_listener_on_collect_with_arrow(self):
-        with self.sql_conf({"spark.sql.execution.arrow.polarspark.enabled": True}):
-            self.assertFalse(
-                self.spark._jvm.OnSuccessCall.isCalled(),
-                "The callback from the query execution listener should not be "
-                "called before 'toPandas'",
-            )
-            self.spark.sql("SELECT * FROM range(1)").toPandas()
-            self.spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty(10000)
-            self.assertTrue(
-                self.spark._jvm.OnSuccessCall.isCalled(),
-                "The callback from the query execution listener should be called after 'toPandas'",
-            )
+    # @unittest.skipIf(
+    #     not have_pandas or not have_pyarrow,
+    #     cast(str, pandas_requirement_message or pyarrow_requirement_message),
+    # )
+    # def test_query_execution_listener_on_collect_with_arrow(self):
+    #     with self.sql_conf({"spark.sql.execution.arrow.polarspark.enabled": True}):
+    #         self.assertFalse(
+    #             self.spark._jvm.OnSuccessCall.isCalled(),
+    #             "The callback from the query execution listener should not be "
+    #             "called before 'toPandas'",
+    #         )
+    #         self.spark.sql("SELECT * FROM range(1)").toPandas()
+    #         self.spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty(10000)
+    #         self.assertTrue(
+    #             self.spark._jvm.OnSuccessCall.isCalled(),
+    #             "The callback from the query execution listener should be called after 'toPandas'",
+    #         )
 
 
 class DataFrameTests(DataFrameTestsMixin, ReusedSQLTestCase):

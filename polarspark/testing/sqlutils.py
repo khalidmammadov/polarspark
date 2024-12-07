@@ -24,7 +24,7 @@ from contextlib import contextmanager
 
 pandas_requirement_message = None
 try:
-    from pyspark.sql.pandas.utils import require_minimum_pandas_version
+    from polarspark.sql.pandas.utils import require_minimum_pandas_version
 
     require_minimum_pandas_version()
 except ImportError as e:
@@ -33,7 +33,7 @@ except ImportError as e:
 
 pyarrow_requirement_message = None
 try:
-    from pyspark.sql.pandas.utils import require_minimum_pyarrow_version
+    from polarspark.sql.pandas.utils import require_minimum_pyarrow_version
 
     require_minimum_pyarrow_version()
 except ImportError as e:
@@ -42,7 +42,7 @@ except ImportError as e:
 
 test_not_compiled_message = None
 try:
-    from pyspark.sql.utils import require_test_compiled
+    from polarspark.sql.utils import require_test_compiled
 
     require_test_compiled()
 except Exception as e:

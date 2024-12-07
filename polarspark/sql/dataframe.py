@@ -140,6 +140,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self,
         ldf: LazyFrame,
         sql_ctx: Union["SQLContext", "SparkSession"],
+        rdds: RDD = None,
         alias: Optional[str] = None
     ):
         from polarspark.sql.context import SQLContext
@@ -162,6 +163,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self._sc: SparkContext = sql_ctx._sc
         self._ldf: LazyFrame = ldf
         self.is_cached = False
+        self.rdds = rdds
         # initialized lazily
         self._schema: Optional[StructType] = None
         self._lazy_rdd: Optional[RDD[Row]] = None
@@ -205,28 +207,23 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         return self._session
 
-    # @property
-    # def rdd(self) -> "RDD[Row]":
-    #     """Returns the content as an :class:`polarspark.RDD` of :class:`Row`.
-    #
-    #     .. versionadded:: 1.3.0
-    #
-    #     Returns
-    #     -------
-    #     :class:`RDD`
-    #
-    #     Examples
-    #     --------
-    #     >>> df = spark.range(1)
-    #     >>> type(df.rdd)
-    #     <class 'polarspark.rdd.RDD'>
-    #     """
-    #     if self._lazy_rdd is None:
-    #         jrdd = self._jdf.javaToPython()
-    #         self._lazy_rdd = RDD(
-    #             jrdd, self.sparkSession._sc, BatchedSerializer(CPickleSerializer())
-    #         )
-    #     return self._lazy_rdd
+    @property
+    def rdd(self) -> "RDD[Row]":
+        """Returns the content as an :class:`polarspark.RDD` of :class:`Row`.
+
+        .. versionadded:: 1.3.0
+
+        Returns
+        -------
+        :class:`RDD`
+
+        Examples
+        --------
+        >>> df = spark.range(1)
+        >>> type(df.rdd)
+        <class 'polarspark.rdd.RDD'>
+        """
+        return self.rdds
 
     @property
     def na(self) -> "DataFrameNaFunctions":
@@ -1844,6 +1841,15 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         # Nothing to repartition
         # There is always one copy/partition in the memory
+        if not isinstance(numPartitions, (int, Column, str)):
+            raise PySparkTypeError(
+                    error_class="NOT_COLUMN_OR_STR",
+                    message_parameters={
+                        "arg_name": "numPartitions",
+                        "arg_type": type(numPartitions).__name__,
+                    },
+                )
+        self.rdds = RDD(numPartitions)
         return self
 
     @overload
@@ -2681,6 +2687,13 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |Alice|  2|
         +-----+---+
         """
+
+        supported = {
+            "inner", "cross", "outer",
+            "full", "fullouter", "full_outer", "left", "leftouter", "left_outer",
+            "right", "rightouter", "right_outer", "semi", "leftsemi", "left_semi",
+            "anti", "leftanti", "left_anti"
+        }
         how_map = {
             "outer": "full",
             "fullouter": "full",
@@ -2695,6 +2708,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             "left_anti": "anti"
         }
         how = how_map.get(how, how)
+
+        if how and how not in supported:
+            raise IllegalArgumentException("Unsupported join type")
 
         if on is not None and not isinstance(on, list):
             on = [on]  # type: ignore[assignment]
@@ -2722,8 +2738,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                                 f"Join with {op} condition not implemented yet"
                             )
 
-        if on is None:
-            if self.sparkSession.conf.get("spark.sql.crossJoin.enabled"):
+        if on is None and how != "cross":
+            if self.sparkSession.conf.get("spark.sql.crossJoin.enabled") == "true":
                 how = "cross"
             else:
                 raise AnalysisException("on clause is missing and cross joins are disabled")
@@ -4775,18 +4791,15 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |Alice|  5|    80|
         +-----+---+------+
         """
-        # if subset is not None and (not isinstance(subset, Iterable) or isinstance(subset, str)):
-        #     raise PySparkTypeError(
-        #         error_class="NOT_LIST_OR_TUPLE",
-        #         message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-        #     )
-        #
-        # if subset is None:
-        #     jdf = self._jdf.dropDuplicates()
-        # else:
-        #     jdf = self._jdf.dropDuplicates(self._jseq(subset))
-        # return DataFrame(jdf, self.sparkSession)
-        raise NotImplementedError()
+        if subset is not None and (not isinstance(subset, Iterable) or isinstance(subset, str)):
+            raise PySparkTypeError(
+                error_class="NOT_LIST_OR_TUPLE",
+                message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
+            )
+
+        if subset is None:
+            return self.distinct()
+        return self._to_df(self._ldf.unique(subset=subset, maintain_order=False,  keep="any"))
 
     def dropDuplicatesWithinWatermark(self, subset: Optional[List[str]] = None) -> "DataFrame":
         """Return a new :class:`DataFrame` with duplicate rows removed,
@@ -6605,6 +6618,14 @@ class DataFrameStatFunctions:
         return self.df.sampleBy(col, fractions, seed)
 
     sampleBy.__doc__ = DataFrame.sampleBy.__doc__
+
+
+class RDD:
+    def __init__(self, part_count):
+        self.part_count = part_count
+
+    def getNumPartitions(self):
+        return self.part_count
 
 
 def _pdf_to_row_iter(pdf: pl.DataFrame) -> Iterator[Row]:
