@@ -338,18 +338,16 @@ class RDD(Generic[T_co]):
 
     def __init__(
         self,
-        jrdd: "JavaObject",
         ctx: "SparkContext",
-        jrdd_deserializer: Serializer = AutoBatchedSerializer(CPickleSerializer()),
+        part_count=1
     ):
-        self._jrdd = jrdd
         self.is_cached = False
         self.is_checkpointed = False
         self.has_resource_profile = False
         self.ctx = ctx
-        self._jrdd_deserializer = jrdd_deserializer
-        self._id = jrdd.id()
+        self._id = 1
         self.partitioner: Optional[Partitioner] = None
+        self.part_count = part_count
 
     def _pickled(self: "RDD[T]") -> "RDD[T]":
         return self._reserialize(AutoBatchedSerializer(CPickleSerializer()))
@@ -944,7 +942,7 @@ class RDD(Generic[T_co]):
         >>> rdd.getNumPartitions()
         2
         """
-        return self._jrdd.partitions().size()
+        return self.part_count
 
     def filter(self: "RDD[T]", f: Callable[[T], bool]) -> "RDD[T]":
         """

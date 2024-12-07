@@ -243,7 +243,7 @@ class PandasConversionMixin:
         #     )
         # else:
         #     return pdf
-        return self._ldf.collect().to_pandas()
+        return self._ldf.collect().to_pandas(use_pyarrow_extension_array=True)
 
     def _collect_as_arrow(self, split_batches: bool = False) -> List["pa.RecordBatch"]:
         """
@@ -375,40 +375,42 @@ class SparkConversionMixin:
 
         require_minimum_pandas_version()
 
-        timezone = tzlocal.get_localzone_name()
+        # timezone = tzlocal.get_localzone_name()
+        #
+        # # If no schema supplied by user then get the names of columns only
+        # if schema is None:
+        #     schema = [str(x) if not isinstance(x, str) else x for x in data.columns]
+        #
+        # # self._jconf.arrowPySparkEnabled()
+        # arrow_optimization_enabled = True
+        # if arrow_optimization_enabled and len(data) > 0:
+        #     try:
+        #         return self._create_from_pandas_with_arrow(data, schema, timezone)
+        #     except Exception as e:
+        #         if self._jconf.arrowPySparkFallbackEnabled():
+        #             msg = (
+        #                 "createDataFrame attempted Arrow optimization because "
+        #                 "'spark.sql.execution.arrow.pyspark.enabled' is set to true; however, "
+        #                 "failed by the reason below:\n  %s\n"
+        #                 "Attempting non-optimization as "
+        #                 "'spark.sql.execution.arrow.pyspark.fallback.enabled' is set to "
+        #                 "true." % str(e)
+        #             )
+        #             warn(msg)
+        #         else:
+        #             msg = (
+        #                 "createDataFrame attempted Arrow optimization because "
+        #                 "'spark.sql.execution.arrow.pyspark.enabled' is set to true, but has "
+        #                 "reached the error below and will not continue because automatic "
+        #                 "fallback with 'spark.sql.execution.arrow.pyspark.fallback.enabled' "
+        #                 "has been set to false.\n  %s" % str(e)
+        #             )
+        #             warn(msg)
+        #             raise
+        # converted_data = self._convert_from_pandas(data, schema, timezone)
+        # return self._create_dataframe(converted_data, schema, samplingRatio, verifySchema)
 
-        # If no schema supplied by user then get the names of columns only
-        if schema is None:
-            schema = [str(x) if not isinstance(x, str) else x for x in data.columns]
-
-        # self._jconf.arrowPySparkEnabled()
-        arrow_optimization_enabled = True
-        if arrow_optimization_enabled and len(data) > 0:
-            try:
-                return self._create_from_pandas_with_arrow(data, schema, timezone)
-            except Exception as e:
-                if self._jconf.arrowPySparkFallbackEnabled():
-                    msg = (
-                        "createDataFrame attempted Arrow optimization because "
-                        "'spark.sql.execution.arrow.pyspark.enabled' is set to true; however, "
-                        "failed by the reason below:\n  %s\n"
-                        "Attempting non-optimization as "
-                        "'spark.sql.execution.arrow.pyspark.fallback.enabled' is set to "
-                        "true." % str(e)
-                    )
-                    warn(msg)
-                else:
-                    msg = (
-                        "createDataFrame attempted Arrow optimization because "
-                        "'spark.sql.execution.arrow.pyspark.enabled' is set to true, but has "
-                        "reached the error below and will not continue because automatic "
-                        "fallback with 'spark.sql.execution.arrow.pyspark.fallback.enabled' "
-                        "has been set to false.\n  %s" % str(e)
-                    )
-                    warn(msg)
-                    raise
-        converted_data = self._convert_from_pandas(data, schema, timezone)
-        return self._create_dataframe(converted_data, schema, samplingRatio, verifySchema)
+        return self._create_dataframe_simple(pl.from_pandas(data).lazy())
 
     def _convert_from_pandas(
         self, pdf: "PandasDataFrameLike", schema: Union[StructType, str, List[str]], timezone: str

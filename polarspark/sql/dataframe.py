@@ -163,7 +163,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self._sc: SparkContext = sql_ctx._sc
         self._ldf: LazyFrame = ldf
         self.is_cached = False
-        self.rdds = rdds
+        if rdds:
+            self.rdds = rdds
+        else:
+            self.rdds = RDD(self._sc, 1)
         # initialized lazily
         self._schema: Optional[StructType] = None
         self._lazy_rdd: Optional[RDD[Row]] = None
@@ -1849,7 +1852,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                         "arg_type": type(numPartitions).__name__,
                     },
                 )
-        self.rdds = RDD(numPartitions)
+        self.rdds = RDD(self._sc, numPartitions)
         return self
 
     @overload
@@ -6226,54 +6229,56 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ), "Func returned an instance of type [%s], " "should have been DataFrame." % type(result)
         return result
 
-    # def sameSemantics(self, other: "DataFrame") -> bool:
-    #     """
-    #     Returns `True` when the logical query plans inside both :class:`DataFrame`\\s are equal and
-    #     therefore return the same results.
-    #
-    #     .. versionadded:: 3.1.0
-    #
-    #     .. versionchanged:: 3.5.0
-    #         Supports Spark Connect.
-    #
-    #     Notes
-    #     -----
-    #     The equality comparison here is simplified by tolerating the cosmetic differences
-    #     such as attribute names.
-    #
-    #     This API can compare both :class:`DataFrame`\\s very fast but can still return
-    #     `False` on the :class:`DataFrame` that return the same results, for instance, from
-    #     different plans. Such false negative semantic can be useful when caching as an example.
-    #
-    #     This API is a developer API.
-    #
-    #     Parameters
-    #     ----------
-    #     other : :class:`DataFrame`
-    #         The other DataFrame to compare against.
-    #
-    #     Returns
-    #     -------
-    #     bool
-    #         Whether these two DataFrames are similar.
-    #
-    #     Examples
-    #     --------
-    #     >>> df1 = spark.range(10)
-    #     >>> df2 = spark.range(10)
-    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id * 2))
-    #     True
-    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id + 2))
-    #     False
-    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col0", df2.id * 2))
-    #     True
-    #     """
-    #     if not isinstance(other, DataFrame):
-    #         raise PySparkTypeError(
-    #             error_class="NOT_STR",
-    #             message_parameters={"arg_name": "other", "arg_type": type(other).__name__},
-    #         )
-    #     return self._jdf.sameSemantics(other._jdf)
+    def sameSemantics(self, other: "DataFrame") -> bool:
+        """
+        Returns `True` when the logical query plans inside both :class:`DataFrame`\\s are equal and
+        therefore return the same results.
+
+        .. versionadded:: 3.1.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
+
+        Notes
+        -----
+        The equality comparison here is simplified by tolerating the cosmetic differences
+        such as attribute names.
+
+        This API can compare both :class:`DataFrame`\\s very fast but can still return
+        `False` on the :class:`DataFrame` that return the same results, for instance, from
+        different plans. Such false negative semantic can be useful when caching as an example.
+
+        This API is a developer API.
+
+        Parameters
+        ----------
+        other : :class:`DataFrame`
+            The other DataFrame to compare against.
+
+        Returns
+        -------
+        bool
+            Whether these two DataFrames are similar.
+
+        Examples
+        --------
+        >>> df1 = spark.range(10)
+        >>> df2 = spark.range(10)
+        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id * 2))
+        True
+        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id + 2))
+        False
+        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col0", df2.id * 2))
+        True
+        """
+        if not isinstance(other, DataFrame):
+            raise PySparkTypeError(
+                error_class="NOT_STR",
+                message_parameters={"arg_name": "other", "arg_type": type(other).__name__},
+            )
+        this_plan = self._ldf.serialize(format="json")
+        other_plan = other._ldf.serialize(format="json")
+        return this_plan == other_plan
 
     # def semanticHash(self) -> int:
     #     """
@@ -6471,7 +6476,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #     return self.pandas_api(index_col)
 
     def _to_df(self, ldf: LazyFrame) -> "DataFrame":
-        return DataFrame(ldf, self.sparkSession, alias=self._alias)
+        return DataFrame(ldf, self.sparkSession, rdds=self.rdds, alias=self._alias)
 
 
 class DataFrameNaFunctions:
@@ -6618,14 +6623,6 @@ class DataFrameStatFunctions:
         return self.df.sampleBy(col, fractions, seed)
 
     sampleBy.__doc__ = DataFrame.sampleBy.__doc__
-
-
-class RDD:
-    def __init__(self, part_count):
-        self.part_count = part_count
-
-    def getNumPartitions(self):
-        return self.part_count
 
 
 def _pdf_to_row_iter(pdf: pl.DataFrame) -> Iterator[Row]:
