@@ -19,8 +19,8 @@
 import json
 import unittest
 
-from pyspark.errors.error_classes import ERROR_CLASSES_JSON
-from pyspark.errors.utils import ErrorClassesReader
+from polarspark.errors.error_classes import ERROR_CLASSES_JSON
+from polarspark.errors.utils import ErrorClassesReader
 
 
 class ErrorsTest(unittest.TestCase):

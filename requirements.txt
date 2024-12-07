@@ -1,7 +1,9 @@
 polars~=1.8.2
 setuptools~=68.2.0
+#numpy-base~=1.35
 numpy~=2.0.2
 cloudpickle~=3.0.0
 pandas>=1.4.4
 tzlocal~=5.2
 pyarrow>=4.0.0
+#pyarrow>=17.0.0

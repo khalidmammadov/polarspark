@@ -22,6 +22,7 @@ import sys
 import unittest
 import difflib
 import functools
+import logging
 import math
 from decimal import Decimal
 from time import time, sleep
@@ -64,6 +65,7 @@ from polarspark.sql.functions import col, when
 __all__ = ["assertDataFrameEqual", "assertSchemaEqual"]
 
 # SPARK_HOME = _find_spark_home()
+logger = logging.getLogger(__name__)
 
 
 def read_int(b):
@@ -142,14 +144,14 @@ def eventually(
 
 class QuietTest:
     def __init__(self, sc):
-        self.log4j = sc._jvm.org.apache.log4j
+        self.log4j = logger
 
     def __enter__(self):
-        self.old_level = self.log4j.LogManager.getRootLogger().getLevel()
-        self.log4j.LogManager.getRootLogger().setLevel(self.log4j.Level.FATAL)
+        self.old_level = self.log4j.level
+        self.log4j.setLevel(logging.FATAL)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.log4j.LogManager.getRootLogger().setLevel(self.old_level)
+        self.log4j.setLevel(self.old_level)
 
 
 class PySparkTestCase(unittest.TestCase):

@@ -1415,6 +1415,9 @@ class SparkSession(SparkConversionMixin):
         df._schema = struct
         return df
 
+    def _create_dataframe_simple(self, ldf):
+        return DataFrame(ldf, self)
+
     def sql(
         self, sqlQuery: str, args: Optional[Union[Dict[str, Any], List]] = None, **kwargs: Any
     ) -> DataFrame:

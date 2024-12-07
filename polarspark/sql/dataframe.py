@@ -140,6 +140,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self,
         ldf: LazyFrame,
         sql_ctx: Union["SQLContext", "SparkSession"],
+        rdds: RDD = None,
         alias: Optional[str] = None
     ):
         from polarspark.sql.context import SQLContext
@@ -162,6 +163,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self._sc: SparkContext = sql_ctx._sc
         self._ldf: LazyFrame = ldf
         self.is_cached = False
+        if rdds:
+            self.rdds = rdds
+        else:
+            self.rdds = RDD(self._sc, 1)
         # initialized lazily
         self._schema: Optional[StructType] = None
         self._lazy_rdd: Optional[RDD[Row]] = None
@@ -205,28 +210,23 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         return self._session
 
-    # @property
-    # def rdd(self) -> "RDD[Row]":
-    #     """Returns the content as an :class:`polarspark.RDD` of :class:`Row`.
-    #
-    #     .. versionadded:: 1.3.0
-    #
-    #     Returns
-    #     -------
-    #     :class:`RDD`
-    #
-    #     Examples
-    #     --------
-    #     >>> df = spark.range(1)
-    #     >>> type(df.rdd)
-    #     <class 'polarspark.rdd.RDD'>
-    #     """
-    #     if self._lazy_rdd is None:
-    #         jrdd = self._jdf.javaToPython()
-    #         self._lazy_rdd = RDD(
-    #             jrdd, self.sparkSession._sc, BatchedSerializer(CPickleSerializer())
-    #         )
-    #     return self._lazy_rdd
+    @property
+    def rdd(self) -> "RDD[Row]":
+        """Returns the content as an :class:`polarspark.RDD` of :class:`Row`.
+
+        .. versionadded:: 1.3.0
+
+        Returns
+        -------
+        :class:`RDD`
+
+        Examples
+        --------
+        >>> df = spark.range(1)
+        >>> type(df.rdd)
+        <class 'polarspark.rdd.RDD'>
+        """
+        return self.rdds
 
     @property
     def na(self) -> "DataFrameNaFunctions":
@@ -1844,6 +1844,15 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         # Nothing to repartition
         # There is always one copy/partition in the memory
+        if not isinstance(numPartitions, (int, Column, str)):
+            raise PySparkTypeError(
+                    error_class="NOT_COLUMN_OR_STR",
+                    message_parameters={
+                        "arg_name": "numPartitions",
+                        "arg_type": type(numPartitions).__name__,
+                    },
+                )
+        self.rdds = RDD(self._sc, numPartitions)
         return self
 
     @overload
@@ -2681,6 +2690,13 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |Alice|  2|
         +-----+---+
         """
+
+        supported = {
+            "inner", "cross", "outer",
+            "full", "fullouter", "full_outer", "left", "leftouter", "left_outer",
+            "right", "rightouter", "right_outer", "semi", "leftsemi", "left_semi",
+            "anti", "leftanti", "left_anti"
+        }
         how_map = {
             "outer": "full",
             "fullouter": "full",
@@ -2695,6 +2711,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             "left_anti": "anti"
         }
         how = how_map.get(how, how)
+
+        if how and how not in supported:
+            raise IllegalArgumentException("Unsupported join type")
 
         if on is not None and not isinstance(on, list):
             on = [on]  # type: ignore[assignment]
@@ -2722,19 +2741,27 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                                 f"Join with {op} condition not implemented yet"
                             )
 
-        if on is None and how is None:
-            ldf = self._ldf.join(other._ldf)
-        else:
-            if how is None:
-                how = "inner"
-            assert isinstance(how, str), "how should be a string"
-            if left_on and right_on:
-                ldf = self._ldf.join(other._ldf, how=how, left_on=left_on, right_on=right_on)
+        if on is None and how != "cross":
+            if self.sparkSession.conf.get("spark.sql.crossJoin.enabled") == "true":
+                how = "cross"
             else:
-                _on = [o if isinstance(o, str) else o._name for o in on]
-                ldf = self._ldf.join(other._ldf, _on, how, coalesce=True)
-                if how == "right":
-                    ldf = ldf.select(list(OrderedDict.fromkeys(self.columns + other.columns)))
+                raise AnalysisException("on clause is missing and cross joins are disabled")
+
+        # if on is None and how is None:
+        #     ldf = self._ldf.join(other._ldf)
+        # else:
+        if how is None:
+            how = "inner"
+        assert isinstance(how, str), "how should be a string"
+        if left_on and right_on:
+            ldf = self._ldf.join(other._ldf, how=how, left_on=left_on, right_on=right_on)
+        elif on is not None:
+            _on = [o if isinstance(o, str) else o._name for o in on]
+            ldf = self._ldf.join(other._ldf, _on, how, coalesce=True)
+            if how == "right":
+                ldf = ldf.select(list(OrderedDict.fromkeys(self.columns + other.columns)))
+        else:
+            ldf = self._ldf.join(other._ldf, how=how)
         return self._to_df(ldf)
 
     # TODO(SPARK-22947): Fix the DataFrame API.
@@ -4767,18 +4794,15 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |Alice|  5|    80|
         +-----+---+------+
         """
-        # if subset is not None and (not isinstance(subset, Iterable) or isinstance(subset, str)):
-        #     raise PySparkTypeError(
-        #         error_class="NOT_LIST_OR_TUPLE",
-        #         message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-        #     )
-        #
-        # if subset is None:
-        #     jdf = self._jdf.dropDuplicates()
-        # else:
-        #     jdf = self._jdf.dropDuplicates(self._jseq(subset))
-        # return DataFrame(jdf, self.sparkSession)
-        raise NotImplementedError()
+        if subset is not None and (not isinstance(subset, Iterable) or isinstance(subset, str)):
+            raise PySparkTypeError(
+                error_class="NOT_LIST_OR_TUPLE",
+                message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
+            )
+
+        if subset is None:
+            return self.distinct()
+        return self._to_df(self._ldf.unique(subset=subset, maintain_order=False,  keep="any"))
 
     def dropDuplicatesWithinWatermark(self, subset: Optional[List[str]] = None) -> "DataFrame":
         """Return a new :class:`DataFrame` with duplicate rows removed,
@@ -6205,54 +6229,56 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ), "Func returned an instance of type [%s], " "should have been DataFrame." % type(result)
         return result
 
-    # def sameSemantics(self, other: "DataFrame") -> bool:
-    #     """
-    #     Returns `True` when the logical query plans inside both :class:`DataFrame`\\s are equal and
-    #     therefore return the same results.
-    #
-    #     .. versionadded:: 3.1.0
-    #
-    #     .. versionchanged:: 3.5.0
-    #         Supports Spark Connect.
-    #
-    #     Notes
-    #     -----
-    #     The equality comparison here is simplified by tolerating the cosmetic differences
-    #     such as attribute names.
-    #
-    #     This API can compare both :class:`DataFrame`\\s very fast but can still return
-    #     `False` on the :class:`DataFrame` that return the same results, for instance, from
-    #     different plans. Such false negative semantic can be useful when caching as an example.
-    #
-    #     This API is a developer API.
-    #
-    #     Parameters
-    #     ----------
-    #     other : :class:`DataFrame`
-    #         The other DataFrame to compare against.
-    #
-    #     Returns
-    #     -------
-    #     bool
-    #         Whether these two DataFrames are similar.
-    #
-    #     Examples
-    #     --------
-    #     >>> df1 = spark.range(10)
-    #     >>> df2 = spark.range(10)
-    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id * 2))
-    #     True
-    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id + 2))
-    #     False
-    #     >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col0", df2.id * 2))
-    #     True
-    #     """
-    #     if not isinstance(other, DataFrame):
-    #         raise PySparkTypeError(
-    #             error_class="NOT_STR",
-    #             message_parameters={"arg_name": "other", "arg_type": type(other).__name__},
-    #         )
-    #     return self._jdf.sameSemantics(other._jdf)
+    def sameSemantics(self, other: "DataFrame") -> bool:
+        """
+        Returns `True` when the logical query plans inside both :class:`DataFrame`\\s are equal and
+        therefore return the same results.
+
+        .. versionadded:: 3.1.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
+
+        Notes
+        -----
+        The equality comparison here is simplified by tolerating the cosmetic differences
+        such as attribute names.
+
+        This API can compare both :class:`DataFrame`\\s very fast but can still return
+        `False` on the :class:`DataFrame` that return the same results, for instance, from
+        different plans. Such false negative semantic can be useful when caching as an example.
+
+        This API is a developer API.
+
+        Parameters
+        ----------
+        other : :class:`DataFrame`
+            The other DataFrame to compare against.
+
+        Returns
+        -------
+        bool
+            Whether these two DataFrames are similar.
+
+        Examples
+        --------
+        >>> df1 = spark.range(10)
+        >>> df2 = spark.range(10)
+        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id * 2))
+        True
+        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col1", df2.id + 2))
+        False
+        >>> df1.withColumn("col1", df1.id * 2).sameSemantics(df2.withColumn("col0", df2.id * 2))
+        True
+        """
+        if not isinstance(other, DataFrame):
+            raise PySparkTypeError(
+                error_class="NOT_STR",
+                message_parameters={"arg_name": "other", "arg_type": type(other).__name__},
+            )
+        this_plan = self._ldf.serialize(format="json")
+        other_plan = other._ldf.serialize(format="json")
+        return this_plan == other_plan
 
     # def semanticHash(self) -> int:
     #     """
@@ -6450,7 +6476,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #     return self.pandas_api(index_col)
 
     def _to_df(self, ldf: LazyFrame) -> "DataFrame":
-        return DataFrame(ldf, self.sparkSession, alias=self._alias)
+        return DataFrame(ldf, self.sparkSession, rdds=self.rdds, alias=self._alias)
 
 
 class DataFrameNaFunctions:

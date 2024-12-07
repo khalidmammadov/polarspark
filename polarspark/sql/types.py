@@ -885,7 +885,7 @@ class StructField(DataType):
     def build_formatted_string(self, prefix: str, string_concat: List[str], depth: int):
         if depth > 0:
             string_concat.append(f"{prefix}-- {escape_meta_characters(self.name)}: " +
-                f"{self.dataType.typeName} (nullable = {self.nullable})\n")
+                f"{self.dataType.typeName()} (nullable = {self.nullable})\n")
             DataType.build_formatted_string(self.dataType,
                                             f"{prefix}    |",
                                             string_concat,

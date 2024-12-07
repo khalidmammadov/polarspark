@@ -33,7 +33,8 @@ class RuntimeConfig:
     """
 
     _defaults = {
-        "spark.sql.sources.partitionOverwriteMode": "STATIC"
+        "spark.sql.sources.partitionOverwriteMode": "STATIC",
+        "spark.sql.crossJoin.enabled": True
     }
 
     _non_mutable = {
