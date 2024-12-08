@@ -339,7 +339,8 @@ class RDD(Generic[T_co]):
     def __init__(
         self,
         ctx: "SparkContext",
-        part_count=1
+        part_count=1,
+        part_by=None
     ):
         self.is_cached = False
         self.is_checkpointed = False
@@ -348,6 +349,7 @@ class RDD(Generic[T_co]):
         self._id = 1
         self.partitioner: Optional[Partitioner] = None
         self.part_count = part_count
+        self.part_by = part_by or []
 
     def _pickled(self: "RDD[T]") -> "RDD[T]":
         return self._reserialize(AutoBatchedSerializer(CPickleSerializer()))

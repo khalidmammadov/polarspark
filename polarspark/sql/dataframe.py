@@ -1920,30 +1920,31 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 23|Alice|                   1|
         +---+-----+--------------------+
         """
-        # if isinstance(numPartitions, int):
-        #     if len(cols) == 0:
-        #         raise PySparkValueError(
-        #             error_class="CANNOT_BE_EMPTY",
-        #             message_parameters={"item": "partition-by expression"},
-        #         )
+        if isinstance(numPartitions, int):
+            if len(cols) == 0:
+                raise PySparkValueError(
+                    error_class="CANNOT_BE_EMPTY",
+                    message_parameters={"item": "partition-by expression"},
+                )
         #     else:
         #         return DataFrame(
         #             self._jdf.repartitionByRange(numPartitions, self._jcols(*cols)),
         #             self.sparkSession,
         #         )
-        # elif isinstance(numPartitions, (str, Column)):
+        elif isinstance(numPartitions, (str, Column)):
+            pass
         #     cols = (numPartitions,) + cols
         #     return DataFrame(self._jdf.repartitionByRange(self._jcols(*cols)), self.sparkSession)
-        # else:
-        #     raise PySparkTypeError(
-        #         error_class="NOT_COLUMN_OR_INT_OR_STR",
-        #         message_parameters={
-        #             "arg_name": "numPartitions",
-        #             "arg_type": type(numPartitions).__name__,
-        #         },
-        #     )
-        # Nothing to repartition
-        # There is always one copy/partition in the memory
+        else:
+            raise PySparkTypeError(
+                error_class="NOT_COLUMN_OR_INT_OR_STR",
+                message_parameters={
+                    "arg_name": "numPartitions",
+                    "arg_type": type(numPartitions).__name__,
+                },
+            )
+
+        self.rdds = RDD(self._sc, part_count=numPartitions, part_by=cols)
         return self
 
     def distinct(self) -> "DataFrame":
@@ -3806,7 +3807,12 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         +---+-----+-------+
         """
         if isinstance(condition, str):
-            ldf = self._ldf.filter(condition)
+            if condition.lower() == "false":
+                ldf = self._ldf.head(0)
+            elif condition.lower() == "true":
+                ldf = self._ldf
+            else:
+                ldf = self._ldf.filter(condition)
         elif isinstance(condition, Column):
             ldf = self._ldf.filter(condition._expr)
         else:
@@ -6144,6 +6150,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             if isinstance(c, str):
                 if c in self.columns:
                     columns.append(c)
+                    if f"{c}_right" in self.columns:
+                        columns.append(f"{c}_right")
             elif isinstance(c, Column):
                 if c._name in self.columns:
                     columns.append(c._expr)
