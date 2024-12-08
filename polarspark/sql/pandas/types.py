@@ -22,6 +22,8 @@ pandas instances during the type conversion.
 import datetime
 import itertools
 from typing import Any, Callable, Iterable, List, Optional, Union, TYPE_CHECKING
+import polars as pl
+
 
 from polarspark.sql.types import (
     cast,
@@ -56,6 +58,58 @@ if TYPE_CHECKING:
     import pyarrow as pa
 
     from polarspark.sql.pandas._typing import SeriesLike as PandasSeriesLike
+
+
+def to_polars_type(data_type: Union[DataType, str]):
+    type_str = data_type if isinstance(data_type, str) else data_type.typeName()
+    type_map = {
+        "boolean": pl.Boolean,
+        "byte": pl.Int8,
+        "short": pl.Int16,
+        "int": pl.Int32,
+        "integer": pl.Int32,
+        "long": pl.Int64,
+        "float": pl.Float32,
+        "double": pl.Float64,
+        "decimal": pl.Decimal(data_type.precision, data_type.scale) if type_str == "decimal" else None,
+        "string": pl.String,
+        "binary": pl.Binary,
+        "date": pl.Date,
+        "timestamp": pl.Int64,
+        "timestampntz": pl.Int64,
+        "array": pl.List,
+        "map": pl.Struct,
+        "struct": pl.Struct,
+        "null": pl.Null
+    }
+    return type_map.get(type_str)
+
+
+def to_polars_selector(data_type: str):
+    _float = [pl.Float32, pl.Float64]
+    _int = [pl.Int8, pl.Int16, pl.Int32, pl.Int64]
+    _bool = [pl.Boolean]
+    _str = [pl.String]
+    _bin = [pl.Binary]
+    selector_map = {
+        "boolean": _bool,
+        "bool": _bool,
+        "byte": _int,
+        "short": _int,
+        "int": _int,
+        "integer": _int,
+        "long": _int,
+        "float": _float,
+        "double": _float,
+        "string": _str,
+        "str": _str,
+        "binary": _bin,
+        "bin": _bin,
+        "date": [pl.Date],
+        "timestamp": _int,
+        "timestampntz": _int,
+    }
+    return selector_map.get(data_type)
 
 
 def to_arrow_type(dt: DataType) -> "pa.DataType":
