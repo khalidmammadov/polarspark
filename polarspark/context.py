@@ -764,130 +764,85 @@ class SparkContext:
 #
 #         return self.parallelize(range(start, end, step), numSlices)
 #
-#     def parallelize(self, c: Iterable[T], numSlices: Optional[int] = None) -> RDD[T]:
-#         """
-#         Distribute a local Python collection to form an RDD. Using range
-#         is recommended if the input represents a range for performance.
-#
-#         .. versionadded:: 0.7.0
-#
-#         Parameters
-#         ----------
-#         c : :class:`collections.abc.Iterable`
-#             iterable collection to distribute
-#         numSlices : int, optional
-#             the number of partitions of the new RDD
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD representing distributed collection.
-#
-#         Examples
-#         --------
-#         >>> sc.parallelize([0, 2, 3, 4, 6], 5).glom().collect()
-#         [[0], [2], [3], [4], [6]]
-#         >>> sc.parallelize(range(0, 6, 2), 5).glom().collect()
-#         [[], [0], [], [2], [4]]
-#
-#         Deal with a list of strings.
-#
-#         >>> strings = ["a", "b", "c"]
-#         >>> sc.parallelize(strings, 2).glom().collect()
-#         [['a'], ['b', 'c']]
-#         """
-#         numSlices = int(numSlices) if numSlices is not None else self.defaultParallelism
-#         if isinstance(c, range):
-#             size = len(c)
-#             if size == 0:
-#                 return self.parallelize([], numSlices)
-#             step = c[1] - c[0] if size > 1 else 1  # type: ignore[index]
-#             start0 = c[0]  # type: ignore[index]
-#
-#             def getStart(split: int) -> int:
-#                 assert numSlices is not None
-#                 return start0 + int((split * size / numSlices)) * step
-#
-#             def f(split: int, iterator: Iterable[T]) -> Iterable:
-#                 # it's an empty iterator here but we need this line for triggering the
-#                 # logic of signal handling in FramedSerializer.load_stream, for instance,
-#                 # SpecialLengths.END_OF_DATA_SECTION in _read_with_length. Since
-#                 # FramedSerializer.load_stream produces a generator, the control should
-#                 # at least be in that function once. Here we do it by explicitly converting
-#                 # the empty iterator to a list, thus make sure worker reuse takes effect.
-#                 # See more details in SPARK-26549.
-#                 assert len(list(iterator)) == 0
-#                 return range(getStart(split), getStart(split + 1), step)
-#
-#             return self.parallelize([], numSlices).mapPartitionsWithIndex(f)
-#
-#         # Make sure we distribute data evenly if it's smaller than self.batchSize
-#         if "__len__" not in dir(c):
-#             c = list(c)  # Make it a list so we can compute its length
-#         batchSize = max(
-#             1, min(len(c) // numSlices, self._batchSize or 1024)  # type: ignore[arg-type]
-#         )
-#         serializer = BatchedSerializer(self._unbatched_serializer, batchSize)
-#
-#         def reader_func(temp_filename: str) -> JavaObject:
-#             assert self._jvm is not None
-#             return self._jvm.PythonRDD.readRDDFromFile(self._jsc, temp_filename, numSlices)
-#
-#         def createRDDServer() -> JavaObject:
-#             assert self._jvm is not None
-#             return self._jvm.PythonParallelizeServer(self._jsc.sc(), numSlices)
-#
-#         jrdd = self._serialize_to_jvm(c, serializer, reader_func, createRDDServer)
-#         return RDD(jrdd, self, serializer)
-#
-#     def _serialize_to_jvm(
-#         self,
-#         data: Iterable[T],
-#         serializer: Serializer,
-#         reader_func: Callable,
-#         server_func: Callable,
-#     ) -> JavaObject:
-#         """
-#         Using Py4J to send a large dataset to the jvm is slow, so we use either a file
-#         or a socket if we have encryption enabled.
-#
-#         Examples
-#         --------
-#         data
-#             object to be serialized
-#         serializer : class:`polarspark.serializers.Serializer`
-#         reader_func : function
-#             A function which takes a filename and reads in the data in the jvm and
-#             returns a JavaRDD. Only used when encryption is disabled.
-#         server_func : function
-#             A function which creates a SocketAuthServer in the JVM to
-#             accept the serialized data, for use when encryption is enabled.
-#         """
-#         if self._encryption_enabled:
-#             # with encryption, we open a server in java and send the data directly
-#             server = server_func()
-#             (sock_file, _) = local_connect_and_auth(server.port(), server.secret())
-#             chunked_out = ChunkedStream(sock_file, 8192)
-#             serializer.dump_stream(data, chunked_out)
-#             chunked_out.close()
-#             # this call will block until the server has read all the data and processed it (or
-#             # throws an exception)
-#             r = server.getResult()
-#             return r
-#         else:
-#             # without encryption, we serialize to a file, and we read the file in java and
-#             # parallelize from there.
-#             tempFile = NamedTemporaryFile(delete=False, dir=self._temp_dir)
-#             try:
-#                 try:
-#                     serializer.dump_stream(data, tempFile)
-#                 finally:
-#                     tempFile.close()
-#                 return reader_func(tempFile.name)
-#             finally:
-#                 # we eagerly reads the file so we can delete right after.
-#                 os.unlink(tempFile.name)
-#
+    def parallelize(self, c: Iterable[T], numSlices: Optional[int] = None) -> RDD[T]:
+        """
+        Distribute a local Python collection to form an RDD. Using range
+        is recommended if the input represents a range for performance.
+
+        .. versionadded:: 0.7.0
+
+        Parameters
+        ----------
+        c : :class:`collections.abc.Iterable`
+            iterable collection to distribute
+        numSlices : int, optional
+            the number of partitions of the new RDD
+
+        Returns
+        -------
+        :class:`RDD`
+            RDD representing distributed collection.
+
+        Examples
+        --------
+        >>> sc.parallelize([0, 2, 3, 4, 6], 5).glom().collect()
+        [[0], [2], [3], [4], [6]]
+        >>> sc.parallelize(range(0, 6, 2), 5).glom().collect()
+        [[], [0], [], [2], [4]]
+
+        Deal with a list of strings.
+
+        >>> strings = ["a", "b", "c"]
+        >>> sc.parallelize(strings, 2).glom().collect()
+        [['a'], ['b', 'c']]
+        """
+        # numSlices = int(numSlices) if numSlices is not None else self.defaultParallelism
+        # if isinstance(c, range):
+        #     size = len(c)
+        #     if size == 0:
+        #         return self.parallelize([], numSlices)
+        #     step = c[1] - c[0] if size > 1 else 1  # type: ignore[index]
+        #     start0 = c[0]  # type: ignore[index]
+        #
+        #     def getStart(split: int) -> int:
+        #         assert numSlices is not None
+        #         return start0 + int((split * size / numSlices)) * step
+        #
+        #     def f(split: int, iterator: Iterable[T]) -> Iterable:
+        #         # it's an empty iterator here but we need this line for triggering the
+        #         # logic of signal handling in FramedSerializer.load_stream, for instance,
+        #         # SpecialLengths.END_OF_DATA_SECTION in _read_with_length. Since
+        #         # FramedSerializer.load_stream produces a generator, the control should
+        #         # at least be in that function once. Here we do it by explicitly converting
+        #         # the empty iterator to a list, thus make sure worker reuse takes effect.
+        #         # See more details in SPARK-26549.
+        #         assert len(list(iterator)) == 0
+        #         return range(getStart(split), getStart(split + 1), step)
+        #
+        #     return self.parallelize([], numSlices).mapPartitionsWithIndex(f)
+        #
+        # # Make sure we distribute data evenly if it's smaller than self.batchSize
+        # if "__len__" not in dir(c):
+        #     c = list(c)  # Make it a list so we can compute its length
+        # batchSize = max(
+        #     1, min(len(c) // numSlices, self._batchSize or 1024)  # type: ignore[arg-type]
+        # )
+        # serializer = BatchedSerializer(self._unbatched_serializer, batchSize)
+        #
+        # def reader_func(temp_filename: str) -> JavaObject:
+        #     assert self._jvm is not None
+        #     return self._jvm.PythonRDD.readRDDFromFile(self._jsc, temp_filename, numSlices)
+        #
+        # def createRDDServer() -> JavaObject:
+        #     assert self._jvm is not None
+        #     return self._jvm.PythonParallelizeServer(self._jsc.sc(), numSlices)
+        #
+        # jrdd = self._serialize_to_jvm(c, serializer, reader_func, createRDDServer)
+        # return RDD(jrdd, self, serializer)
+        raise NotImplementedError()
+
+
+
 #     def pickleFile(self, name: str, minPartitions: Optional[int] = None) -> RDD[Any]:
 #         """
 #         Load an RDD previously saved using :meth:`RDD.saveAsPickleFile` method.

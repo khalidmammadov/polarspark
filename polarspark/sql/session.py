@@ -49,6 +49,7 @@ from polarspark.sql.conf import RuntimeConfig
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql.functions import lit
 from polarspark.sql.pandas.conversion import SparkConversionMixin
+from polarspark.sql.pandas.types import to_polars_type
 from polarspark.sql.readwriter import DataFrameReader
 # from polarspark.sql.sql_formatter import SQLStringFormatter
 # from polarspark.sql.streaming import DataStreamReader
@@ -1034,11 +1035,13 @@ class SparkSession(SparkConversionMixin):
         pdata = {}
         cols = struct.names
         row_count = len(data)
+        schema = {f.name: to_polars_type(f.dataType) for f in struct.fields}
+        print(schema)
         for tuples in tupled_data:
             for k, v in zip(cols*row_count, tuples):
                 arr = pdata.setdefault(k, [])
                 arr.append(v)
-        return pl.LazyFrame(pdata), struct
+        return pl.LazyFrame(pdata, schema), struct
 
     @staticmethod
     def _create_shell_session() -> "SparkSession":
@@ -1406,8 +1409,8 @@ class SparkSession(SparkConversionMixin):
                 return obj
 
         if isinstance(data, RDD):
-            #FIX
-            rdd, struct = self._createFromRDD(data.map(prepare), schema, samplingRatio)
+            raise NotImplementedError("Creating DataFrame from RDD is not supported yet")
+            # rdd, struct = self._createFromRDD(data.map(prepare), schema, samplingRatio)
         else:
             ldf, struct = self._createFromLocal(map(prepare, data), schema)
 

@@ -62,6 +62,7 @@ from polarspark.sql.types import (
 from polarspark.sql.utils import get_active_spark_context#, toJArray
 from polarspark.sql.pandas.conversion import PandasConversionMixin, schema_from_polars
 from polarspark.sql.pandas.map_ops import PandasMapOpsMixin
+from polarspark.sql.pandas.types import to_polars_type, to_polars_selector
 
 import polars as pl
 from polars.lazyframe import LazyFrame
@@ -2333,7 +2334,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.columns == df2.columns
         False
         """
-        return [f.name for f in self.schema.fields]
+        # [f.name for f in self.schema.fields]
+        return self._ldf.collect_schema().names()
 
     def colRegex(self, colName: str) -> Column:
         """
@@ -4922,7 +4924,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         if thresh is not None:
             raise NotImplementedError("Thresh parameter is not implemented yet")
         if how == "all":
-            raise NotImplementedError("'all' is not implemented yet")
+            _filter = " and ".join([f"{c} is null" for c in self.columns])
+            _filter = f"not ({_filter})"
+            return self.filter(Column(pl.sql_expr(_filter)))
 
         _df = None
         if subset:
@@ -5031,14 +5035,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 message_parameters={"arg_name": "value", "arg_type": type(value).__name__},
             )
 
-        # Note that bool validates isinstance(int), but we don't want to
-        # convert bools to floats
-
-        # if not isinstance(value, bool) and isinstance(value, int):
-        #     value = float(value)
-
-        if subset:
-            return self._to_df(self._ldf.with_columns(pl.col(subset).fill_null(value)))
+        if subset and not isinstance(subset, (list, tuple)):
+            raise PySparkTypeError(
+                error_class="NOT_LIST_OR_TUPLE",
+                message_parameters={"arg_name": "subset", "arg_type": type(value).__name__},
+            )
 
         # Warning: Eager execution
         if isinstance(value, dict):
@@ -5051,7 +5052,34 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                     sers[c] = _df[c]
             return self._to_df(pl.DataFrame(sers).lazy())
 
-        return self._to_df(self._ldf.fill_null(value))
+        def _fill(ldf, sub, val):
+            # Fill Nulls for given subset of columns
+            return self._to_df(ldf.with_columns(pl.col(sub).fill_null(val)))
+
+        def subs(t):
+            # Get subset of columns using type selectors
+            pl_type = to_polars_selector(t)
+            # print(_fill"{t} {pl_type}")
+            scols = pl.selectors.by_dtype(pl_type)
+            return self._ldf.select(scols).collect_schema().names()
+
+        if subset is None:
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                return _fill(_fill(self._ldf, subs("int"), int(value))._ldf, subs("float"), value)
+            else:
+                return _fill(self._ldf, subs(str(type(value).__name__)), value)
+
+        def ff(sub):
+            # Filter subset
+            return set(sub).intersection(subset)
+
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return _fill(_fill(self._ldf, ff(subs("int")), int(value))._ldf, ff(subs("float")), value)
+        else:
+            return _fill(self._ldf, ff(subs(str(type(value).__name__))), value)
+
+        # return _fill(self._ldf, subset, value)
+        # return self._to_df(self._ldf.fill_null(value))
 
     @overload
     def replace(
@@ -5932,8 +5960,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="NOT_DICT",
                 message_parameters={"arg_name": "colsMap", "arg_type": type(colsMap).__name__},
             )
-
-        return self._to_df(self._ldf.rename(colsMap))
+        _cols_map = {k:v for k, v in colsMap.items() if k in self.columns}
+        return self._to_df(self._ldf.rename(_cols_map))
 
     # def withMetadata(self, columnName: str, metadata: Dict[str, Any]) -> "DataFrame":
     #     """Returns a new :class:`DataFrame` by updating an existing column with metadata.
@@ -6114,15 +6142,16 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         columns: List[str, pl.Expr] = []
         for c in cols:
             if isinstance(c, str):
-                columns.append(c)
+                if c in self.columns:
+                    columns.append(c)
             elif isinstance(c, Column):
-                columns.append(c._expr)
+                if c._name in self.columns:
+                    columns.append(c._expr)
             else:
                 raise PySparkTypeError(
                     error_class="NOT_COLUMN_OR_STR",
                     message_parameters={"arg_name": "col", "arg_type": type(c).__name__},
                 )
-
         return self._to_df(self._ldf.drop(*columns))
 
     def toDF(self, *cols: str) -> "DataFrame":

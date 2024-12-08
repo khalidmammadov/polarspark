@@ -38,6 +38,7 @@ from polarspark import copy_func
 from polarspark.context import SparkContext
 from polarspark.errors import PySparkAttributeError, PySparkTypeError, PySparkValueError
 from polarspark.sql.types import DataType
+from polarspark.sql.pandas.types import to_polars_type
 from polarspark.sql.utils import get_active_spark_context
 
 if TYPE_CHECKING:
@@ -1199,27 +1200,8 @@ class Column:
         >>> df.select(df.age.cast(StringType()).alias('ages')).collect()
         [Row(ages='2'), Row(ages='5')]
         """
-        type_str = dataType if isinstance(dataType, str) else dataType.typeName()
-        type_map = {
-            "boolean": pl.Boolean,
-            "byte": pl.Int8,
-            "short": pl.Int16,
-            "int": pl.Int32,
-            "long": pl.Int64,
-            "float": pl.Float32,
-            "double": pl.Float64,
-            "decimal": pl.Decimal(dataType.precision, dataType.scale) if type_str == "decimal" else None,
-            "string": pl.String,
-            "binary": pl.Binary,
-            "date": pl.Date,
-            "timestamp": pl.Int64,
-            "timestampntz": pl.Int64,
-            "array": pl.List,
-            "map": pl.Struct,
-            "struct": pl.Struct,
-            "null": pl.Null
-        }
-        pl_type = type_map.get(type_str)
+
+        pl_type = to_polars_type(dataType)
         if pl_type is None:
             raise PySparkTypeError(
                 error_class="NOT_DATATYPE_OR_STR",

@@ -1925,7 +1925,7 @@ def exp(col: "ColumnOrName") -> Column:
     |   1.0|
     +------+
     """
-    return _invoke_function_over_columns("exp", col)
+    return _invoke_function_over_column("exp", col)
 
 
 @_try_remote_functions
@@ -5709,7 +5709,7 @@ def expr(str: str) -> Column:
     |  Bob|           3|
     +-----+------------+
     """
-    return _invoke_function("expr", str)
+    return _invoke_function("sql_expr", str)
 
 
 @overload
