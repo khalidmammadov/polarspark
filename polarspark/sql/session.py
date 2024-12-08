@@ -839,9 +839,9 @@ class SparkSession(SparkConversionMixin):
         +---+
         """
         if end is None:
-            ldf = pl.LazyFrame(pl.int_range(0, int(start), int(step), eager=True))
+            ldf = pl.LazyFrame(pl.int_range(0, int(start), int(step), eager=True).alias("id"))
         else:
-            ldf = pl.LazyFrame(pl.int_range(int(start), int(end), int(step), eager=True))
+            ldf = pl.LazyFrame(pl.int_range(int(start), int(end), int(step), eager=True).alias("id"))
 
         return DataFrame(ldf, self)
 
@@ -1036,7 +1036,6 @@ class SparkSession(SparkConversionMixin):
         cols = struct.names
         row_count = len(data)
         schema = {f.name: to_polars_type(f.dataType) for f in struct.fields}
-        print(schema)
         for tuples in tupled_data:
             for k, v in zip(cols*row_count, tuples):
                 arr = pdata.setdefault(k, [])
