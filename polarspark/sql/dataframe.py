@@ -6347,40 +6347,40 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     #     """
     #     return self._jdf.semanticHash()
 
-    # def inputFiles(self) -> List[str]:
-    #     """
-    #     Returns a best-effort snapshot of the files that compose this :class:`DataFrame`.
-    #     This method simply asks each constituent BaseRelation for its respective files and
-    #     takes the union of all results. Depending on the source relations, this may not find
-    #     all input files. Duplicates are removed.
-    #
-    #     .. versionadded:: 3.1.0
-    #
-    #     .. versionchanged:: 3.4.0
-    #         Supports Spark Connect.
-    #
-    #     Returns
-    #     -------
-    #     list
-    #         List of file paths.
-    #
-    #     Examples
-    #     --------
-    #     >>> import tempfile
-    #     >>> with tempfile.TemporaryDirectory() as d:
-    #     ...     # Write a single-row DataFrame into a JSON file
-    #     ...     spark.createDataFrame(
-    #     ...         [{"age": 100, "name": "Hyukjin Kwon"}]
-    #     ...     ).repartition(1).write.json(d, mode="overwrite")
-    #     ...
-    #     ...     # Read the JSON file as a DataFrame.
-    #     ...     df = spark.read.format("json").load(d)
-    #     ...
-    #     ...     # Returns the number of input files.
-    #     ...     len(df.inputFiles())
-    #     1
-    #     """
-    #     return self._ldf.collect().files()
+    def inputFiles(self) -> List[str]:
+        """
+        Returns a best-effort snapshot of the files that compose this :class:`DataFrame`.
+        This method simply asks each constituent BaseRelation for its respective files and
+        takes the union of all results. Depending on the source relations, this may not find
+        all input files. Duplicates are removed.
+
+        .. versionadded:: 3.1.0
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
+        Returns
+        -------
+        list
+            List of file paths.
+
+        Examples
+        --------
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as d:
+        ...     # Write a single-row DataFrame into a JSON file
+        ...     spark.createDataFrame(
+        ...         [{"age": 100, "name": "Hyukjin Kwon"}]
+        ...     ).repartition(1).write.json(d, mode="overwrite")
+        ...
+        ...     # Read the JSON file as a DataFrame.
+        ...     df = spark.read.format("json").load(d)
+        ...
+        ...     # Returns the number of input files.
+        ...     len(df.inputFiles())
+        1
+        """
+        return self._ldf.collect().files()
 
     where = copy_func(filter, sinceversion=1.3, doc=":func:`where` is an alias for :func:`filter`.")
 

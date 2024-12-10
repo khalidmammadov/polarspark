@@ -882,61 +882,62 @@ class DataFrameReader(OptionUtils):
         |100|Hyukjin Kwon|
         +---+------------+
         """
-        self._set_opts(
-            rowTag=rowTag,
-            schema=schema,
-            excludeAttribute=excludeAttribute,
-            attributePrefix=attributePrefix,
-            valueTag=valueTag,
-            ignoreSurroundingSpaces=ignoreSurroundingSpaces,
-            rowValidationXSDPath=rowValidationXSDPath,
-            ignoreNamespace=ignoreNamespace,
-            wildcardColName=wildcardColName,
-            encoding=encoding,
-            inferSchema=inferSchema,
-            nullValue=nullValue,
-            dateFormat=dateFormat,
-            timestampFormat=timestampFormat,
-            mode=mode,
-            columnNameOfCorruptRecord=columnNameOfCorruptRecord,
-            multiLine=multiLine,
-            samplingRatio=samplingRatio,
-            locale=locale,
-        )
-        if isinstance(path, str):
-            path = [path]
-        if type(path) == list:
-            assert self._spark._sc._jvm is not None
-            return self._df(self._jreader.xml(self._spark._sc._jvm.PythonUtils.toSeq(path)))
-        elif isinstance(path, RDD):
-
-            def func(iterator: Iterable) -> Iterable:
-                for x in iterator:
-                    if not isinstance(x, str):
-                        x = str(x)
-                    if isinstance(x, str):
-                        x = x.encode("utf-8")
-                    yield x
-
-            keyed = path.mapPartitions(func)
-            keyed._bypass_serializer = True  # type: ignore[attr-defined]
-            assert self._spark._jvm is not None
-            jrdd = keyed._jrdd.map(self._spark._jvm.BytesToString())
-            # There isn't any jvm api for creating a dataframe from rdd storing XML.
-            # We can do it through creating a jvm dataset first and using the jvm api
-            # for creating a dataframe from dataset storing XML.
-            jdataset = self._spark._jsparkSession.createDataset(
-                jrdd.rdd(), self._spark._jvm.Encoders.STRING()
-            )
-            return self._df(self._jreader.xml(jdataset))
-        else:
-            raise PySparkTypeError(
-                error_class="NOT_STR_OR_LIST_OF_RDD",
-                message_parameters={
-                    "arg_name": "path",
-                    "arg_type": type(path).__name__,
-                },
-            )
+        # self._set_opts(
+        #     rowTag=rowTag,
+        #     schema=schema,
+        #     excludeAttribute=excludeAttribute,
+        #     attributePrefix=attributePrefix,
+        #     valueTag=valueTag,
+        #     ignoreSurroundingSpaces=ignoreSurroundingSpaces,
+        #     rowValidationXSDPath=rowValidationXSDPath,
+        #     ignoreNamespace=ignoreNamespace,
+        #     wildcardColName=wildcardColName,
+        #     encoding=encoding,
+        #     inferSchema=inferSchema,
+        #     nullValue=nullValue,
+        #     dateFormat=dateFormat,
+        #     timestampFormat=timestampFormat,
+        #     mode=mode,
+        #     columnNameOfCorruptRecord=columnNameOfCorruptRecord,
+        #     multiLine=multiLine,
+        #     samplingRatio=samplingRatio,
+        #     locale=locale,
+        # )
+        # if isinstance(path, str):
+        #     path = [path]
+        # if type(path) == list:
+        #     assert self._spark._sc._jvm is not None
+        #     return self._df(self._jreader.xml(self._spark._sc._jvm.PythonUtils.toSeq(path)))
+        # elif isinstance(path, RDD):
+        #
+        #     def func(iterator: Iterable) -> Iterable:
+        #         for x in iterator:
+        #             if not isinstance(x, str):
+        #                 x = str(x)
+        #             if isinstance(x, str):
+        #                 x = x.encode("utf-8")
+        #             yield x
+        #
+        #     keyed = path.mapPartitions(func)
+        #     keyed._bypass_serializer = True  # type: ignore[attr-defined]
+        #     assert self._spark._jvm is not None
+        #     jrdd = keyed._jrdd.map(self._spark._jvm.BytesToString())
+        #     # There isn't any jvm api for creating a dataframe from rdd storing XML.
+        #     # We can do it through creating a jvm dataset first and using the jvm api
+        #     # for creating a dataframe from dataset storing XML.
+        #     jdataset = self._spark._jsparkSession.createDataset(
+        #         jrdd.rdd(), self._spark._jvm.Encoders.STRING()
+        #     )
+        #     return self._df(self._jreader.xml(jdataset))
+        # else:
+        #     raise PySparkTypeError(
+        #         error_class="NOT_STR_OR_LIST_OF_RDD",
+        #         message_parameters={
+        #             "arg_name": "path",
+        #             "arg_type": type(path).__name__,
+        #         },
+        #     )
+        raise NotImplementedError()
 
     def orc(
         self,
@@ -986,16 +987,17 @@ class DataFrameReader(OptionUtils):
         |100|Hyukjin Kwon|
         +---+------------+
         """
-        self._set_opts(
-            mergeSchema=mergeSchema,
-            pathGlobFilter=pathGlobFilter,
-            modifiedBefore=modifiedBefore,
-            modifiedAfter=modifiedAfter,
-            recursiveFileLookup=recursiveFileLookup,
-        )
-        if isinstance(path, str):
-            path = [path]
-        return self._df(self._jreader.orc(_to_seq(self._spark._sc, path)))
+        # self._set_opts(
+        #     mergeSchema=mergeSchema,
+        #     pathGlobFilter=pathGlobFilter,
+        #     modifiedBefore=modifiedBefore,
+        #     modifiedAfter=modifiedAfter,
+        #     recursiveFileLookup=recursiveFileLookup,
+        # )
+        # if isinstance(path, str):
+        #     path = [path]
+        # return self._df(self._jreader.orc(_to_seq(self._spark._sc, path)))
+        raise NotImplementedError()
 
     @overload
     def jdbc(
@@ -1088,32 +1090,33 @@ class DataFrameReader(OptionUtils):
         -------
         :class:`DataFrame`
         """
-        if properties is None:
-            properties = dict()
-        assert self._spark._sc._gateway is not None
-        jprop = JavaClass(
-            "java.util.Properties",
-            self._spark._sc._gateway._gateway_client,
-        )()
-        for k in properties:
-            jprop.setProperty(k, properties[k])
-        if column is not None:
-            assert lowerBound is not None, "lowerBound can not be None when ``column`` is specified"
-            assert upperBound is not None, "upperBound can not be None when ``column`` is specified"
-            assert (
-                numPartitions is not None
-            ), "numPartitions can not be None when ``column`` is specified"
-            return self._df(
-                self._jreader.jdbc(
-                    url, table, column, int(lowerBound), int(upperBound), int(numPartitions), jprop
-                )
-            )
-        if predicates is not None:
-            gateway = self._spark._sc._gateway
-            assert gateway is not None
-            jpredicates = utils.toJArray(gateway, gateway.jvm.java.lang.String, predicates)
-            return self._df(self._jreader.jdbc(url, table, jpredicates, jprop))
-        return self._df(self._jreader.jdbc(url, table, jprop))
+        # if properties is None:
+        #     properties = dict()
+        # assert self._spark._sc._gateway is not None
+        # jprop = JavaClass(
+        #     "java.util.Properties",
+        #     self._spark._sc._gateway._gateway_client,
+        # )()
+        # for k in properties:
+        #     jprop.setProperty(k, properties[k])
+        # if column is not None:
+        #     assert lowerBound is not None, "lowerBound can not be None when ``column`` is specified"
+        #     assert upperBound is not None, "upperBound can not be None when ``column`` is specified"
+        #     assert (
+        #         numPartitions is not None
+        #     ), "numPartitions can not be None when ``column`` is specified"
+        #     return self._df(
+        #         self._jreader.jdbc(
+        #             url, table, column, int(lowerBound), int(upperBound), int(numPartitions), jprop
+        #         )
+        #     )
+        # if predicates is not None:
+        #     gateway = self._spark._sc._gateway
+        #     assert gateway is not None
+        #     jpredicates = utils.toJArray(gateway, gateway.jvm.java.lang.String, predicates)
+        #     return self._df(self._jreader.jdbc(url, table, jpredicates, jprop))
+        # return self._df(self._jreader.jdbc(url, table, jprop))
+        raise NotImplementedError()
 
 
 class DataFrameWriter(OptionUtils):
@@ -1134,6 +1137,9 @@ class DataFrameWriter(OptionUtils):
         self._mode = "error"
         self._format = None
         self._options = {}
+        self._part_cols = []
+        self._bucket_by = ()
+        self._sort_by = []
 
     # def _sq(self, jsq: JavaObject) -> "StreamingQuery":
     #     from polarspark.sql.streaming import StreamingQuery
@@ -1383,9 +1389,7 @@ class DataFrameWriter(OptionUtils):
         """
         if len(cols) == 1 and isinstance(cols[0], (list, tuple)):
             cols = cols[0]  # type: ignore[assignment]
-        self._jwrite = self._jwrite.partitionBy(
-            _to_seq(self._spark._sc, cast(Iterable["ColumnOrName"], cols))
-        )
+        self._part_cols = cols
         return self
 
     @overload
@@ -1482,9 +1486,7 @@ class DataFrameWriter(OptionUtils):
                 },
             )
 
-        self._jwrite = self._jwrite.bucketBy(
-            numBuckets, col, _to_seq(self._spark._sc, cast(Iterable["ColumnOrName"], cols))
-        )
+        self._bucket_by = (numBuckets, col, cols)
         return self
 
     @overload
@@ -1564,9 +1566,7 @@ class DataFrameWriter(OptionUtils):
                 },
             )
 
-        self._jwrite = self._jwrite.sortBy(
-            col, _to_seq(self._spark._sc, cast(Iterable["ColumnOrName"], cols))
-        )
+        self._sort_by = [col, *cols]
         return self
 
     def save(
@@ -1858,7 +1858,8 @@ class DataFrameWriter(OptionUtils):
             encoding=encoding,
             ignoreNullFields=ignoreNullFields,
         )
-        self._jwrite.json(path)
+        # self._jwrite.json(path)
+        self.save(path=path, format="json")
 
     def parquet(
         self,
@@ -1921,7 +1922,8 @@ class DataFrameWriter(OptionUtils):
         if partitionBy is not None:
             self.partitionBy(partitionBy)
         self._set_opts(compression=compression)
-        self._jwrite.parquet(path)
+        # self._jwrite.parquet(path)
+        self.save(path=path, format="parquet")
 
     def text(
         self, path: str, compression: Optional[str] = None, lineSep: Optional[str] = None
@@ -1974,7 +1976,8 @@ class DataFrameWriter(OptionUtils):
         +---------+
         """
         self._set_opts(compression=compression, lineSep=lineSep)
-        self._jwrite.text(path)
+        # self._jwrite.text(path)
+        self.save(path=path, format="text")
 
     def csv(
         self,
@@ -2064,7 +2067,8 @@ class DataFrameWriter(OptionUtils):
             emptyValue=emptyValue,
             lineSep=lineSep,
         )
-        self._jwrite.csv(path)
+        # self._jwrite.csv(path)
+        self.save(path=path, format="csv")
 
     def xml(
         self,
@@ -2141,7 +2145,7 @@ class DataFrameWriter(OptionUtils):
             compression=compression,
             encoding=encoding,
         )
-        self._jwrite.xml(path)
+        raise NotImplementedError()
 
     def orc(
         self,
@@ -2204,7 +2208,7 @@ class DataFrameWriter(OptionUtils):
         if partitionBy is not None:
             self.partitionBy(partitionBy)
         self._set_opts(compression=compression)
-        self._jwrite.orc(path)
+        raise NotImplementedError()
 
     def jdbc(
         self,
@@ -2261,7 +2265,8 @@ class DataFrameWriter(OptionUtils):
         )()
         for k in properties:
             jprop.setProperty(k, properties[k])
-        self.mode(mode)._jwrite.jdbc(url, table, jprop)
+        self.mode(mode)
+        raise NotImplementedError()
 
 
 class DataFrameWriterV2:
