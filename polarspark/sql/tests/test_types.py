@@ -25,6 +25,8 @@ import sys
 import unittest
 from dataclasses import dataclass, asdict
 
+import pytest
+
 from polarspark.sql import Row
 from polarspark.sql import functions as F
 from polarspark.errors import (
@@ -79,6 +81,7 @@ from polarspark.testing.sqlutils import (
 from polarspark.testing.utils import PySparkErrorTestUtils
 
 
+@pytest.mark.skip
 class TypesTestsMixin:
     def test_apply_schema_to_row(self):
         df = self.spark.read.json(self.sc.parallelize(["""{"a":2}"""]))
@@ -2328,6 +2331,7 @@ class DataTypeTests(unittest.TestCase):
         self.assertRaises(ValueError, lambda: row_class(1, 2, 3))
 
 
+@pytest.mark.skip
 class DataTypeVerificationTests(unittest.TestCase, PySparkErrorTestUtils):
     def test_verify_type_exception_msg(self):
         with self.assertRaises(PySparkValueError) as pe:

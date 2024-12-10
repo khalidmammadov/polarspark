@@ -17,6 +17,7 @@
 import os
 import sys
 import warnings
+from array import array
 from collections.abc import Sized
 from functools import reduce
 from threading import RLock
@@ -1039,6 +1040,8 @@ class SparkSession(SparkConversionMixin):
         for tuples in tupled_data:
             for k, v in zip(cols*row_count, tuples):
                 arr = pdata.setdefault(k, [])
+                if isinstance(v, array):
+                    v = v.tolist()
                 arr.append(v)
         return pl.LazyFrame(pdata, schema), struct
 
@@ -1367,7 +1370,8 @@ class SparkSession(SparkConversionMixin):
                 data, schema, samplingRatio, verifySchema
             )
         if isinstance(data, list) and isinstance(data[0], Row):
-            data = [r.asDict(True) for r in data]
+            if hasattr(data[0], "__fields__"):
+                data = [r.asDict(True) for r in data]
         return self._create_dataframe(
             data, schema, samplingRatio, verifySchema  # type: ignore[arg-type]
         )

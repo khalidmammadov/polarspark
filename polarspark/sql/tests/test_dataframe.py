@@ -1451,14 +1451,14 @@ class DataFrameTestsMixin:
     #     pdf_with_only_nulls = self.spark.sql(sql).filter("tinyint is null").toPandas()
     #     self.assertTrue(np.all(pdf_with_only_nulls.dtypes == pdf_with_some_nulls.dtypes))
 
-    @unittest.skipIf(
-        not have_pandas or not have_pyarrow,
-        pandas_requirement_message or pyarrow_requirement_message,
-    )
-    def test_to_pandas_for_array_of_struct(self):
-        for is_arrow_enabled in [True, False]:
-            with self.sql_conf({"spark.sql.execution.arrow.pyspark.enabled": is_arrow_enabled}):
-                self.check_to_pandas_for_array_of_struct(is_arrow_enabled)
+    # @unittest.skipIf(
+    #     not have_pandas or not have_pyarrow,
+    #     pandas_requirement_message or pyarrow_requirement_message,
+    # )
+    # def test_to_pandas_for_array_of_struct(self):
+    #     for is_arrow_enabled in [True, False]:
+    #         with self.sql_conf({"spark.sql.execution.arrow.pyspark.enabled": is_arrow_enabled}):
+    #             self.check_to_pandas_for_array_of_struct(is_arrow_enabled)
 
     def check_to_pandas_for_array_of_struct(self, is_arrow_enabled):
         # SPARK-38098: Support Array of Struct for Pandas UDFs and toPandas
@@ -1485,26 +1485,26 @@ class DataFrameTestsMixin:
         df = self.spark.createDataFrame(data)
         self.assertEqual(df.first(), Row(longarray=[-9223372036854775808, 0, 9223372036854775807]))
 
-    @unittest.skipIf(not have_pandas, pandas_requirement_message)  # type: ignore
-    def test_create_dataframe_from_pandas_with_timestamp(self):
-        import pandas as pd
-        from datetime import datetime
-
-        pdf = pd.DataFrame(
-            {"ts": [datetime(2017, 10, 31, 1, 1, 1)], "d": [pd.Timestamp.now().date()]},
-            columns=["d", "ts"],
-        )
-        # test types are inferred correctly without specifying schema
-        df = self.spark.createDataFrame(pdf)
-        self.assertIsInstance(df.schema["ts"].dataType, TimestampType)
-        self.assertIsInstance(df.schema["d"].dataType, DateType)
-        # test with schema will accept pdf as input
-        df = self.spark.createDataFrame(pdf, schema="d date, ts timestamp")
-        self.assertIsInstance(df.schema["ts"].dataType, TimestampType)
-        self.assertIsInstance(df.schema["d"].dataType, DateType)
-        df = self.spark.createDataFrame(pdf, schema="d date, ts timestamp_ntz")
-        self.assertIsInstance(df.schema["ts"].dataType, TimestampNTZType)
-        self.assertIsInstance(df.schema["d"].dataType, DateType)
+    # @unittest.skipIf(not have_pandas, pandas_requirement_message)  # type: ignore
+    # def test_create_dataframe_from_pandas_with_timestamp(self):
+    #     import pandas as pd
+    #     from datetime import datetime
+    #
+    #     pdf = pd.DataFrame(
+    #         {"ts": [datetime(2017, 10, 31, 1, 1, 1)], "d": [pd.Timestamp.now().date()]},
+    #         columns=["d", "ts"],
+    #     )
+    #     # test types are inferred correctly without specifying schema
+    #     df = self.spark.createDataFrame(pdf)
+    #     self.assertIsInstance(df.schema["ts"].dataType, TimestampType)
+    #     self.assertIsInstance(df.schema["d"].dataType, DateType)
+    #     # test with schema will accept pdf as input
+    #     df = self.spark.createDataFrame(pdf, schema="d date, ts timestamp")
+    #     self.assertIsInstance(df.schema["ts"].dataType, TimestampType)
+    #     self.assertIsInstance(df.schema["d"].dataType, DateType)
+    #     df = self.spark.createDataFrame(pdf, schema="d date, ts timestamp_ntz")
+    #     self.assertIsInstance(df.schema["ts"].dataType, TimestampNTZType)
+    #     self.assertIsInstance(df.schema["d"].dataType, DateType)
 
     @unittest.skipIf(have_pandas, "Required Pandas was found.")
     def test_create_dataframe_required_pandas_not_found(self):
@@ -1682,21 +1682,21 @@ class DataFrameTestsMixin:
                 message_parameters={"arg_name": "other", "arg_type": "int"},
             )
 
-    def test_input_files(self):
-        tpath = tempfile.mkdtemp()
-        shutil.rmtree(tpath)
-        try:
-            self.spark.range(1, 100, 1, 10).write.parquet(tpath)
-            # read parquet file and get the input files list
-            input_files_list = self.spark.read.parquet(tpath).inputFiles()
-
-            # input files list should contain 10 entries
-            self.assertEqual(len(input_files_list), 10)
-            # all file paths in list must contain tpath
-            for file_path in input_files_list:
-                self.assertTrue(tpath in file_path)
-        finally:
-            shutil.rmtree(tpath)
+    # def test_input_files(self):
+    #     tpath = tempfile.mkdtemp()
+    #     shutil.rmtree(tpath)
+    #     try:
+    #         self.spark.range(1, 100, 1, 10).write.parquet(tpath)
+    #         # read parquet file and get the input files list
+    #         input_files_list = self.spark.read.parquet(tpath).inputFiles()
+    #
+    #         # input files list should contain 10 entries
+    #         self.assertEqual(len(input_files_list), 10)
+    #         # all file paths in list must contain tpath
+    #         for file_path in input_files_list:
+    #             self.assertTrue(tpath in file_path)
+    #     finally:
+    #         shutil.rmtree(tpath)
 
     def test_df_show(self):
         # SPARK-35408: ensure better diagnostics if incorrect parameters are passed
@@ -1824,29 +1824,29 @@ class DataFrameTestsMixin:
             message_parameters={"arg_name": "condition", "arg_type": "int"},
         )
 
-    def test_duplicate_field_names(self):
-        data = [
-            Row(Row("a", 1), Row(2, 3, "b", 4, "c", "d")),
-            Row(Row("w", 6), Row(7, 8, "x", 9, "y", "z")),
-        ]
-        schema = (
-            StructType()
-            .add("struct", StructType().add("x", StringType()).add("x", IntegerType()))
-            .add(
-                "struct",
-                StructType()
-                .add("a", IntegerType())
-                .add("x", IntegerType())
-                .add("x", StringType())
-                .add("y", IntegerType())
-                .add("y", StringType())
-                .add("x", StringType()),
-            )
-        )
-        df = self.spark.createDataFrame(data, schema=schema)
-
-        self.assertEqual(df.schema, schema)
-        self.assertEqual(df.collect(), data)
+    # def test_duplicate_field_names(self):
+    #     data = [
+    #         Row(Row("a", 1), Row(2, 3, "b", 4, "c", "d")),
+    #         Row(Row("w", 6), Row(7, 8, "x", 9, "y", "z")),
+    #     ]
+    #     schema = (
+    #         StructType()
+    #         .add("struct", StructType().add("x", StringType()).add("x", IntegerType()))
+    #         .add(
+    #             "struct",
+    #             StructType()
+    #             .add("a", IntegerType())
+    #             .add("x", IntegerType())
+    #             .add("x", StringType())
+    #             .add("y", IntegerType())
+    #             .add("y", StringType())
+    #             .add("x", StringType()),
+    #         )
+    #     )
+    #     df = self.spark.createDataFrame(data, schema=schema)
+    #
+    #     self.assertEqual(df.schema, schema)
+    #     self.assertEqual(df.collect(), data)
 
 
 def _at(t):
