@@ -1010,8 +1010,6 @@ class SparkSession(SparkConversionMixin):
 
         if schema is None or isinstance(schema, (list, tuple)):
             struct = self._inferSchemaFromList(data, names=schema)
-            converter = _create_converter(struct)
-            tupled_data: Iterable[Tuple] = map(converter, data)
             if isinstance(schema, (list, tuple)):
                 for i, name in enumerate(schema):
                     struct.fields[i].name = name
@@ -1019,8 +1017,6 @@ class SparkSession(SparkConversionMixin):
 
         elif isinstance(schema, StructType):
             struct = schema
-            tupled_data = data
-
         else:
             raise PySparkTypeError(
                 error_class="NOT_LIST_OR_NONE_OR_STRUCT",
@@ -1029,6 +1025,9 @@ class SparkSession(SparkConversionMixin):
                     "arg_type": type(schema).__name__,
                 },
             )
+
+        converter = _create_converter(struct)
+        tupled_data: Iterable[Tuple] = map(converter, data)
 
         # convert python objects to sql data
         # internal_data = [struct.toInternal(row) for row in tupled_data]
@@ -1369,7 +1368,7 @@ class SparkSession(SparkConversionMixin):
             return super(SparkSession, self).createDataFrame(  # type: ignore[call-overload]
                 data, schema, samplingRatio, verifySchema
             )
-        if isinstance(data, list) and isinstance(data[0], Row):
+        if isinstance(data, list) and data and isinstance(data[0], Row):
             if hasattr(data[0], "__fields__"):
                 data = [r.asDict(True) for r in data]
         return self._create_dataframe(
