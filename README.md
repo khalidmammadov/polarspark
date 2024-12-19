@@ -10,18 +10,22 @@
 
 **Polar Spark** is PySpark on [Polars](https://github.com/pola-rs/polars) for single machine workloads.
 
+It uses PySpark API so it can be used as a drop in replacement for small workloads
+where Spark is not needed. One main example is automated unit tests that runs 
+on CI/CD pipelines.
+
 It runs on Polars' Lazy API which is backed by powerful Rust engine
 whereas classic PySpark depends on JVM/Java based engine
 which is slow for these types of workloads.
 
-It benefits all the performance improvements and optimizations **polars** provides 
+It benefits all the performance improvements and optimizations **Polars** provides 
 to run on a multithreaded environment with modern CPUs.
 
 So, the aim is to make **Polar Spark** drop in replacement for PySpark
 where PySpark is used on single machine or where data can fit into
 resources of a single machine.
 
-Examples:
+Usage examples:
 ### Create spark session
 ```python
 try:            
@@ -61,7 +65,7 @@ pprint(rows)
 >>>  Row(age=99, name='Sim')]
 
 
-# Wiith schema
+# With schema
 schema = StructType([
             StructField("name", StringType(), True),
             StructField("age", IntegerType(), True)])
