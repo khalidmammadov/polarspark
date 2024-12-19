@@ -318,21 +318,22 @@ class DataFrameReader(OptionUtils):
         self.options(**options)
 
         readers = {
-            "csv": partial(self._read_paths_with_concat, reader=pl.read_csv),
+            "csv": partial(self._read_ldf, reader=pl.scan_csv),
             "json": partial(self._read_paths_with_concat, reader=pl.read_json),
-            "parquet": partial(self._read_df, reader=pl.read_parquet),
-            "delta": partial(self._read_paths_with_concat, reader=pl.read_delta),
+            "parquet": partial(self._read_ldf, reader=pl.scan_parquet),
+            "delta": partial(self._read_ldf, reader=pl.scan_delta),
             "avro": partial(self._read_paths_with_concat, reader=pl.read_avro),
             "excel": partial(self._read_paths_with_concat, reader=pl.read_excel),
         }
         reader = readers[self._format]
         return reader(path)
 
-    def _read_df(self, path, reader):
+    def _read_ldf(self, path, reader):
         from polarspark.sql.dataframe import DataFrame
-        pdf = reader(path, **self._options)
-        df = DataFrame(pdf.lazy(), self._spark)
-        df._schema = schema_from_polars(pdf)
+        ldf = reader(path, **self._options)
+        sample = ldf.first().collect()
+        df = DataFrame(ldf, self._spark)
+        df._schema = schema_from_polars(sample)
         return df
 
     def _read_paths_with_concat(self, path, reader):
@@ -620,7 +621,7 @@ class DataFrameReader(OptionUtils):
             int96RebaseMode=int96RebaseMode,
         )
 
-        return self._read_df(paths, pl.read_parquet)
+        return self._read_ldf(paths, pl.scan_parquet)
 
     def text(
         self,
@@ -1637,7 +1638,10 @@ class DataFrameWriter(OptionUtils):
 
         # Create dir with target file name
         p = Path(path)
-        path = p / f"part-00000-{uuid.uuid4()}-c000{p.suffix}"
+        if self._format != "delta":
+            path = p / f"part-00000-{uuid.uuid4()}-c000{p.suffix}"
+        else:
+            path = p
         if p.exists() and self._mode == "overwrite":
             shutil.rmtree(p)
         elif p.exists() and self._mode == "error":
