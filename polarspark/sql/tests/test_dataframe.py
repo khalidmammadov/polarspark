@@ -1740,18 +1740,20 @@ class DataFrameTestsMixin:
         not have_pandas or not have_pyarrow,
         cast(str, pandas_requirement_message or pyarrow_requirement_message),
     )
-    # def test_pandas_api(self):
-    #     import pandas as pd
-    #     from pandas.testing import assert_frame_equal
-    #
-    #     sdf = self.spark.createDataFrame([("a", 1), ("b", 2), ("c", 3)], ["Col1", "Col2"])
-    #     psdf_from_sdf = sdf.pandas_api()
-    #     psdf_from_sdf_with_index = sdf.pandas_api(index_col="Col1")
-    #     pdf = pd.DataFrame({"Col1": ["a", "b", "c"], "Col2": [1, 2, 3]})
-    #     pdf_with_index = pdf.set_index("Col1")
-    #
-    #     assert_frame_equal(pdf, psdf_from_sdf.to_pandas())
-    #     assert_frame_equal(pdf_with_index, psdf_from_sdf_with_index.to_pandas())
+    def test_pandas_api(self):
+        import pandas as pd
+        from pandas.testing import assert_frame_equal
+
+        sdf = self.spark.createDataFrame([("a", 1), ("b", 2), ("c", 3)], ["Col1", "Col2"])
+        psdf_from_sdf = sdf.pandas_api()
+        psdf_from_sdf_with_index = sdf.pandas_api(index_col="Col1")
+        pdf = pd.DataFrame({"Col1": ["a", "b", "c"], "Col2": [1, 2, 3]})
+        pdf_with_index = pdf.set_index("Col1")
+
+        assert pdf.to_dict() == psdf_from_sdf.to_pandas().to_dict()
+        assert pdf_with_index.to_dict() == psdf_from_sdf_with_index.to_pandas().to_dict()
+        # assert_frame_equal(pdf, psdf_from_sdf.to_pandas())
+        # assert_frame_equal(pdf_with_index, psdf_from_sdf_with_index.to_pandas())
 
     # test for SPARK-36337
     # def test_create_nan_decimal_dataframe(self):
