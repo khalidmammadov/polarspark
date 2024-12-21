@@ -6317,36 +6317,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         other_plan = other._ldf.serialize(format="json")
         return this_plan == other_plan
 
-    # def semanticHash(self) -> int:
-    #     """
-    #     Returns a hash code of the logical query plan against this :class:`DataFrame`.
-    #
-    #     .. versionadded:: 3.1.0
-    #
-    #     .. versionchanged:: 3.5.0
-    #         Supports Spark Connect.
-    #
-    #     Notes
-    #     -----
-    #     Unlike the standard hash code, the hash is calculated against the query plan
-    #     simplified by tolerating the cosmetic differences such as attribute names.
-    #
-    #     This API is a developer API.
-    #
-    #     Returns
-    #     -------
-    #     int
-    #         Hash value.
-    #
-    #     Examples
-    #     --------
-    #     >>> spark.range(10).selectExpr("id as col0").semanticHash()  # doctest: +SKIP
-    #     1855039936
-    #     >>> spark.range(10).selectExpr("id as col1").semanticHash()  # doctest: +SKIP
-    #     1855039936
-    #     """
-    #     return self._jdf.semanticHash()
-
     def inputFiles(self) -> List[str]:
         """
         Returns a best-effort snapshot of the files that compose this :class:`DataFrame`.
@@ -6434,86 +6404,97 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         # return DataFrameWriterV2(self, table)
         raise NotImplementedError()
 
-    # # Keep to_pandas_on_spark for backward compatibility for now.
-    # def to_pandas_on_spark(
-    #     self, index_col: Optional[Union[str, List[str]]] = None
-    # ) -> "PandasOnSparkDataFrame":
-    #     warnings.warn(
-    #         "DataFrame.to_pandas_on_spark is deprecated. Use DataFrame.pandas_api instead.",
-    #         FutureWarning,
-    #     )
-    #     return self.pandas_api(index_col)
-    #
-    # def pandas_api(
-    #     self, index_col: Optional[Union[str, List[str]]] = None
-    # ) -> "PandasOnSparkDataFrame":
-    #     """
-    #     Converts the existing DataFrame into a pandas-on-Spark DataFrame.
-    #
-    #     .. versionadded:: 3.2.0
-    #
-    #     .. versionchanged:: 3.5.0
-    #         Supports Spark Connect.
-    #
-    #     If a pandas-on-Spark DataFrame is converted to a Spark DataFrame and then back
-    #     to pandas-on-Spark, it will lose the index information and the original index
-    #     will be turned into a normal column.
-    #
-    #     This is only available if Pandas is installed and available.
-    #
-    #     Parameters
-    #     ----------
-    #     index_col: str or list of str, optional, default: None
-    #         Index column of table in Spark.
-    #
-    #     Returns
-    #     -------
-    #     :class:`PandasOnSparkDataFrame`
-    #
-    #     See Also
-    #     --------
-    #     polarspark.pandas.frame.DataFrame.to_spark
-    #
-    #     Examples
-    #     --------
-    #     >>> df = spark.createDataFrame(
-    #     ...     [(14, "Tom"), (23, "Alice"), (16, "Bob")], ["age", "name"])
-    #
-    #     >>> df.pandas_api()  # doctest: +SKIP
-    #        age   name
-    #     0   14    Tom
-    #     1   23  Alice
-    #     2   16    Bob
-    #
-    #     We can specify the index columns.
-    #
-    #     >>> df.pandas_api(index_col="age")  # doctest: +SKIP
-    #           name
-    #     age
-    #     14     Tom
-    #     23   Alice
-    #     16     Bob
-    #     """
-    #     from polarspark.pandas.namespace import _get_index_map
-    #     from polarspark.pandas.frame import DataFrame as PandasOnSparkDataFrame
-    #     from polarspark.pandas.internal import InternalFrame
-    #
-    #     index_spark_columns, index_names = _get_index_map(self, index_col)
-    #     internal = InternalFrame(
-    #         spark_frame=self,
-    #         index_spark_columns=index_spark_columns,
-    #         index_names=index_names,  # type: ignore[arg-type]
-    #     )
-    #     return PandasOnSparkDataFrame(internal)
-    #
-    # # Keep to_koalas for backward compatibility for now.
-    # def to_koalas(
-    #     self, index_col: Optional[Union[str, List[str]]] = None
-    # ) -> "PandasOnSparkDataFrame":
-    #     return self.pandas_api(index_col)
+    # Keep to_pandas_on_spark for backward compatibility for now.
+    def to_pandas_on_spark(
+        self, index_col: Optional[Union[str, List[str]]] = None
+    ) -> "PandasOnSparkDataFrame":
+        warnings.warn(
+            "DataFrame.to_pandas_on_spark is deprecated. Use DataFrame.pandas_api instead.",
+            FutureWarning,
+        )
+        return self.pandas_api(index_col)
+
+    def pandas_api(
+        self, index_col: Optional[Union[str, List[str]]] = None
+    ) -> "PandasOnSparkDataFrame":
+        """
+        Converts the existing DataFrame into a pandas-on-Spark DataFrame.
+
+        .. versionadded:: 3.2.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
+
+        If a pandas-on-Spark DataFrame is converted to a Spark DataFrame and then back
+        to pandas-on-Spark, it will lose the index information and the original index
+        will be turned into a normal column.
+
+        This is only available if Pandas is installed and available.
+
+        Parameters
+        ----------
+        index_col: str or list of str, optional, default: None
+            Index column of table in Spark.
+
+        Returns
+        -------
+        :class:`PandasOnSparkDataFrame`
+
+        See Also
+        --------
+        polarspark.pandas.frame.DataFrame.to_spark
+
+        Examples
+        --------
+        >>> df = spark.createDataFrame(
+        ...     [(14, "Tom"), (23, "Alice"), (16, "Bob")], ["age", "name"])
+
+        >>> df.pandas_api()  # doctest: +SKIP
+           age   name
+        0   14    Tom
+        1   23  Alice
+        2   16    Bob
+
+        We can specify the index columns.
+
+        >>> df.pandas_api(index_col="age")  # doctest: +SKIP
+              name
+        age
+        14     Tom
+        23   Alice
+        16     Bob
+        """
+        pdf = self._ldf.collect().to_pandas(use_pyarrow_extension_array=True)
+        if index_col:
+            if isinstance(index_col, str):
+                pdf = pdf.set_index(index_col)
+            else:
+                raise NotImplementedError(f"index_col of type {type(index_col)} not supported")
+        return PandasFrameWrapper(pdf, self._session)
+
+    # Keep to_koalas for backward compatibility for now.
+    def to_koalas(
+        self, index_col: Optional[Union[str, List[str]]] = None
+    ) -> "PandasOnSparkDataFrame":
+        return self.pandas_api(index_col)
 
     def _to_df(self, ldf: LazyFrame) -> "DataFrame":
         return DataFrame(ldf, self.sparkSession, rdds=self.rdds, alias=self._alias)
+
+
+class PandasFrameWrapper:
+    def __init__(self, pdf, spark):
+        self.spark = spark
+        self.pdf = pdf
+
+    def __getitem__(self, item):
+        return getattr(self.pdf, item)
+
+    def __getattr__(self, item):
+        if item == "to_pandas":
+            return lambda: self.pdf
+            # return self.spark.createDataFrame(self.pdf)
+        return getattr(self.pdf, item)
 
 
 class DataFrameNaFunctions:

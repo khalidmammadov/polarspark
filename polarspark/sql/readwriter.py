@@ -1091,32 +1091,6 @@ class DataFrameReader(OptionUtils):
         -------
         :class:`DataFrame`
         """
-        # if properties is None:
-        #     properties = dict()
-        # assert self._spark._sc._gateway is not None
-        # jprop = JavaClass(
-        #     "java.util.Properties",
-        #     self._spark._sc._gateway._gateway_client,
-        # )()
-        # for k in properties:
-        #     jprop.setProperty(k, properties[k])
-        # if column is not None:
-        #     assert lowerBound is not None, "lowerBound can not be None when ``column`` is specified"
-        #     assert upperBound is not None, "upperBound can not be None when ``column`` is specified"
-        #     assert (
-        #         numPartitions is not None
-        #     ), "numPartitions can not be None when ``column`` is specified"
-        #     return self._df(
-        #         self._jreader.jdbc(
-        #             url, table, column, int(lowerBound), int(upperBound), int(numPartitions), jprop
-        #         )
-        #     )
-        # if predicates is not None:
-        #     gateway = self._spark._sc._gateway
-        #     assert gateway is not None
-        #     jpredicates = utils.toJArray(gateway, gateway.jvm.java.lang.String, predicates)
-        #     return self._df(self._jreader.jdbc(url, table, jpredicates, jprop))
-        # return self._df(self._jreader.jdbc(url, table, jprop))
         raise NotImplementedError()
 
 
@@ -1141,11 +1115,6 @@ class DataFrameWriter(OptionUtils):
         self._part_cols = []
         self._bucket_by = ()
         self._sort_by = []
-
-    # def _sq(self, jsq: JavaObject) -> "StreamingQuery":
-    #     from polarspark.sql.streaming import StreamingQuery
-    #
-    #     return StreamingQuery(jsq)
 
     def mode(self, saveMode: Optional[str]) -> "DataFrameWriter":
         """Specifies the behavior when data or table already exists.
