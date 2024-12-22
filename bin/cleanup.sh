@@ -1,0 +1,1 @@
+rm -fR dist build polarspark.egg-info
