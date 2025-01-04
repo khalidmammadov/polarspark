@@ -1,0 +1,30 @@
+[project]
+name = "polarspark"
+version = "0.1.7"
+authors = [
+  { name="Khalid Mammadov", email="xmamedov@gmail.com" },
+]
+description = "Apache Spark on Polars"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    'pandas>=2.2.3',
+    'numpy>=1.21',
+    'polars==1.8.2',
+    'pyarrow>=4.0.0',
+    'tzlocal==5.2',
+    'deltalake==0.22.3'
+]
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/khalidmammadov/polarspark"
+Issues = "https://github.com/khalidmammadov/polarspark/issues"
