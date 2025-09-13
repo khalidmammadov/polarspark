@@ -1283,14 +1283,14 @@ class DataFrameTestsMixin:
     def test_to_pandas(self):
         pdf = self._to_pandas()
         types = pdf.dtypes
-        self.assertEqual(types[0], _at(pa.int32()))
-        self.assertEqual(types[1], _at(pa.large_string()))
-        self.assertEqual(types[2], _at(pa.bool_()))
-        self.assertEqual(types[3], _at(pa.float32()))
-        self.assertEqual(types[4].name, _at("date32[day]"))  # datetime.date
-        self.assertEqual(types[5].name, _at("timestamp[us]"))
-        self.assertEqual(types[6].name, _at("timestamp[us]"))
-        self.assertEqual(types[7].name, _at("duration[us]"))
+        self.assertEqual(types.iloc[0], _at(pa.int32()))
+        self.assertEqual(types.iloc[1], _at(pa.large_string()))
+        self.assertEqual(types.iloc[2], _at(pa.bool_()))
+        self.assertEqual(types.iloc[3], _at(pa.float32()))
+        self.assertEqual(types.iloc[4].name, _at("date32[day]"))  # datetime.date
+        self.assertEqual(types.iloc[5].name, _at("timestamp[us]"))
+        self.assertEqual(types.iloc[6].name, _at("timestamp[us]"))
+        self.assertEqual(types.iloc[7].name, _at("duration[us]"))
 
     @unittest.skipIf(not have_pandas, pandas_requirement_message)  # type: ignore
     def test_to_pandas_with_duplicated_column_names(self):
@@ -1345,9 +1345,9 @@ class DataFrameTestsMixin:
         data = [(1, "foo", 16777220), (None, "bar", None)]
         df = self.spark.createDataFrame(data, schema)
         types = df.toPandas().dtypes
-        self.assertEqual(types[0], _at(pa.int32()))  # doesn't convert to np.int32 due to NaN value.
-        self.assertEqual(types[1], _at(pa.large_string()))
-        self.assertEqual(types[2], _at(pa.int32()))
+        self.assertEqual(types.iloc[0], _at(pa.int32()))  # doesn't convert to np.int32 due to NaN value.
+        self.assertEqual(types.iloc[1], _at(pa.large_string()))
+        self.assertEqual(types.iloc[2], _at(pa.int32()))
 
     @unittest.skipIf(not have_pandas, pandas_requirement_message)  # type: ignore
     def test_to_pandas_from_empty_dataframe(self):
@@ -1407,14 +1407,14 @@ class DataFrameTestsMixin:
 #            INTERVAL '1563:04' MINUTE TO SECOND AS day_time_interval
         pdf = self.spark.sql(sql).toPandas()
         types = pdf.dtypes
-        self.assertEqual(types[0], _at(pa.int8()))
-        self.assertEqual(types[1], _at(pa.int16()))
-        self.assertEqual(types[2], _at(pa.int32()))
-        self.assertEqual(types[3], _at(pa.int64()))
-        self.assertEqual(types[4], _at(pa.float64()))
-        self.assertEqual(types[5], _at(pa.float64()))
-        self.assertEqual(types[6], _at(pa.bool_()))
-        self.assertEqual(types[7], _at(pa.large_string()))
+        self.assertEqual(types.iloc[0], _at(pa.int8()))
+        self.assertEqual(types.iloc[1], _at(pa.int16()))
+        self.assertEqual(types.iloc[2], _at(pa.int32()))
+        self.assertEqual(types.iloc[3], _at(pa.int64()))
+        self.assertEqual(types.iloc[4], _at(pa.float64()))
+        self.assertEqual(types.iloc[5], _at(pa.float64()))
+        self.assertEqual(types.iloc[6], _at(pa.bool_()))
+        self.assertEqual(types.iloc[7], _at(pa.large_string()))
         # self.assertTrue(np.can_cast(np.datetime64, types[8]))
         # self.assertTrue(np.can_cast(np.datetime64, types[9]))
         # self.assertTrue(np.can_cast(np.timedelta64, types[10]))

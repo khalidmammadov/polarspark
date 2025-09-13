@@ -2,12 +2,12 @@ from setuptools import setup, find_packages
 
 setup(
     name='polarspark',
-    version='0.1.7',
+    version='0.1.8',
     packages=find_packages(),
     install_requires=[
         'pandas>=2.2.3',
         'numpy>=1.21',
-        'polars==1.8.2',
+        'polars==1.33.1',
         'pyarrow>=4.0.0',
         'tzlocal==5.2',
         'deltalake==0.22.3'

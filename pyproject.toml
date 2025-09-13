@@ -1,6 +1,6 @@
 [project]
 name = "polarspark"
-version = "0.1.7"
+version = "0.1.8"
 authors = [
   { name="Khalid Mammadov", email="xmamedov@gmail.com" },
 ]
@@ -15,7 +15,7 @@ classifiers = [
 dependencies = [
     'pandas>=2.2.3',
     'numpy>=1.21',
-    'polars==1.8.2',
+    'polars==1.33.1',
     'pyarrow>=4.0.0',
     'tzlocal==5.2',
     'deltalake==0.22.3'
@@ -24,6 +24,11 @@ dependencies = [
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
 
 [project.urls]
 Homepage = "https://github.com/khalidmammadov/polarspark"
