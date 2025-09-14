@@ -1619,7 +1619,7 @@ class DataFrameWriter(OptionUtils):
                 message_parameters={"path":str(p)},
             )
         if not p.exists():
-            p.mkdir()
+            p.mkdir(parents=True)
 
 
         if path is None:
