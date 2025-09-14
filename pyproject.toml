@@ -1,6 +1,6 @@
 [project]
 name = "polarspark"
-version = "0.1.8"
+version = "0.1.9"
 authors = [
   { name="Khalid Mammadov", email="xmamedov@gmail.com" },
 ]
@@ -18,7 +18,7 @@ dependencies = [
     'polars==1.33.1',
     'pyarrow>=4.0.0',
     'tzlocal==5.2',
-    'deltalake==0.22.3'
+    'deltalake>=1.0.0'
 ]
 
 [build-system]
@@ -29,6 +29,12 @@ build-backend = "setuptools.build_meta"
 dev = [
     "pytest>=8.4.2",
 ]
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
 
 [project.urls]
 Homepage = "https://github.com/khalidmammadov/polarspark"
