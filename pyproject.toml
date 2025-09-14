@@ -1,6 +1,6 @@
 [project]
 name = "polarspark"
-version = "0.1.9"
+version = "0.1.10"
 authors = [
   { name="Khalid Mammadov", email="xmamedov@gmail.com" },
 ]
