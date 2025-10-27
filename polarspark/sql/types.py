@@ -28,6 +28,7 @@ from array import array
 import ctypes
 from collections.abc import Iterable
 from functools import reduce
+from tokenize import String
 from typing import (
     cast,
     overload,
@@ -44,6 +45,7 @@ from typing import (
     TypeVar,
     TYPE_CHECKING,
 )
+import polars as pl
 
 # from polarspark.serializers import CloudPickleSerializer
 from polarspark.sql.utils import has_numpy, get_active_spark_context
@@ -176,16 +178,8 @@ class DataType:
         >>> DataType.fromDDL("b: string, a: int")
         StructType([StructField('b', StringType(), True), StructField('a', IntegerType(), True)])
         """
-        from polarspark.sql import SparkSession
-        from polarspark.sql.functions import udf
 
-        # Intentionally uses SparkSession so one implementation can be shared with/without
-        # Spark Connect.
-        schema = (
-            SparkSession.active().range(0).select(udf(lambda x: x, returnType=ddl)("id")).schema
-        )
-        assert len(schema) == 1
-        return schema[0].dataType
+        return  DateType._build_from_str(ddl)
 
     @staticmethod
     def build_formatted_string(data_type: "DataType",
@@ -195,6 +189,65 @@ class DataType:
                                ):
         if isinstance(data_type, (ArrayType, StructType, MapType)):
             data_type.buildFormattedString(prefix, string_concat, depth - 1)
+
+    @staticmethod
+    def _build_from_str(ddl: str) -> "DataType":
+        ddl_dict = DataType._parse_ddl_str(ddl)
+
+        fields = []
+        for col, ty in ddl_dict.items():
+            fields.append(StructField(col, ty))
+
+        return StructType(fields)
+
+    @staticmethod
+    def _split_top_level_commas(s: str) -> list:
+        """Split string on commas that are not inside any parentheses."""
+        parts = []
+        buf = []
+        depth = 0
+        for ch in s:
+            if ch in '(<':
+                depth += 1
+                buf.append(ch)
+            elif ch in ')>':
+                depth = max(0, depth - 1)
+                buf.append(ch)
+            elif ch == ',' and depth == 0:
+                part = ''.join(buf).strip()
+                if part:
+                    parts.append(part)
+                buf = []
+            else:
+                buf.append(ch)
+        # final part
+        last = ''.join(buf).strip()
+        if last:
+            parts.append(last)
+        return parts
+
+    @staticmethod
+    def _parse_ddl_str(schema: str) -> Dict[str, "DataType"]:
+        """
+        Parse a schema string like:
+          "name: string, age: int, money: decimal(10, 10)"
+        into a dict: {'name': 'string', 'age': 'int', 'money': 'decimal(10, 10)'}
+        """
+        if not schema:
+            return {}
+
+        fields = DataType._split_top_level_commas(schema)
+        result = {}
+        pattern = re.compile(r'^\s*([A-Za-z_]\w*)\s*[:\s]\s*(.+?)\s*$')
+        for fld in fields:
+            m = pattern.match(fld)
+            if not m:
+                raise ValueError(f"Invalid field format: {fld!r}")
+            name, type_str = m.groups()
+            if name in result:
+                raise ValueError(f"Duplicate field name: {name}")
+            result[name] = _to_spark_type(type_str)
+        return result
 
 # This singleton pattern does not work with pickle, you will get
 # another object after pickle and unpickle
@@ -2783,6 +2836,102 @@ def escape_meta_characters(string: str) -> str:
               .replace('\b', r'\\b')
               .replace('\u000b', r'\\v')
               .replace('\u0007', r'\\a'))
+
+
+_TO_SPARK_TYPE_MAP = {
+    "boolean": BooleanType,
+    "byte": ByteType,
+    "short": ShortType,
+    "int": IntegerType,
+    "integer": IntegerType,
+    "long": LongType,
+    "float": FloatType,
+    "double": DoubleType,
+    "string": String,
+    "binary": BinaryType,
+    "date": DateType,
+    "timestamp": TimestampType,
+    "timestampntz": TimestampNTZType,
+    "daytimeinterval": DayTimeIntervalType,
+    "array": ArrayType,
+    "map": MapType,
+    "struct": StructType,
+    "null": NullType
+}
+
+def _to_spark_type(ty: str) -> DataType:
+    ty = ty.lower()
+    if ty in _TO_SPARK_TYPE_MAP:
+        return _TO_SPARK_TYPE_MAP[ty]()
+
+    if ty == "decimal":
+        parsed_args = parse_param_type(ty)["args"]
+        assert len(parsed_args) == 2, "Decimal precision must be defined with both parts"
+        return DecimalType(parsed_args[0], parsed_args[1])
+
+    raise TypeError(f"Type not supported yet {ty}")
+
+
+_TO_PL_TYPE_MAP = {
+    "boolean": pl.Boolean,
+    "byte": pl.Int8,
+    "short": pl.Int16,
+    "int": pl.Int32,
+    "integer": pl.Int32,
+    "long": pl.Int64,
+    "float": pl.Float32,
+    "double": pl.Float64,
+    "string": pl.String,
+    "binary": pl.Binary,
+    "date": pl.Date,
+    "timestamp": pl.Datetime,
+    "timestampntz": pl.Datetime,
+    "daytimeinterval": pl.Duration,
+    "array": pl.List,
+    "map": pl.Struct,
+    "struct": pl.Struct,
+    "null": pl.Null
+}
+
+
+def _to_polars_type(data_type: Union[DataType, str]) -> pl.DataType:
+    type_str = data_type if isinstance(data_type, str) else data_type.typeName()
+
+    if isinstance(data_type, DecimalType):
+        return pl.Decimal(data_type.precision, data_type.scale)
+    if type_str == "decimal":
+        parsed_args = parse_param_type(data_type)["args"]
+        assert len(parsed_args) == 2, "Decimal precision must be defined with both parts"
+        return pl.Decimal(parsed_args[0], parsed_args[1])
+
+    return _TO_PL_TYPE_MAP.get(type_str)
+
+
+def parse_param_type(type_str: str) -> dict:
+    """
+    Parse a type string like 'decimal(12,3)' into a structured dictionary.
+    Example:
+        'decimal(12,3)' -> {'type': 'decimal', 'args': [12, 3]}
+        'int' -> {'type': 'int', 'args': []}
+    """
+    match = re.match(r'^([A-Za-z_]\w*)\s*(?:\((.*?)\))?$', type_str.strip())
+    if not match:
+        raise ValueError(f"Invalid type string: {type_str!r}")
+
+    type_name, args = match.groups()
+    if args:
+        # Split by commas and convert to int if possible
+        arg_list = []
+        for a in args.split(','):
+            a = a.strip()
+            if a.isdigit():
+                arg_list.append(int(a))
+            else:
+                arg_list.append(a)
+    else:
+        arg_list = []
+
+    return {"type": type_name, "args": arg_list}
 
 
 # datetime is a subclass of date, we should register DatetimeConverter first

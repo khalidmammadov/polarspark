@@ -37,8 +37,7 @@ import polars as pl
 from polarspark import copy_func
 from polarspark.context import SparkContext
 from polarspark.errors import PySparkAttributeError, PySparkTypeError, PySparkValueError
-from polarspark.sql.types import DataType
-from polarspark.sql.pandas.types import to_polars_type
+from polarspark.sql.types import DataType, _to_polars_type
 from polarspark.sql.utils import get_active_spark_context
 
 if TYPE_CHECKING:
@@ -1201,7 +1200,7 @@ class Column:
         [Row(ages='2'), Row(ages='5')]
         """
 
-        pl_type = to_polars_type(dataType)
+        pl_type = _to_polars_type(dataType)
         if pl_type is None:
             raise PySparkTypeError(
                 error_class="NOT_DATATYPE_OR_STR",

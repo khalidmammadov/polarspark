@@ -81,8 +81,9 @@ from polarspark.testing.sqlutils import (
 from polarspark.testing.utils import PySparkErrorTestUtils
 
 
-@pytest.mark.skip
+# @pytest.mark.skip
 class TypesTestsMixin:
+    @pytest.mark.skip(reason="no parallelize")
     def test_apply_schema_to_row(self):
         df = self.spark.read.json(self.sc.parallelize(["""{"a":2}"""]))
         df2 = self.spark.createDataFrame(df.rdd.map(lambda x: x), df.schema)
@@ -92,6 +93,7 @@ class TypesTestsMixin:
         df3 = self.spark.createDataFrame(rdd, df.schema)
         self.assertEqual(10, df3.count())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_schema_to_local(self):
         input = [{"a": 1}, {"b": "coffee"}]
         rdd = self.sc.parallelize(input)
@@ -103,6 +105,7 @@ class TypesTestsMixin:
         df3 = self.spark.createDataFrame(rdd, df.schema)
         self.assertEqual(10, df3.count())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_apply_schema_to_dict_and_rows(self):
         schema = StructType().add("a", IntegerType()).add("b", StringType())
         input = [{"a": 1}, {"b": "coffee"}]
@@ -119,12 +122,14 @@ class TypesTestsMixin:
             df4 = self.spark.createDataFrame(input, schema, verifySchema=verify)
             self.assertEqual(10, df4.count())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_create_dataframe_schema_mismatch(self):
         rdd = self.sc.parallelize(range(3)).map(lambda i: Row(a=i))
         schema = StructType([StructField("a", IntegerType()), StructField("b", StringType())])
         df = self.spark.createDataFrame(rdd, schema)
         self.assertRaises(Exception, lambda: df.show())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_schema(self):
         d = [Row(l=[], d={}, s=None), Row(l=[Row(a=1, b="s")], d={"key": Row(c=1.0, d="2")}, s="")]
         rdd = self.sc.parallelize(d)
@@ -272,6 +277,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame([["a", "b"]], ["col1"])
         self.assertEqual(df.columns, ["col1", "_2"])
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_schema_upcast_int_to_string(self):
         df = self.spark.createDataFrame(
             self.spark.sparkContext.parallelize([[1, 1], ["x", 1]]),
@@ -288,6 +294,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame([[True, 1], ["false", 1]], schema=["a", "b"])
         self.assertEqual([Row(a="true", b=1), Row(a="false", b=1)], df.collect())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_nested_schema(self):
         NestedRow = Row("f1", "f2")
         nestedRdd1 = self.sc.parallelize(
@@ -328,6 +335,7 @@ class TypesTestsMixin:
             df = self.spark.createDataFrame(data)
             self.assertEqual(Row(f1=[Row(payment=200.5, name="A")], f2=[1, 2]), df.first())
 
+    @pytest.mark.skip
     def test_infer_nested_dict_as_struct_with_rdd(self):
         # SPARK-35929: Test inferring nested dict as a struct type.
         NestedRow = Row("f1", "f2")
@@ -372,6 +380,7 @@ class TypesTestsMixin:
         with self.assertRaisesRegex(ValueError, "types cannot be determined after inferring"):
             self.spark.createDataFrame(data4)
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_array_merge_element_types_with_rdd(self):
         # SPARK-39168: Test inferring array element type from all values in array
         ArrayRow = Row("f1", "f2")
@@ -382,6 +391,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame(rdd)
         self.assertEqual(Row(f1=[1, None], f2=[None, 2]), df.first())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_array_element_type_empty_rdd(self):
         # SPARK-39168: Test inferring array element type from all rows
         ArrayRow = Row("f1")
@@ -436,6 +446,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame(rdd)
         self.assertEqual(Row(f1={"a": 1, "b": None}, f2={"a": None, "b": 1}), df.first())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_map_pair_type_empty_rdd(self):
         # SPARK-48247: Test inferring map pair type from all rows
         MapRow = Row("f1")
@@ -505,6 +516,7 @@ class TypesTestsMixin:
         self.assertEqual(df.dtypes, [("key", "bigint"), ("value", "string")])
         self.assertEqual(df.first(), Row(key=1, value="1"))
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_apply_schema(self):
         from datetime import date, datetime, timedelta
 
@@ -704,6 +716,7 @@ class TypesTestsMixin:
             assert schema == python_datatype
             assert schema == _parse_datatype_json_string(schema.json())
 
+    @pytest.mark.skip
     def test_schema_with_collations_on_non_string_types(self):
         from polarspark.sql.types import _parse_datatype_json_string, _COLLATIONS_METADATA_KEY
 
@@ -818,6 +831,7 @@ class TypesTestsMixin:
             PySparkTypeError, lambda: _parse_datatype_json_string(collations_in_nested_map_json)
         )
 
+    @pytest.mark.skip
     def test_schema_with_bad_collations_provider(self):
         from polarspark.sql.types import _parse_datatype_json_string, _COLLATIONS_METADATA_KEY
 
@@ -841,6 +855,7 @@ class TypesTestsMixin:
 
         self.assertRaises(PySparkValueError, lambda: _parse_datatype_json_string(schema_json))
 
+    @pytest.mark.skip(reason="no udt")
     def test_udt(self):
         from polarspark.sql.types import _parse_datatype_json_string, _infer_type, _make_type_verifier
 
@@ -877,6 +892,7 @@ class TypesTestsMixin:
         _make_type_verifier(PythonOnlyUDT())(PythonOnlyPoint(1.0, 2.0))
         self.assertRaises(ValueError, lambda: _make_type_verifier(PythonOnlyUDT())([1.0, 2.0]))
 
+    @pytest.mark.skip(reason="no udt")
     def test_simple_udt_in_df(self):
         schema = StructType().add("key", LongType()).add("val", PythonOnlyUDT())
         df = self.spark.createDataFrame(
@@ -884,6 +900,7 @@ class TypesTestsMixin:
         )
         df.collect()
 
+    @pytest.mark.skip(reason="no udt")
     def test_nested_udt_in_df(self):
         schema = StructType().add("key", LongType()).add("val", ArrayType(PythonOnlyUDT()))
         df = self.spark.createDataFrame(
@@ -900,6 +917,7 @@ class TypesTestsMixin:
         )
         df.collect()
 
+    @pytest.mark.skip(reason="no udt")
     def test_complex_nested_udt_in_df(self):
         schema = StructType().add("key", LongType()).add("val", PythonOnlyUDT())
         df = self.spark.createDataFrame(
@@ -912,6 +930,7 @@ class TypesTestsMixin:
         udf = F.udf(lambda k, v: [(k, v[0])], ArrayType(df.schema))
         gd.select(udf(*gd)).collect()
 
+    @pytest.mark.skip(reason="no udt")
     def test_udt_with_none(self):
         df = self.spark.range(0, 10, 1, 1)
 
@@ -923,6 +942,7 @@ class TypesTestsMixin:
         rows = [r[0] for r in df.selectExpr("udf(id)").take(2)]
         self.assertEqual(rows, [None, PythonOnlyPoint(1, 1)])
 
+    @pytest.mark.skip(reason="no udt")
     def test_infer_schema_with_udt(self):
         row = Row(label=1.0, point=ExamplePoint(1.0, 2.0))
         df = self.spark.createDataFrame([row])
@@ -946,6 +966,7 @@ class TypesTestsMixin:
             point = self.spark.sql("SELECT point FROM labeled_point").head().point
             self.assertEqual(point, PythonOnlyPoint(1.0, 2.0))
 
+    @pytest.mark.skip(reason="no udt")
     def test_infer_schema_with_udt_with_column_names(self):
         row = (1.0, ExamplePoint(1.0, 2.0))
         df = self.spark.createDataFrame([row], ["label", "point"])
@@ -969,6 +990,7 @@ class TypesTestsMixin:
             point = self.spark.sql("SELECT point FROM labeled_point").head().point
             self.assertEqual(point, PythonOnlyPoint(1.0, 2.0))
 
+    @pytest.mark.skip(reason="no udt")
     def test_apply_schema_with_udt(self):
         row = (1.0, ExamplePoint(1.0, 2.0))
         schema = StructType(
@@ -992,6 +1014,7 @@ class TypesTestsMixin:
         point = df.head().point
         self.assertEqual(point, PythonOnlyPoint(1.0, 2.0))
 
+    @pytest.mark.skip(reason="no udt")
     def test_apply_schema_with_nullable_udt(self):
         rows = [(1.0, ExamplePoint(1.0, 2.0)), (2.0, None)]
         schema = StructType(
@@ -1015,6 +1038,7 @@ class TypesTestsMixin:
         points = [row.point for row in df.collect()]
         self.assertEqual(points, [PythonOnlyPoint(1.0, 2.0), None])
 
+    @pytest.mark.skip(reason="no udt")
     def test_udf_with_udt(self):
         row = Row(label=1.0, point=ExamplePoint(1.0, 2.0))
         df = self.spark.createDataFrame([row])
@@ -1030,6 +1054,7 @@ class TypesTestsMixin:
         udf2 = F.udf(lambda p: PythonOnlyPoint(p.x + 1, p.y + 1), PythonOnlyUDT())
         self.assertEqual(PythonOnlyPoint(2.0, 3.0), df.select(udf2(df.point)).first()[0])
 
+    @pytest.mark.skip(reason="no udt")
     def test_rdd_with_udt(self):
         row = Row(label=1.0, point=ExamplePoint(1.0, 2.0))
         df = self.spark.createDataFrame([row])
@@ -1039,6 +1064,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame([row])
         self.assertEqual(1.0, df.rdd.map(lambda r: r.point.x).first())
 
+    @pytest.mark.skip(reason="no udt")
     def test_parquet_with_udt(self):
         row = Row(label=1.0, point=ExamplePoint(1.0, 2.0))
         df0 = self.spark.createDataFrame([row])
@@ -1055,6 +1081,7 @@ class TypesTestsMixin:
         point = df1.head().point
         self.assertEqual(point, PythonOnlyPoint(1.0, 2.0))
 
+    @pytest.mark.skip(reason="no udt")
     def test_union_with_udt(self):
         row1 = (1.0, ExamplePoint(1.0, 2.0))
         row2 = (2.0, ExamplePoint(3.0, 4.0))
@@ -1076,6 +1103,7 @@ class TypesTestsMixin:
             ],
         )
 
+    @pytest.mark.skip(reason="no udt")
     def test_cast_to_string_with_udt(self):
         row = (ExamplePoint(1.0, 2.0), PythonOnlyPoint(3.0, 4.0))
         schema = StructType(
@@ -1089,6 +1117,7 @@ class TypesTestsMixin:
         result = df.select(F.col("point").cast("string"), F.col("pypoint").cast("string")).head()
         self.assertEqual(result, Row(point="(1.0, 2.0)", pypoint="[3.0, 4.0]"))
 
+    @pytest.mark.skip(reason="no udt")
     def test_cast_to_udt_with_udt(self):
         row = Row(point=ExamplePoint(1.0, 2.0), python_only_point=PythonOnlyPoint(1.0, 2.0))
         df = self.spark.createDataFrame([row])
@@ -1216,6 +1245,7 @@ class TypesTestsMixin:
         )
         # self.assertEqual(VariantType(), _parse_datatype_string("variant"))
 
+    @pytest.mark.skip
     def test_tree_string(self):
         schema1 = DataType.fromDDL("c1 INT, c2 STRUCT<c3: INT, c4: STRUCT<c5: INT, c6: INT>>")
 
@@ -1532,6 +1562,7 @@ class TypesTestsMixin:
         )
         self.spark.createDataFrame([["a", "b"], ["c", "d"]], schema)
 
+    @pytest.mark.skip
     def test_access_nested_types(self):
         df = self.spark.createDataFrame([Row(l=[1], r=Row(a=1, b="b"), d={"k": "v"})])
         self.assertEqual(1, df.select(df.l[0]).first()[0])
@@ -1553,6 +1584,7 @@ class TypesTestsMixin:
             0,
         )
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_long_type(self):
         longrow = [Row(f1="a", f2=100000000000000)]
         df = self.sc.parallelize(longrow).toDF()
@@ -1573,6 +1605,7 @@ class TypesTestsMixin:
         self.assertEqual(_infer_type(2**61), LongType())
         self.assertEqual(_infer_type(2**71), LongType())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_binary_type(self):
         binaryrow = [Row(f1="a", f2=b"abcd")]
         df = self.sc.parallelize(binaryrow).toDF()
@@ -1840,10 +1873,10 @@ class TypesTestsMixin:
         instances = [
             NullType(),
             StringType(),
-            StringType("UTF8_BINARY"),
-            StringType("UTF8_LCASE"),
-            StringType("UNICODE"),
-            StringType("UNICODE_CI"),
+            # StringType("UTF8_BINARY"),
+            # StringType("UTF8_LCASE"),
+            # StringType("UNICODE"),
+            # StringType("UNICODE_CI"),
             CharType(10),
             VarcharType(10),
             BinaryType(),
@@ -1955,6 +1988,7 @@ class TypesTestsMixin:
         for n, (a, e) in enumerate(zip(actual, expected)):
             self.assertEqual(a, e, "%s does not match with %s" % (exprs[n], expected[n]))
 
+    @pytest.mark.skip
     def test_yearmonth_interval_type_constructor(self):
         self.assertEqual(YearMonthIntervalType().simpleString(), "interval year to month")
         self.assertEqual(
@@ -1994,6 +2028,7 @@ class TypesTestsMixin:
             message_parameters={"start_field": "0", "end_field": "321"},
         )
 
+    @pytest.mark.skip
     def test_yearmonth_interval_type(self):
         schema1 = self.spark.sql("SELECT INTERVAL '10-8' YEAR TO MONTH AS interval").schema
         self.assertEqual(schema1.fields[0].dataType, YearMonthIntervalType(0, 1))
@@ -2010,10 +2045,12 @@ class TypesTestsMixin:
         with self.assertRaisesRegex(TypeError, "takes 1 positional argument but 2 were given"):
             CalendarIntervalType(3)
 
+    @pytest.mark.skip
     def test_calendar_interval_type(self):
         schema1 = self.spark.sql("SELECT make_interval(100, 11, 1, 1, 12, 30, 01.001001)").schema
         self.assertEqual(schema1.fields[0].dataType, CalendarIntervalType())
 
+    @pytest.mark.skip
     def test_calendar_interval_type_with_sf(self):
         schema1 = self.spark.range(1).select(F.make_interval(F.lit(1))).schema
         self.assertEqual(schema1.fields[0].dataType, CalendarIntervalType())
@@ -2216,6 +2253,7 @@ class TypesTestsMixin:
         #     StructType([StructField("a", IntegerType()), StructField("v", VariantType())]),
         # )
 
+    @pytest.mark.skip
     def test_collated_string(self):
         dfs = [
             self.spark.sql("SELECT 'abc' collate UTF8_LCASE"),
@@ -2242,6 +2280,7 @@ class TypesTestsMixin:
                 self.spark.createDataFrame([[[[1, 1.0]]]]).schema.fields[0].dataType,
             )
 
+    @pytest.mark.skip
     def test_ym_interval_in_collect(self):
         with self.assertRaises(PySparkNotImplementedError):
             self.spark.sql("SELECT INTERVAL '10-8' YEAR TO MONTH AS interval").first()
@@ -2252,6 +2291,7 @@ class TypesTestsMixin:
                 Row(interval=128),
             )
 
+    @pytest.mark.skip
     def test_cal_interval_in_collect(self):
         with self.assertRaises(PySparkNotImplementedError):
             self.spark.sql("SELECT make_interval(100, 11, 1, 1, 12, 30, 01.001001)").first()[0]

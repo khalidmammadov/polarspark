@@ -57,12 +57,13 @@ from polarspark.sql.readwriter import DataFrameWriter, DataFrameWriterV2
 from polarspark.sql.types import (
     StructType,
     Row,
+    _to_polars_type,
     _parse_datatype_json_string,
 )
 from polarspark.sql.utils import get_active_spark_context#, toJArray
 from polarspark.sql.pandas.conversion import PandasConversionMixin, schema_from_polars
 from polarspark.sql.pandas.map_ops import PandasMapOpsMixin
-from polarspark.sql.pandas.types import to_polars_type, to_polars_selector
+from polarspark.sql.pandas.types import to_polars_selector
 
 import polars as pl
 from polars.lazyframe import LazyFrame
