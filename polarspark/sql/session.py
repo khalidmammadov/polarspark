@@ -1042,7 +1042,7 @@ class SparkSession(SparkConversionMixin):
                 if isinstance(v, array):
                     v = v.tolist()
                 arr.append(v)
-        return pl.LazyFrame(pdata, schema), struct
+        return pl.LazyFrame(data=pdata, schema=schema, strict=False), struct
 
     @staticmethod
     def _create_shell_session() -> "SparkSession":
@@ -1314,9 +1314,7 @@ class SparkSession(SparkConversionMixin):
             )
 
         if isinstance(schema, str):
-            raise NotImplementedError("Construct StructType type with StructField instead "+
-                                      "to pass as schema")
-            # schema = cast(Union[AtomicType, StructType, str], _parse_datatype_string(schema))
+            schema = cast(Union[AtomicType, StructType, str], _parse_datatype_string(schema))
         elif isinstance(schema, (list, tuple)):
             # Must re-encode any unicode strings to be consistent with StructField names
             schema = [x.encode("utf-8") if not isinstance(x, str) else x for x in schema]
