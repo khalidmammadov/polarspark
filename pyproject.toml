@@ -1,6 +1,6 @@
 [project]
 name = "polarspark"
-version = "0.1.7"
+version = "0.1.10"
 authors = [
   { name="Khalid Mammadov", email="xmamedov@gmail.com" },
 ]
@@ -15,15 +15,26 @@ classifiers = [
 dependencies = [
     'pandas>=2.2.3',
     'numpy>=1.21',
-    'polars==1.8.2',
+    'polars==1.33.1',
     'pyarrow>=4.0.0',
     'tzlocal==5.2',
-    'deltalake==0.22.3'
+    'deltalake>=1.0.0'
 ]
 
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
 
 [project.urls]
 Homepage = "https://github.com/khalidmammadov/polarspark"
