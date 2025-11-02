@@ -60,32 +60,6 @@ if TYPE_CHECKING:
     from polarspark.sql.pandas._typing import SeriesLike as PandasSeriesLike
 
 
-def to_polars_type(data_type: Union[DataType, str]):
-    type_str = data_type if isinstance(data_type, str) else data_type.typeName()
-    type_map = {
-        "boolean": pl.Boolean,
-        "byte": pl.Int8,
-        "short": pl.Int16,
-        "int": pl.Int32,
-        "integer": pl.Int32,
-        "long": pl.Int64,
-        "float": pl.Float32,
-        "double": pl.Float64,
-        "decimal": pl.Decimal(data_type.precision, data_type.scale) if type_str == "decimal" else None,
-        "string": pl.String,
-        "binary": pl.Binary,
-        "date": pl.Date,
-        "timestamp": pl.Datetime,
-        "timestampntz": pl.Datetime,
-        "daytimeinterval": pl.Duration,
-        "array": pl.List,
-        "map": pl.Struct,
-        "struct": pl.Struct,
-        "null": pl.Null
-    }
-    return type_map.get(type_str)
-
-
 def to_polars_selector(data_type: str):
     _float = [pl.Float32, pl.Float64]
     _int = [pl.Int8, pl.Int16, pl.Int32, pl.Int64]

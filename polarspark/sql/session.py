@@ -50,10 +50,9 @@ from polarspark.sql.conf import RuntimeConfig
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql.functions import lit
 from polarspark.sql.pandas.conversion import SparkConversionMixin
-from polarspark.sql.pandas.types import to_polars_type
 from polarspark.sql.readwriter import DataFrameReader
 # from polarspark.sql.sql_formatter import SQLStringFormatter
-# from polarspark.sql.streaming import DataStreamReader
+from polarspark.sql.streaming import DataStreamReader
 from polarspark.sql.types import (
     AtomicType,
     DataType,
@@ -67,6 +66,7 @@ from polarspark.sql.types import (
     _create_converter,
     _parse_datatype_string,
     _from_numpy_type,
+    _to_polars_type,
 )
 
 from polarspark.errors.exceptions.captured import install_exception_handler
@@ -1035,14 +1035,14 @@ class SparkSession(SparkConversionMixin):
         pdata = {}
         cols = struct.names
         row_count = len(data)
-        schema = {f.name: to_polars_type(f.dataType) for f in struct.fields}
+        schema = {f.name: _to_polars_type(f.dataType) for f in struct.fields}
         for tuples in tupled_data:
             for k, v in zip(cols*row_count, tuples):
                 arr = pdata.setdefault(k, [])
                 if isinstance(v, array):
                     v = v.tolist()
                 arr.append(v)
-        return pl.LazyFrame(pdata, schema), struct
+        return pl.LazyFrame(data=pdata, schema=schema, strict=False), struct
 
     @staticmethod
     def _create_shell_session() -> "SparkSession":
@@ -1314,9 +1314,7 @@ class SparkSession(SparkConversionMixin):
             )
 
         if isinstance(schema, str):
-            raise NotImplementedError("Construct StructType type with StructField instead "+
-                                      "to pass as schema")
-            # schema = cast(Union[AtomicType, StructType, str], _parse_datatype_string(schema))
+            schema = cast(Union[AtomicType, StructType, str], _parse_datatype_string(schema))
         elif isinstance(schema, (list, tuple)):
             # Must re-encode any unicode strings to be consistent with StructField names
             schema = [x.encode("utf-8") if not isinstance(x, str) else x for x in schema]
@@ -1645,42 +1643,42 @@ class SparkSession(SparkConversionMixin):
         """
         return DataFrameReader(self)
 
-    # @property
-    # def readStream(self) -> DataStreamReader:
-    #     """
-    #     Returns a :class:`DataStreamReader` that can be used to read data streams
-    #     as a streaming :class:`DataFrame`.
-    #
-    #     .. versionadded:: 2.0.0
-    #
-    #     .. versionchanged:: 3.5.0
-    #         Supports Spark Connect.
-    #
-    #     Notes
-    #     -----
-    #     This API is evolving.
-    #
-    #     Returns
-    #     -------
-    #     :class:`DataStreamReader`
-    #
-    #     Examples
-    #     --------
-    #     >>> spark.readStream
-    #     <polarspark...DataStreamReader object ...>
-    #
-    #     The example below uses Rate source that generates rows continuously.
-    #     After that, we operate a modulo by 3, and then write the stream out to the console.
-    #     The streaming query stops in 3 seconds.
-    #
-    #     >>> import time
-    #     >>> df = spark.readStream.format("rate").load()
-    #     >>> df = df.selectExpr("value % 3 as v")
-    #     >>> q = df.writeStream.format("console").start()
-    #     >>> time.sleep(3)
-    #     >>> q.stop()
-    #     """
-    #     return DataStreamReader(self)
+    @property
+    def readStream(self) -> DataStreamReader:
+        """
+        Returns a :class:`DataStreamReader` that can be used to read data streams
+        as a streaming :class:`DataFrame`.
+
+        .. versionadded:: 2.0.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
+
+        Notes
+        -----
+        This API is evolving.
+
+        Returns
+        -------
+        :class:`DataStreamReader`
+
+        Examples
+        --------
+        >>> spark.readStream
+        <polarspark...DataStreamReader object ...>
+
+        The example below uses Rate source that generates rows continuously.
+        After that, we operate a modulo by 3, and then write the stream out to the console.
+        The streaming query stops in 3 seconds.
+
+        >>> import time
+        >>> df = spark.readStream.format("rate").load()
+        >>> df = df.selectExpr("value % 3 as v")
+        >>> q = df.writeStream.format("console").start()
+        >>> time.sleep(3)
+        >>> q.stop()
+        """
+        return DataStreamReader(self)
 
     @property
     def streams(self) -> "StreamingQueryManager":

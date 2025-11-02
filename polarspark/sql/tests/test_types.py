@@ -24,6 +24,7 @@ import pickle
 import sys
 import unittest
 from dataclasses import dataclass, asdict
+from pickletools import pyset
 
 import pytest
 
@@ -81,8 +82,9 @@ from polarspark.testing.sqlutils import (
 from polarspark.testing.utils import PySparkErrorTestUtils
 
 
-@pytest.mark.skip
+# @pytest.mark.skip
 class TypesTestsMixin:
+    @pytest.mark.skip(reason="no parallelize")
     def test_apply_schema_to_row(self):
         df = self.spark.read.json(self.sc.parallelize(["""{"a":2}"""]))
         df2 = self.spark.createDataFrame(df.rdd.map(lambda x: x), df.schema)
@@ -92,6 +94,7 @@ class TypesTestsMixin:
         df3 = self.spark.createDataFrame(rdd, df.schema)
         self.assertEqual(10, df3.count())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_schema_to_local(self):
         input = [{"a": 1}, {"b": "coffee"}]
         rdd = self.sc.parallelize(input)
@@ -103,6 +106,7 @@ class TypesTestsMixin:
         df3 = self.spark.createDataFrame(rdd, df.schema)
         self.assertEqual(10, df3.count())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_apply_schema_to_dict_and_rows(self):
         schema = StructType().add("a", IntegerType()).add("b", StringType())
         input = [{"a": 1}, {"b": "coffee"}]
@@ -119,12 +123,14 @@ class TypesTestsMixin:
             df4 = self.spark.createDataFrame(input, schema, verifySchema=verify)
             self.assertEqual(10, df4.count())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_create_dataframe_schema_mismatch(self):
         rdd = self.sc.parallelize(range(3)).map(lambda i: Row(a=i))
         schema = StructType([StructField("a", IntegerType()), StructField("b", StringType())])
         df = self.spark.createDataFrame(rdd, schema)
         self.assertRaises(Exception, lambda: df.show())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_schema(self):
         d = [Row(l=[], d={}, s=None), Row(l=[Row(a=1, b="s")], d={"key": Row(c=1.0, d="2")}, s="")]
         rdd = self.sc.parallelize(d)
@@ -169,6 +175,7 @@ class TypesTestsMixin:
                 result = self.spark.sql("SELECT l[0].a from test2 where d['key'].d = '2'")
                 self.assertEqual(1, result.head()[0])
 
+    @pytest.mark.skip("no schema inference")
     def test_infer_schema_specification(self):
         from decimal import Decimal
 
@@ -272,6 +279,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame([["a", "b"]], ["col1"])
         self.assertEqual(df.columns, ["col1", "_2"])
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_schema_upcast_int_to_string(self):
         df = self.spark.createDataFrame(
             self.spark.sparkContext.parallelize([[1, 1], ["x", 1]]),
@@ -288,6 +296,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame([[True, 1], ["false", 1]], schema=["a", "b"])
         self.assertEqual([Row(a="true", b=1), Row(a="false", b=1)], df.collect())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_nested_schema(self):
         NestedRow = Row("f1", "f2")
         nestedRdd1 = self.sc.parallelize(
@@ -315,6 +324,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame(rdd)
         self.assertEqual(Row(field1=1, field2="row1"), df.first())
 
+    @pytest.mark.skip("no schema inference")
     def test_infer_nested_dict_as_struct(self):
         # SPARK-35929: Test inferring nested dict as a struct type.
         NestedRow = Row("f1", "f2")
@@ -328,6 +338,7 @@ class TypesTestsMixin:
             df = self.spark.createDataFrame(data)
             self.assertEqual(Row(f1=[Row(payment=200.5, name="A")], f2=[1, 2]), df.first())
 
+    @pytest.mark.skip
     def test_infer_nested_dict_as_struct_with_rdd(self):
         # SPARK-35929: Test inferring nested dict as a struct type.
         NestedRow = Row("f1", "f2")
@@ -342,6 +353,7 @@ class TypesTestsMixin:
             df = self.spark.createDataFrame(nestedRdd)
             self.assertEqual(Row(f1=[Row(payment=200.5, name="A")], f2=[1, 2]), df.first())
 
+    @pytest.mark.skip("no schema inference")
     def test_infer_array_merge_element_types(self):
         # SPARK-39168: Test inferring array element type from all values in array
         ArrayRow = Row("f1", "f2")
@@ -372,6 +384,7 @@ class TypesTestsMixin:
         with self.assertRaisesRegex(ValueError, "types cannot be determined after inferring"):
             self.spark.createDataFrame(data4)
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_array_merge_element_types_with_rdd(self):
         # SPARK-39168: Test inferring array element type from all values in array
         ArrayRow = Row("f1", "f2")
@@ -382,6 +395,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame(rdd)
         self.assertEqual(Row(f1=[1, None], f2=[None, 2]), df.first())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_array_element_type_empty_rdd(self):
         # SPARK-39168: Test inferring array element type from all rows
         ArrayRow = Row("f1")
@@ -395,6 +409,7 @@ class TypesTestsMixin:
         self.assertEqual(Row(f1=[None]), rows[1])
         self.assertEqual(Row(f1=[1]), rows[2])
 
+    @pytest.mark.skip("no schema inference")
     def test_infer_array_element_type_empty(self):
         # SPARK-39168: Test inferring array element type from all rows
         ArrayRow = Row("f1")
@@ -407,6 +422,7 @@ class TypesTestsMixin:
         self.assertEqual(Row(f1=[None]), rows[1])
         self.assertEqual(Row(f1=[1]), rows[2])
 
+    @pytest.mark.skip("no schema inference")
     def test_infer_array_element_type_with_struct(self):
         # SPARK-39168: Test inferring array of struct type from all struct values
         NestedRow = Row("f1")
@@ -426,6 +442,7 @@ class TypesTestsMixin:
                 df = self.spark.createDataFrame(data)
                 self.assertEqual(Row(f1=[Row(payment=200.5), Row(payment=None)]), df.first())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_map_merge_pair_types_with_rdd(self):
         # SPARK-48247: Test inferring map pair type from all values in array
         MapRow = Row("f1", "f2")
@@ -436,6 +453,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame(rdd)
         self.assertEqual(Row(f1={"a": 1, "b": None}, f2={"a": None, "b": 1}), df.first())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_map_pair_type_empty_rdd(self):
         # SPARK-48247: Test inferring map pair type from all rows
         MapRow = Row("f1")
@@ -449,6 +467,7 @@ class TypesTestsMixin:
         self.assertEqual(Row(f1={"a": None}), rows[1])
         self.assertEqual(Row(f1={"a": 1}), rows[2])
 
+    @pytest.mark.skip("no schema inference")
     def test_infer_map_pair_type_empty(self):
         # SPARK-48247: Test inferring map pair type from all rows
         MapRow = Row("f1")
@@ -461,6 +480,7 @@ class TypesTestsMixin:
         self.assertEqual(Row(f1={"a": None}), rows[1])
         self.assertEqual(Row(f1={"a": 1}), rows[2])
 
+    @pytest.mark.skip("no schema inference")
     def test_infer_map_pair_type_with_nested_maps(self):
         # SPARK-48247: Test inferring nested map
         NestedRow = Row("f1", "f2")
@@ -492,6 +512,7 @@ class TypesTestsMixin:
         r = self.spark.createDataFrame([user]).first()
         self.assertEqual(asdict(user), r.asDict())
 
+    @pytest.mark.skip("not implemented")
     def test_negative_decimal(self):
         with self.sql_conf({"spark.sql.legacy.allowNegativeScaleOfDecimal": True}):
             df = self.spark.createDataFrame([(1,), (11,)], ["value"])
@@ -505,6 +526,7 @@ class TypesTestsMixin:
         self.assertEqual(df.dtypes, [("key", "bigint"), ("value", "string")])
         self.assertEqual(df.first(), Row(key=1, value="1"))
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_apply_schema(self):
         from datetime import date, datetime, timedelta
 
@@ -589,6 +611,7 @@ class TypesTestsMixin:
 
             self.assertEqual((126, -127, -32767, 32766, 2147483646, 2.5), tuple(r))
 
+    @pytest.mark.skip
     def test_convert_row_to_dict(self):
         row = Row(l=[Row(a=1, b="s")], d={"key": Row(c=1.0, d="2")})
         self.assertEqual(1, row.asDict()["l"][0].a)
@@ -613,97 +636,7 @@ class TypesTestsMixin:
         self.assertEqual(df.count(), 1)
         self.assertEqual(df.head(), Row(name="[123]", income=120))
 
-    def test_schema_with_collations_json_ser_de(self):
-        from polarspark.sql.types import _parse_datatype_json_string
-
-        unicode_collation = "UNICODE"
-
-        simple_struct = StructType([StructField("c1", StringType(unicode_collation))])
-
-        nested_struct = StructType([StructField("nested", simple_struct)])
-
-        array_in_schema = StructType(
-            [StructField("array", ArrayType(StringType(unicode_collation)))]
-        )
-
-        map_in_schema = StructType(
-            [
-                StructField(
-                    "map", MapType(StringType(unicode_collation), StringType(unicode_collation))
-                )
-            ]
-        )
-
-        nested_map = StructType(
-            [
-                StructField(
-                    "nested",
-                    StructType(
-                        [
-                            StructField(
-                                "mapField",
-                                MapType(
-                                    StringType(unicode_collation), StringType(unicode_collation)
-                                ),
-                            )
-                        ]
-                    ),
-                )
-            ]
-        )
-
-        array_in_map = StructType(
-            [
-                StructField(
-                    "arrInMap",
-                    MapType(
-                        StringType(unicode_collation), ArrayType(StringType(unicode_collation))
-                    ),
-                )
-            ]
-        )
-
-        nested_array_in_map_value = StructType(
-            [
-                StructField(
-                    "nestedArrayInMap",
-                    ArrayType(
-                        MapType(
-                            StringType(unicode_collation),
-                            ArrayType(ArrayType(StringType(unicode_collation))),
-                        )
-                    ),
-                )
-            ]
-        )
-
-        schema_with_multiple_fields = StructType(
-            simple_struct.fields
-            + nested_struct.fields
-            + array_in_schema.fields
-            + map_in_schema.fields
-            + nested_map.fields
-            + array_in_map.fields
-            + nested_array_in_map_value.fields
-        )
-
-        schemas = [
-            simple_struct,
-            nested_struct,
-            array_in_schema,
-            map_in_schema,
-            nested_map,
-            nested_array_in_map_value,
-            array_in_map,
-            schema_with_multiple_fields,
-        ]
-
-        for schema in schemas:
-            scala_datatype = self.spark._jsparkSession.parseDataType(schema.json())
-            python_datatype = _parse_datatype_json_string(scala_datatype.json())
-            assert schema == python_datatype
-            assert schema == _parse_datatype_json_string(schema.json())
-
+    @pytest.mark.skip
     def test_schema_with_collations_on_non_string_types(self):
         from polarspark.sql.types import _parse_datatype_json_string, _COLLATIONS_METADATA_KEY
 
@@ -818,6 +751,7 @@ class TypesTestsMixin:
             PySparkTypeError, lambda: _parse_datatype_json_string(collations_in_nested_map_json)
         )
 
+    @pytest.mark.skip
     def test_schema_with_bad_collations_provider(self):
         from polarspark.sql.types import _parse_datatype_json_string, _COLLATIONS_METADATA_KEY
 
@@ -841,6 +775,7 @@ class TypesTestsMixin:
 
         self.assertRaises(PySparkValueError, lambda: _parse_datatype_json_string(schema_json))
 
+    @pytest.mark.skip(reason="no udt")
     def test_udt(self):
         from polarspark.sql.types import _parse_datatype_json_string, _infer_type, _make_type_verifier
 
@@ -877,6 +812,7 @@ class TypesTestsMixin:
         _make_type_verifier(PythonOnlyUDT())(PythonOnlyPoint(1.0, 2.0))
         self.assertRaises(ValueError, lambda: _make_type_verifier(PythonOnlyUDT())([1.0, 2.0]))
 
+    @pytest.mark.skip(reason="no udt")
     def test_simple_udt_in_df(self):
         schema = StructType().add("key", LongType()).add("val", PythonOnlyUDT())
         df = self.spark.createDataFrame(
@@ -884,6 +820,7 @@ class TypesTestsMixin:
         )
         df.collect()
 
+    @pytest.mark.skip(reason="no udt")
     def test_nested_udt_in_df(self):
         schema = StructType().add("key", LongType()).add("val", ArrayType(PythonOnlyUDT()))
         df = self.spark.createDataFrame(
@@ -900,6 +837,7 @@ class TypesTestsMixin:
         )
         df.collect()
 
+    @pytest.mark.skip(reason="no udt")
     def test_complex_nested_udt_in_df(self):
         schema = StructType().add("key", LongType()).add("val", PythonOnlyUDT())
         df = self.spark.createDataFrame(
@@ -912,6 +850,7 @@ class TypesTestsMixin:
         udf = F.udf(lambda k, v: [(k, v[0])], ArrayType(df.schema))
         gd.select(udf(*gd)).collect()
 
+    @pytest.mark.skip(reason="no udt")
     def test_udt_with_none(self):
         df = self.spark.range(0, 10, 1, 1)
 
@@ -923,6 +862,7 @@ class TypesTestsMixin:
         rows = [r[0] for r in df.selectExpr("udf(id)").take(2)]
         self.assertEqual(rows, [None, PythonOnlyPoint(1, 1)])
 
+    @pytest.mark.skip(reason="no udt")
     def test_infer_schema_with_udt(self):
         row = Row(label=1.0, point=ExamplePoint(1.0, 2.0))
         df = self.spark.createDataFrame([row])
@@ -946,6 +886,7 @@ class TypesTestsMixin:
             point = self.spark.sql("SELECT point FROM labeled_point").head().point
             self.assertEqual(point, PythonOnlyPoint(1.0, 2.0))
 
+    @pytest.mark.skip(reason="no udt")
     def test_infer_schema_with_udt_with_column_names(self):
         row = (1.0, ExamplePoint(1.0, 2.0))
         df = self.spark.createDataFrame([row], ["label", "point"])
@@ -969,6 +910,7 @@ class TypesTestsMixin:
             point = self.spark.sql("SELECT point FROM labeled_point").head().point
             self.assertEqual(point, PythonOnlyPoint(1.0, 2.0))
 
+    @pytest.mark.skip(reason="no udt")
     def test_apply_schema_with_udt(self):
         row = (1.0, ExamplePoint(1.0, 2.0))
         schema = StructType(
@@ -992,6 +934,7 @@ class TypesTestsMixin:
         point = df.head().point
         self.assertEqual(point, PythonOnlyPoint(1.0, 2.0))
 
+    @pytest.mark.skip(reason="no udt")
     def test_apply_schema_with_nullable_udt(self):
         rows = [(1.0, ExamplePoint(1.0, 2.0)), (2.0, None)]
         schema = StructType(
@@ -1015,6 +958,7 @@ class TypesTestsMixin:
         points = [row.point for row in df.collect()]
         self.assertEqual(points, [PythonOnlyPoint(1.0, 2.0), None])
 
+    @pytest.mark.skip(reason="no udt")
     def test_udf_with_udt(self):
         row = Row(label=1.0, point=ExamplePoint(1.0, 2.0))
         df = self.spark.createDataFrame([row])
@@ -1030,6 +974,7 @@ class TypesTestsMixin:
         udf2 = F.udf(lambda p: PythonOnlyPoint(p.x + 1, p.y + 1), PythonOnlyUDT())
         self.assertEqual(PythonOnlyPoint(2.0, 3.0), df.select(udf2(df.point)).first()[0])
 
+    @pytest.mark.skip(reason="no udt")
     def test_rdd_with_udt(self):
         row = Row(label=1.0, point=ExamplePoint(1.0, 2.0))
         df = self.spark.createDataFrame([row])
@@ -1039,6 +984,7 @@ class TypesTestsMixin:
         df = self.spark.createDataFrame([row])
         self.assertEqual(1.0, df.rdd.map(lambda r: r.point.x).first())
 
+    @pytest.mark.skip(reason="no udt")
     def test_parquet_with_udt(self):
         row = Row(label=1.0, point=ExamplePoint(1.0, 2.0))
         df0 = self.spark.createDataFrame([row])
@@ -1055,6 +1001,7 @@ class TypesTestsMixin:
         point = df1.head().point
         self.assertEqual(point, PythonOnlyPoint(1.0, 2.0))
 
+    @pytest.mark.skip(reason="no udt")
     def test_union_with_udt(self):
         row1 = (1.0, ExamplePoint(1.0, 2.0))
         row2 = (2.0, ExamplePoint(3.0, 4.0))
@@ -1076,6 +1023,7 @@ class TypesTestsMixin:
             ],
         )
 
+    @pytest.mark.skip(reason="no udt")
     def test_cast_to_string_with_udt(self):
         row = (ExamplePoint(1.0, 2.0), PythonOnlyPoint(3.0, 4.0))
         schema = StructType(
@@ -1089,6 +1037,7 @@ class TypesTestsMixin:
         result = df.select(F.col("point").cast("string"), F.col("pypoint").cast("string")).head()
         self.assertEqual(result, Row(point="(1.0, 2.0)", pypoint="[3.0, 4.0]"))
 
+    @pytest.mark.skip(reason="no udt")
     def test_cast_to_udt_with_udt(self):
         row = Row(point=ExamplePoint(1.0, 2.0), python_only_point=PythonOnlyPoint(1.0, 2.0))
         df = self.spark.createDataFrame([row])
@@ -1167,25 +1116,26 @@ class TypesTestsMixin:
             LongType(),
             DateType(),
             TimestampType(),
-            TimestampNTZType(),
+            # TimestampNTZType(),
             NullType(),
-            YearMonthIntervalType(),
-            YearMonthIntervalType(YearMonthIntervalType.YEAR),
-            YearMonthIntervalType(YearMonthIntervalType.YEAR, YearMonthIntervalType.MONTH),
-            DayTimeIntervalType(),
-            DayTimeIntervalType(DayTimeIntervalType.DAY),
-            DayTimeIntervalType(DayTimeIntervalType.HOUR, DayTimeIntervalType.SECOND),
-            CalendarIntervalType(),
+            # YearMonthIntervalType(),
+            # YearMonthIntervalType(YearMonthIntervalType.YEAR),
+            # YearMonthIntervalType(YearMonthIntervalType.YEAR, YearMonthIntervalType.MONTH),
+            # DayTimeIntervalType(),
+            # DayTimeIntervalType(DayTimeIntervalType.DAY),
+            # DayTimeIntervalType(DayTimeIntervalType.HOUR, DayTimeIntervalType.SECOND),
+            # CalendarIntervalType(),
         ]:
             json_str = dataType.json()
             parsed = _parse_datatype_json_string(json_str)
             self.assertEqual(dataType, parsed)
 
     def test_parse_datatype_string(self):
-        from polarspark.sql.types import _all_mappable_types, _parse_datatype_string
+        from polarspark.sql.types import _all_atomic_types, _parse_datatype_string
 
-        for k, t in _all_mappable_types.items():
-            self.assertEqual(t(), _parse_datatype_string(k))
+        for k, t in _all_atomic_types.items():
+            if k != "varchar" and k != "char":
+                self.assertEqual(t(), _parse_datatype_string(k))
 
         self.assertEqual(IntegerType(), _parse_datatype_string("int"))
         self.assertEqual(StringType(), _parse_datatype_string("string"))
@@ -1216,6 +1166,7 @@ class TypesTestsMixin:
         )
         # self.assertEqual(VariantType(), _parse_datatype_string("variant"))
 
+    @pytest.mark.skip
     def test_tree_string(self):
         schema1 = DataType.fromDDL("c1 INT, c2 STRUCT<c3: INT, c4: STRUCT<c5: INT, c6: INT>>")
 
@@ -1468,7 +1419,7 @@ class TypesTestsMixin:
             .add("bool", BooleanType())
             .add("date", DateType())
             .add("ts", TimestampType())
-            .add("ts_ntz", TimestampNTZType())
+            # .add("ts_ntz", TimestampNTZType())
             .add("dec", DecimalType(10, 2))
             .add("double", DoubleType())
             .add("float", FloatType())
@@ -1476,19 +1427,19 @@ class TypesTestsMixin:
             .add("int", IntegerType())
             .add("short", ShortType())
             .add("byte", ByteType())
-            .add("ym_interval_1", YearMonthIntervalType())
-            .add("ym_interval_2", YearMonthIntervalType(YearMonthIntervalType.YEAR))
-            .add(
-                "ym_interval_3",
-                YearMonthIntervalType(YearMonthIntervalType.YEAR, YearMonthIntervalType.MONTH),
-            )
-            .add("dt_interval_1", DayTimeIntervalType())
-            .add("dt_interval_2", DayTimeIntervalType(DayTimeIntervalType.DAY))
-            .add(
-                "dt_interval_3",
-                DayTimeIntervalType(DayTimeIntervalType.HOUR, DayTimeIntervalType.SECOND),
-            )
-            .add("cal_interval", CalendarIntervalType())
+            # .add("ym_interval_1", YearMonthIntervalType())
+            # .add("ym_interval_2", YearMonthIntervalType(YearMonthIntervalType.YEAR))
+            # .add(
+            #     "ym_interval_3",
+            #     YearMonthIntervalType(YearMonthIntervalType.YEAR, YearMonthIntervalType.MONTH),
+            # )
+            # .add("dt_interval_1", DayTimeIntervalType())
+            # .add("dt_interval_2", DayTimeIntervalType(DayTimeIntervalType.DAY))
+            # .add(
+            #     "dt_interval_3",
+            #     DayTimeIntervalType(DayTimeIntervalType.HOUR, DayTimeIntervalType.SECOND),
+            # )
+            # .add("cal_interval", CalendarIntervalType())
             # .add("var", VariantType())
         )
         self.assertEqual(
@@ -1503,7 +1454,6 @@ class TypesTestsMixin:
                 " |-- bool: boolean (nullable = true)",
                 " |-- date: date (nullable = true)",
                 " |-- ts: timestamp (nullable = true)",
-                " |-- ts_ntz: timestamp_ntz (nullable = true)",
                 " |-- dec: decimal(10,2) (nullable = true)",
                 " |-- double: double (nullable = true)",
                 " |-- float: float (nullable = true)",
@@ -1511,15 +1461,18 @@ class TypesTestsMixin:
                 " |-- int: integer (nullable = true)",
                 " |-- short: short (nullable = true)",
                 " |-- byte: byte (nullable = true)",
-                " |-- ym_interval_1: interval year to month (nullable = true)",
-                " |-- ym_interval_2: interval year (nullable = true)",
-                " |-- ym_interval_3: interval year to month (nullable = true)",
-                " |-- dt_interval_1: interval day to second (nullable = true)",
-                " |-- dt_interval_2: interval day (nullable = true)",
-                " |-- dt_interval_3: interval hour to second (nullable = true)",
-                " |-- cal_interval: interval (nullable = true)",
-                " |-- var: variant (nullable = true)",
                 "",
+
+                # " |-- ts_ntz: timestamp_ntz (nullable = true)",
+
+                # " |-- ym_interval_1: interval year to month (nullable = true)",
+                # " |-- ym_interval_2: interval year (nullable = true)",
+                # " |-- ym_interval_3: interval year to month (nullable = true)",
+                # " |-- dt_interval_1: interval day to second (nullable = true)",
+                # " |-- dt_interval_2: interval day (nullable = true)",
+                # " |-- dt_interval_3: interval hour to second (nullable = true)",
+                # " |-- cal_interval: interval (nullable = true)",
+                # " |-- var: variant (nullable = true)",
             ],
         )
 
@@ -1532,6 +1485,7 @@ class TypesTestsMixin:
         )
         self.spark.createDataFrame([["a", "b"], ["c", "d"]], schema)
 
+    @pytest.mark.skip
     def test_access_nested_types(self):
         df = self.spark.createDataFrame([Row(l=[1], r=Row(a=1, b="b"), d={"k": "v"})])
         self.assertEqual(1, df.select(df.l[0]).first()[0])
@@ -1553,6 +1507,7 @@ class TypesTestsMixin:
             0,
         )
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_long_type(self):
         longrow = [Row(f1="a", f2=100000000000000)]
         df = self.sc.parallelize(longrow).toDF()
@@ -1573,6 +1528,7 @@ class TypesTestsMixin:
         self.assertEqual(_infer_type(2**61), LongType())
         self.assertEqual(_infer_type(2**71), LongType())
 
+    @pytest.mark.skip(reason="no parallelize")
     def test_infer_binary_type(self):
         binaryrow = [Row(f1="a", f2=b"abcd")]
         df = self.sc.parallelize(binaryrow).toDF()
@@ -1840,10 +1796,10 @@ class TypesTestsMixin:
         instances = [
             NullType(),
             StringType(),
-            StringType("UTF8_BINARY"),
-            StringType("UTF8_LCASE"),
-            StringType("UNICODE"),
-            StringType("UNICODE_CI"),
+            # StringType("UTF8_BINARY"),
+            # StringType("UTF8_LCASE"),
+            # StringType("UNICODE"),
+            # StringType("UNICODE_CI"),
             CharType(10),
             VarcharType(10),
             BinaryType(),
@@ -1867,6 +1823,7 @@ class TypesTestsMixin:
         for instance in instances:
             self.assertEqual(eval(repr(instance)), instance)
 
+    @pytest.mark.skip(reason="no interval")
     def test_daytime_interval_type_constructor(self):
         # SPARK-37277: Test constructors in day time interval.
         self.assertEqual(DayTimeIntervalType().simpleString(), "interval day to second")
@@ -1907,6 +1864,7 @@ class TypesTestsMixin:
             message_parameters={"start_field": "0", "end_field": "321"},
         )
 
+    @pytest.mark.skip(reason="no interval")
     def test_daytime_interval_type(self):
         # SPARK-37277: Support DayTimeIntervalType in createDataFrame
         timedetlas = [
@@ -1955,6 +1913,7 @@ class TypesTestsMixin:
         for n, (a, e) in enumerate(zip(actual, expected)):
             self.assertEqual(a, e, "%s does not match with %s" % (exprs[n], expected[n]))
 
+    @pytest.mark.skip(reason="no interval")
     def test_yearmonth_interval_type_constructor(self):
         self.assertEqual(YearMonthIntervalType().simpleString(), "interval year to month")
         self.assertEqual(
@@ -1994,6 +1953,7 @@ class TypesTestsMixin:
             message_parameters={"start_field": "0", "end_field": "321"},
         )
 
+    @pytest.mark.skip(reason="no interval")
     def test_yearmonth_interval_type(self):
         schema1 = self.spark.sql("SELECT INTERVAL '10-8' YEAR TO MONTH AS interval").schema
         self.assertEqual(schema1.fields[0].dataType, YearMonthIntervalType(0, 1))
@@ -2010,196 +1970,199 @@ class TypesTestsMixin:
         with self.assertRaisesRegex(TypeError, "takes 1 positional argument but 2 were given"):
             CalendarIntervalType(3)
 
+    @pytest.mark.skip(reason="no interval")
     def test_calendar_interval_type(self):
         schema1 = self.spark.sql("SELECT make_interval(100, 11, 1, 1, 12, 30, 01.001001)").schema
         self.assertEqual(schema1.fields[0].dataType, CalendarIntervalType())
 
+    @pytest.mark.skip(reason="no interval")
     def test_calendar_interval_type_with_sf(self):
         schema1 = self.spark.range(1).select(F.make_interval(F.lit(1))).schema
         self.assertEqual(schema1.fields[0].dataType, CalendarIntervalType())
 
-    # def test_variant_type(self):
-    #     from decimal import Decimal
-    #
-    #     self.assertEqual(VariantType().simpleString(), "variant")
-    #
-    #     # Holds a tuple of (key, json string value, python value)
-    #     expected_values = [
-    #         ("str", '"%s"' % ("0123456789" * 10), "0123456789" * 10),
-    #         ("short_str", '"abc"', "abc"),
-    #         ("null", "null", None),
-    #         ("true", "true", True),
-    #         ("false", "false", False),
-    #         ("int1", "1", 1),
-    #         ("-int1", "-5", -5),
-    #         ("int2", "257", 257),
-    #         ("-int2", "-124", -124),
-    #         ("int4", "65793", 65793),
-    #         ("-int4", "-69633", -69633),
-    #         ("int8", "4295033089", 4295033089),
-    #         ("-int8", "-4294967297", -4294967297),
-    #         ("float4", "3.402e+38", 3.402e38),
-    #         ("-float4", "-3.402e+38", -3.402e38),
-    #         ("float8", "1.79769e+308", 1.79769e308),
-    #         ("-float8", "-1.79769e+308", -1.79769e308),
-    #         ("dec4", "123.456", Decimal("123.456")),
-    #         ("-dec4", "-321.654", Decimal("-321.654")),
-    #         ("dec8", "429.4967297", Decimal("429.4967297")),
-    #         ("-dec8", "-5.678373902", Decimal("-5.678373902")),
-    #         ("dec16", "467440737095.51617", Decimal("467440737095.51617")),
-    #         ("-dec16", "-67.849438003827263", Decimal("-67.849438003827263")),
-    #         ("arr", '[1.1,"2",[3],{"4":5}]', [Decimal("1.1"), "2", [3], {"4": 5}]),
-    #         ("obj", '{"a":["123",{"b":2}],"c":3}', {"a": ["123", {"b": 2}], "c": 3}),
-    #     ]
-    #     json_str = "{%s}" % ",".join(['"%s": %s' % (t[0], t[1]) for t in expected_values])
-    #
-    #     df = self.spark.createDataFrame([({"json": json_str})])
-    #     row = df.select(
-    #         F.parse_json(df.json).alias("v"),
-    #         F.array([F.parse_json(F.lit('{"a": 1}'))]).alias("a"),
-    #         F.struct([F.parse_json(F.lit('{"b": "2"}'))]).alias("s"),
-    #         F.create_map([F.lit("k"), F.parse_json(F.lit('{"c": true}'))]).alias("m"),
-    #     ).collect()[0]
-    #
-    #     # These data types are not supported by parse_json yet so they are being handled
-    #     # separately - Date, Timestamp, TimestampNTZ, Binary, Float (Single Precision)
-    #     date_columns = self.spark.sql(
-    #         "select cast(Date('2021-01-01')"
-    #         + " as variant) as d0, cast(Date('1800-12-31')"
-    #         + " as variant) as d1"
-    #     ).collect()[0]
-    #     float_columns = self.spark.sql(
-    #         "select cast(Float(5.5)" + " as variant) as f0, cast(Float(-5.5) as variant) as f1"
-    #     ).collect()[0]
-    #     binary_columns = self.spark.sql(
-    #         "select cast(binary(x'324FA69E')" + " as variant) as b"
-    #     ).collect()[0]
-    #     timetamp_ntz_columns = self.spark.sql(
-    #         "select cast(cast('1940-01-01 12:33:01.123'"
-    #         + " as timestamp_ntz) as variant) as tntz0, cast(cast('2522-12-31 05:57:13'"
-    #         + " as timestamp_ntz) as variant) as tntz1, cast(cast('0001-07-15 17:43:26+08:00'"
-    #         + " as timestamp_ntz) as variant) as tntz2"
-    #     ).collect()[0]
-    #     timetamp_columns = self.spark.sql(
-    #         "select cast(cast('1940-01-01 12:35:13.123+7:30'"
-    #         + " as timestamp) as variant) as t0, cast(cast('2522-12-31 00:00:00-5:23'"
-    #         + " as timestamp) as variant) as t1, cast(cast('0001-12-31 01:01:01+08:00'"
-    #         + " as timestamp) as variant) as t2"
-    #     ).collect()[0]
-    #
-    #     variants = [
-    #         row["v"],
-    #         row["a"][0],
-    #         row["s"]["col1"],
-    #         row["m"]["k"],
-    #         date_columns["d0"],
-    #         date_columns["d1"],
-    #         float_columns["f0"],
-    #         float_columns["f1"],
-    #         binary_columns["b"],
-    #         timetamp_ntz_columns["tntz0"],
-    #         timetamp_ntz_columns["tntz1"],
-    #         timetamp_ntz_columns["tntz2"],
-    #         timetamp_columns["t0"],
-    #         timetamp_columns["t1"],
-    #         timetamp_columns["t2"],
-    #     ]
-    #
-    #     for v in variants:
-    #         self.assertEqual(type(v), VariantVal)
-    #
-    #     # check str (to_json)
-    #     as_string = str(variants[0])
-    #     for key, expected, _ in expected_values:
-    #         self.assertTrue('"%s":%s' % (key, expected) in as_string)
-    #     self.assertEqual(str(variants[1]), '{"a":1}')
-    #     self.assertEqual(str(variants[2]), '{"b":"2"}')
-    #     self.assertEqual(str(variants[3]), '{"c":true}')
-    #     self.assertEqual(str(variants[4]), '"2021-01-01"')
-    #     self.assertEqual(str(variants[5]), '"1800-12-31"')
-    #     self.assertEqual(str(variants[6]), "5.5")
-    #     self.assertEqual(str(variants[7]), "-5.5")
-    #     self.assertEqual(str(variants[8]), '"Mk+mng=="')
-    #     self.assertEqual(str(variants[9]), '"1940-01-01 12:33:01.123000"')
-    #     self.assertEqual(str(variants[10]), '"2522-12-31 05:57:13"')
-    #     self.assertEqual(str(variants[11]), '"0001-07-15 17:43:26"')
-    #     self.assertEqual(str(variants[12]), '"1940-01-01 05:05:13.123000+00:00"')
-    #     self.assertEqual(str(variants[13]), '"2522-12-31 05:23:00+00:00"')
-    #     self.assertEqual(str(variants[14]), '"0001-12-30 17:01:01+00:00"')
-    #
-    #     # Check to_json on timestamps with custom timezones
-    #     self.assertEqual(
-    #         variants[12].toJson("America/Los_Angeles"), '"1939-12-31 21:05:13.123000-08:00"'
-    #     )
-    #
-    #     # check toPython
-    #     as_python = variants[0].toPython()
-    #     for key, _, obj in expected_values:
-    #         self.assertEqual(as_python[key], obj)
-    #     self.assertEqual(variants[1].toPython(), {"a": 1})
-    #     self.assertEqual(variants[2].toPython(), {"b": "2"})
-    #     self.assertEqual(variants[3].toPython(), {"c": True})
-    #     self.assertEqual(variants[4].toPython(), datetime.date(2021, 1, 1))
-    #     self.assertEqual(variants[5].toPython(), datetime.date(1800, 12, 31))
-    #     self.assertEqual(variants[6].toPython(), float(5.5))
-    #     self.assertEqual(variants[7].toPython(), float(-5.5))
-    #     self.assertEqual(variants[8].toPython(), bytearray(b"2O\xa6\x9e"))
-    #     self.assertEqual(variants[9].toPython(), datetime.datetime(1940, 1, 1, 12, 33, 1, 123000))
-    #     self.assertEqual(variants[10].toPython(), datetime.datetime(2522, 12, 31, 5, 57, 13))
-    #     self.assertEqual(variants[11].toPython(), datetime.datetime(1, 7, 15, 17, 43, 26))
-    #     self.assertEqual(
-    #         variants[12].toPython(),
-    #         datetime.datetime(
-    #             1940,
-    #             1,
-    #             1,
-    #             12,
-    #             35,
-    #             13,
-    #             123000,
-    #             tzinfo=datetime.timezone(datetime.timedelta(hours=7, minutes=30)),
-    #         ),
-    #     )
-    #     self.assertEqual(
-    #         variants[13].toPython(),
-    #         datetime.datetime(
-    #             2522,
-    #             12,
-    #             31,
-    #             3,
-    #             3,
-    #             31,
-    #             tzinfo=datetime.timezone(datetime.timedelta(hours=-2, minutes=-20, seconds=31)),
-    #         ),
-    #     )
-    #     self.assertEqual(
-    #         variants[14].toPython(),
-    #         datetime.datetime(
-    #             1,
-    #             12,
-    #             31,
-    #             16,
-    #             3,
-    #             23,
-    #             tzinfo=datetime.timezone(datetime.timedelta(hours=23, minutes=2, seconds=22)),
-    #         ),
-    #     )
-    #
-    #     # check repr
-    #     self.assertEqual(str(variants[0]), str(eval(repr(variants[0]))))
-    #
-    #     metadata = bytes([1, 0, 0])
-    #     self.assertEqual(str(VariantVal(bytes([32, 0, 1, 0, 0, 0]), metadata)), "1")
-    #     self.assertEqual(str(VariantVal(bytes([32, 1, 2, 0, 0, 0]), metadata)), "0.2")
-    #     self.assertEqual(str(VariantVal(bytes([32, 2, 3, 0, 0, 0]), metadata)), "0.03")
-    #     self.assertEqual(str(VariantVal(bytes([32, 0, 1, 0, 0, 0]), metadata)), "1")
-    #     self.assertEqual(str(VariantVal(bytes([32, 0, 255, 201, 154, 59]), metadata)), "999999999")
-    #     self.assertRaises(
-    #         PySparkValueError, lambda: str(VariantVal(bytes([32, 0, 0, 202, 154, 59]), metadata))
-    #     )
-    #     self.assertRaises(
-    #         PySparkValueError, lambda: str(VariantVal(bytes([32, 10, 1, 0, 0, 0]), metadata))
-    #     )
+    @pytest.mark.skip(reason="no variant")
+    def test_variant_type(self):
+        from decimal import Decimal
+
+        self.assertEqual(VariantType().simpleString(), "variant")
+
+        # Holds a tuple of (key, json string value, python value)
+        expected_values = [
+            ("str", '"%s"' % ("0123456789" * 10), "0123456789" * 10),
+            ("short_str", '"abc"', "abc"),
+            ("null", "null", None),
+            ("true", "true", True),
+            ("false", "false", False),
+            ("int1", "1", 1),
+            ("-int1", "-5", -5),
+            ("int2", "257", 257),
+            ("-int2", "-124", -124),
+            ("int4", "65793", 65793),
+            ("-int4", "-69633", -69633),
+            ("int8", "4295033089", 4295033089),
+            ("-int8", "-4294967297", -4294967297),
+            ("float4", "3.402e+38", 3.402e38),
+            ("-float4", "-3.402e+38", -3.402e38),
+            ("float8", "1.79769e+308", 1.79769e308),
+            ("-float8", "-1.79769e+308", -1.79769e308),
+            ("dec4", "123.456", Decimal("123.456")),
+            ("-dec4", "-321.654", Decimal("-321.654")),
+            ("dec8", "429.4967297", Decimal("429.4967297")),
+            ("-dec8", "-5.678373902", Decimal("-5.678373902")),
+            ("dec16", "467440737095.51617", Decimal("467440737095.51617")),
+            ("-dec16", "-67.849438003827263", Decimal("-67.849438003827263")),
+            ("arr", '[1.1,"2",[3],{"4":5}]', [Decimal("1.1"), "2", [3], {"4": 5}]),
+            ("obj", '{"a":["123",{"b":2}],"c":3}', {"a": ["123", {"b": 2}], "c": 3}),
+        ]
+        json_str = "{%s}" % ",".join(['"%s": %s' % (t[0], t[1]) for t in expected_values])
+
+        df = self.spark.createDataFrame([({"json": json_str})])
+        row = df.select(
+            F.parse_json(df.json).alias("v"),
+            F.array([F.parse_json(F.lit('{"a": 1}'))]).alias("a"),
+            F.struct([F.parse_json(F.lit('{"b": "2"}'))]).alias("s"),
+            F.create_map([F.lit("k"), F.parse_json(F.lit('{"c": true}'))]).alias("m"),
+        ).collect()[0]
+
+        # These data types are not supported by parse_json yet so they are being handled
+        # separately - Date, Timestamp, TimestampNTZ, Binary, Float (Single Precision)
+        date_columns = self.spark.sql(
+            "select cast(Date('2021-01-01')"
+            + " as variant) as d0, cast(Date('1800-12-31')"
+            + " as variant) as d1"
+        ).collect()[0]
+        float_columns = self.spark.sql(
+            "select cast(Float(5.5)" + " as variant) as f0, cast(Float(-5.5) as variant) as f1"
+        ).collect()[0]
+        binary_columns = self.spark.sql(
+            "select cast(binary(x'324FA69E')" + " as variant) as b"
+        ).collect()[0]
+        timetamp_ntz_columns = self.spark.sql(
+            "select cast(cast('1940-01-01 12:33:01.123'"
+            + " as timestamp_ntz) as variant) as tntz0, cast(cast('2522-12-31 05:57:13'"
+            + " as timestamp_ntz) as variant) as tntz1, cast(cast('0001-07-15 17:43:26+08:00'"
+            + " as timestamp_ntz) as variant) as tntz2"
+        ).collect()[0]
+        timetamp_columns = self.spark.sql(
+            "select cast(cast('1940-01-01 12:35:13.123+7:30'"
+            + " as timestamp) as variant) as t0, cast(cast('2522-12-31 00:00:00-5:23'"
+            + " as timestamp) as variant) as t1, cast(cast('0001-12-31 01:01:01+08:00'"
+            + " as timestamp) as variant) as t2"
+        ).collect()[0]
+
+        variants = [
+            row["v"],
+            row["a"][0],
+            row["s"]["col1"],
+            row["m"]["k"],
+            date_columns["d0"],
+            date_columns["d1"],
+            float_columns["f0"],
+            float_columns["f1"],
+            binary_columns["b"],
+            timetamp_ntz_columns["tntz0"],
+            timetamp_ntz_columns["tntz1"],
+            timetamp_ntz_columns["tntz2"],
+            timetamp_columns["t0"],
+            timetamp_columns["t1"],
+            timetamp_columns["t2"],
+        ]
+
+        for v in variants:
+            self.assertEqual(type(v), VariantVal)
+
+        # check str (to_json)
+        as_string = str(variants[0])
+        for key, expected, _ in expected_values:
+            self.assertTrue('"%s":%s' % (key, expected) in as_string)
+        self.assertEqual(str(variants[1]), '{"a":1}')
+        self.assertEqual(str(variants[2]), '{"b":"2"}')
+        self.assertEqual(str(variants[3]), '{"c":true}')
+        self.assertEqual(str(variants[4]), '"2021-01-01"')
+        self.assertEqual(str(variants[5]), '"1800-12-31"')
+        self.assertEqual(str(variants[6]), "5.5")
+        self.assertEqual(str(variants[7]), "-5.5")
+        self.assertEqual(str(variants[8]), '"Mk+mng=="')
+        self.assertEqual(str(variants[9]), '"1940-01-01 12:33:01.123000"')
+        self.assertEqual(str(variants[10]), '"2522-12-31 05:57:13"')
+        self.assertEqual(str(variants[11]), '"0001-07-15 17:43:26"')
+        self.assertEqual(str(variants[12]), '"1940-01-01 05:05:13.123000+00:00"')
+        self.assertEqual(str(variants[13]), '"2522-12-31 05:23:00+00:00"')
+        self.assertEqual(str(variants[14]), '"0001-12-30 17:01:01+00:00"')
+
+        # Check to_json on timestamps with custom timezones
+        self.assertEqual(
+            variants[12].toJson("America/Los_Angeles"), '"1939-12-31 21:05:13.123000-08:00"'
+        )
+
+        # check toPython
+        as_python = variants[0].toPython()
+        for key, _, obj in expected_values:
+            self.assertEqual(as_python[key], obj)
+        self.assertEqual(variants[1].toPython(), {"a": 1})
+        self.assertEqual(variants[2].toPython(), {"b": "2"})
+        self.assertEqual(variants[3].toPython(), {"c": True})
+        self.assertEqual(variants[4].toPython(), datetime.date(2021, 1, 1))
+        self.assertEqual(variants[5].toPython(), datetime.date(1800, 12, 31))
+        self.assertEqual(variants[6].toPython(), float(5.5))
+        self.assertEqual(variants[7].toPython(), float(-5.5))
+        self.assertEqual(variants[8].toPython(), bytearray(b"2O\xa6\x9e"))
+        self.assertEqual(variants[9].toPython(), datetime.datetime(1940, 1, 1, 12, 33, 1, 123000))
+        self.assertEqual(variants[10].toPython(), datetime.datetime(2522, 12, 31, 5, 57, 13))
+        self.assertEqual(variants[11].toPython(), datetime.datetime(1, 7, 15, 17, 43, 26))
+        self.assertEqual(
+            variants[12].toPython(),
+            datetime.datetime(
+                1940,
+                1,
+                1,
+                12,
+                35,
+                13,
+                123000,
+                tzinfo=datetime.timezone(datetime.timedelta(hours=7, minutes=30)),
+            ),
+        )
+        self.assertEqual(
+            variants[13].toPython(),
+            datetime.datetime(
+                2522,
+                12,
+                31,
+                3,
+                3,
+                31,
+                tzinfo=datetime.timezone(datetime.timedelta(hours=-2, minutes=-20, seconds=31)),
+            ),
+        )
+        self.assertEqual(
+            variants[14].toPython(),
+            datetime.datetime(
+                1,
+                12,
+                31,
+                16,
+                3,
+                23,
+                tzinfo=datetime.timezone(datetime.timedelta(hours=23, minutes=2, seconds=22)),
+            ),
+        )
+
+        # check repr
+        self.assertEqual(str(variants[0]), str(eval(repr(variants[0]))))
+
+        metadata = bytes([1, 0, 0])
+        self.assertEqual(str(VariantVal(bytes([32, 0, 1, 0, 0, 0]), metadata)), "1")
+        self.assertEqual(str(VariantVal(bytes([32, 1, 2, 0, 0, 0]), metadata)), "0.2")
+        self.assertEqual(str(VariantVal(bytes([32, 2, 3, 0, 0, 0]), metadata)), "0.03")
+        self.assertEqual(str(VariantVal(bytes([32, 0, 1, 0, 0, 0]), metadata)), "1")
+        self.assertEqual(str(VariantVal(bytes([32, 0, 255, 201, 154, 59]), metadata)), "999999999")
+        self.assertRaises(
+            PySparkValueError, lambda: str(VariantVal(bytes([32, 0, 0, 202, 154, 59]), metadata))
+        )
+        self.assertRaises(
+            PySparkValueError, lambda: str(VariantVal(bytes([32, 10, 1, 0, 0, 0]), metadata))
+        )
 
     def test_from_ddl(self):
         self.assertEqual(DataType.fromDDL("long"), LongType())
@@ -2211,11 +2174,14 @@ class TypesTestsMixin:
             DataType.fromDDL("a int, b string"),
             StructType([StructField("a", IntegerType()), StructField("b", StringType())]),
         )
+
+        # @pytest.mark.skip(reason="no variant")
         # self.assertEqual(
         #     DataType.fromDDL("a int, v variant"),
         #     StructType([StructField("a", IntegerType()), StructField("v", VariantType())]),
         # )
 
+    @pytest.mark.skip
     def test_collated_string(self):
         dfs = [
             self.spark.sql("SELECT 'abc' collate UTF8_LCASE"),
@@ -2232,6 +2198,7 @@ class TypesTestsMixin:
                 StringType("UTF8_LCASE"),
             )
 
+    @pytest.mark.skip("no schema inference")
     def test_infer_array_element_type_with_struct(self):
         # SPARK-48248: Nested array to respect legacy conf of inferArrayTypeFromFirstElement
         with self.sql_conf(
@@ -2242,6 +2209,7 @@ class TypesTestsMixin:
                 self.spark.createDataFrame([[[[1, 1.0]]]]).schema.fields[0].dataType,
             )
 
+    @pytest.mark.skip
     def test_ym_interval_in_collect(self):
         with self.assertRaises(PySparkNotImplementedError):
             self.spark.sql("SELECT INTERVAL '10-8' YEAR TO MONTH AS interval").first()
@@ -2252,6 +2220,7 @@ class TypesTestsMixin:
                 Row(interval=128),
             )
 
+    @pytest.mark.skip
     def test_cal_interval_in_collect(self):
         with self.assertRaises(PySparkNotImplementedError):
             self.spark.sql("SELECT make_interval(100, 11, 1, 1, 12, 30, 01.001001)").first()[0]
