@@ -19,6 +19,7 @@ import sys
 import warnings
 from typing import Any, Callable, NamedTuple, List, Optional, TYPE_CHECKING
 import re
+import pathlib
 
 from polarspark.storagelevel import StorageLevel
 from polarspark.sql.dataframe import DataFrame
@@ -780,7 +781,20 @@ class Catalog:
         ...         "tbl2", schema=spark.range(1).schema, path=d, source='parquet')
         >>> _ = spark.sql("DROP TABLE tbl2")
         """
-        raise NotImplementedError()
+        _path = pathlib.Path(path) if path else pathlib.Path("spark-warehouse").joinpath(tableName)
+
+        # Create empty table
+        if not _path.exists():
+            if schema:
+                df = self._sparkSession.createDataFrame([], schema=schema)
+                df.write.format(source).options(**options).save(str(_path.absolute()))
+            else:
+                raise ValueError("For empty path schema must be specified")
+
+        # Read existing
+        df = self._sparkSession.read.format(source).schema(schema).options(**options).load(path)
+        self._sparkSession._pl_ctx.register(tableName, df._ldf)
+        return df
 
     def dropTempView(self, viewName: str) -> bool:
         """Drops the local temporary view with the given view name in the catalog.
@@ -1087,7 +1101,6 @@ class Catalog:
         >>> spark.catalog.refreshTable("spark_catalog.default.tbl1")
         >>> _ = spark.sql("DROP TABLE tbl1")
         """
-        # self._jcatalog.refreshTable(tableName)
         pass
 
     def recoverPartitions(self, tableName: str) -> None:

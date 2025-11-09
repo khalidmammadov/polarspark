@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import os
 import sys
 from typing import cast, overload, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING, Union
 from functools import partial, reduce
@@ -318,6 +319,15 @@ class DataFrameReader(OptionUtils):
         self.options(**options)
 
         readers = {
+            "text": partial(
+                self._read_ldf,
+                reader=partial(
+                    pl.scan_csv,
+                    infer_schema=False,
+                    has_header=False,
+                    schema={"col": pl.String}
+                )
+            ),
             "csv": partial(self._read_ldf, reader=pl.scan_csv),
             "json": partial(self._read_paths_with_concat, reader=pl.read_json),
             "parquet": partial(self._read_ldf, reader=pl.scan_parquet),
@@ -1759,7 +1769,10 @@ class DataFrameWriter(OptionUtils):
             self.partitionBy(partitionBy)
         if format is not None:
             self.format(format)
-        self._jwrite.saveAsTable(name)
+
+        # Register immutable (no insert supported yet) virtual table for now
+        self._spark._pl_ctx.register(name, self._df._ldf) # noqa
+        # TODO: Add mode support for inserts and overwrites
 
     def json(
         self,

@@ -53,7 +53,7 @@ from polarspark.storagelevel import StorageLevel
 from polarspark.traceback_utils import SCCallSiteSync
 from polarspark.sql.column import Column#, _to_seq, _to_list, _to_java_column
 from polarspark.sql.readwriter import DataFrameWriter, DataFrameWriterV2
-# from polarspark.sql.streaming import DataStreamWriter
+from polarspark.sql.streaming import DataStreamWriter
 from polarspark.sql.types import (
     StructType,
     Row,
@@ -526,39 +526,39 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         return DataFrameWriter(self)
 
-    # @property
-    # def writeStream(self) -> DataStreamWriter:
-    #     """
-    #     Interface for saving the content of the streaming :class:`DataFrame` out into external
-    #     storage.
-    #
-    #     .. versionadded:: 2.0.0
-    #
-    #     .. versionchanged:: 3.5.0
-    #         Supports Spark Connect.
-    #
-    #     Notes
-    #     -----
-    #     This API is evolving.
-    #
-    #     Returns
-    #     -------
-    #     :class:`DataStreamWriter`
-    #
-    #     Examples
-    #     --------
-    #     >>> import tempfile
-    #     >>> df = spark.readStream.format("rate").load()
-    #     >>> type(df.writeStream)
-    #     <class '...streaming.readwriter.DataStreamWriter'>
-    #
-    #     >>> with tempfile.TemporaryDirectory() as d:
-    #     ...     # Create a table with Rate source.
-    #     ...     df.writeStream.toTable(
-    #     ...         "my_table", checkpointLocation=d)
-    #     <...streaming.query.StreamingQuery object at 0x...>
-    #     """
-    #     return DataStreamWriter(self)
+    @property
+    def writeStream(self) -> DataStreamWriter:
+        """
+        Interface for saving the content of the streaming :class:`DataFrame` out into external
+        storage.
+
+        .. versionadded:: 2.0.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
+
+        Notes
+        -----
+        This API is evolving.
+
+        Returns
+        -------
+        :class:`DataStreamWriter`
+
+        Examples
+        --------
+        >>> import tempfile
+        >>> df = spark.readStream.format("rate").load()
+        >>> type(df.writeStream)
+        <class '...streaming.readwriter.DataStreamWriter'>
+
+        >>> with tempfile.TemporaryDirectory() as d:
+        ...     # Create a table with Rate source.
+        ...     df.writeStream.toTable(
+        ...         "my_table", checkpointLocation=d)
+        <...streaming.query.StreamingQuery object at 0x...>
+        """
+        return DataStreamWriter(self)
 
     @property
     def schema(self) -> StructType:

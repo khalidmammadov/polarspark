@@ -16,6 +16,7 @@
 #
 
 import json
+import uuid
 from typing import Any, Dict, List, Optional
 
 # from py4j.java_gateway import JavaObject, java_import
@@ -44,9 +45,9 @@ class StreamingQuery:
     This API is evolving.
     """
 
-    def __init__(self) -> None: # , jsq: JavaObject
-        pass
-        # self._jsq = jsq
+    def __init__(self, writer) -> None:
+        self._writer = writer
+        self._id = str(uuid.uuid4())
 
     @property
     def id(self) -> str:
@@ -79,7 +80,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._jsq.id().toString()
+        return self._id
 
     @property
     def runId(self) -> str:
@@ -109,7 +110,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._jsq.runId().toString()
+        return self._id
 
     @property
     def name(self) -> str:
@@ -141,7 +142,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._jsq.name()
+        return self._writer._query_name # noqa
 
     @property
     def isActive(self) -> bool:
@@ -167,7 +168,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._jsq.isActive()
+        return self._writer._active # noqa
 
     def awaitTermination(self, timeout: Optional[int] = None) -> Optional[bool]:
         """
@@ -211,15 +212,20 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
+        if not self._writer._handle: # noqa
+            return
+
         if timeout is not None:
             if not isinstance(timeout, (int, float)) or timeout <= 0:
                 raise PySparkValueError(
                     error_class="VALUE_NOT_POSITIVE",
                     message_parameters={"arg_name": "timeout", "arg_value": type(timeout).__name__},
                 )
-            return self._jsq.awaitTermination(int(timeout * 1000))
+            self._writer._handle.join(timeout * 1000) # noqa
         else:
-            return self._jsq.awaitTermination()
+            self._writer._handle.join() # noqa
+
+        return self._writer._handle.is_alive() # noqa
 
     @property
     def status(self) -> Dict[str, Any]:
@@ -248,7 +254,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return json.loads(self._jsq.status().json())
+        return json.loads("{}")
 
     @property
     def recentProgress(self) -> List[Dict[str, Any]]:
@@ -345,7 +351,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._jsq.processAllAvailable()
+        return self.awaitTermination()
 
     def stop(self) -> None:
         """
@@ -370,7 +376,8 @@ class StreamingQuery:
         >>> sq.isActive
         False
         """
-        self._jsq.stop()
+        # Let the thread run till the end for now
+        return None
 
     def explain(self, extended: bool = False) -> None:
         """
