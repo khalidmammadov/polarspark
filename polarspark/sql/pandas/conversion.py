@@ -28,7 +28,6 @@ from typing import (
 from warnings import warn
 import tzlocal
 
-from polarspark.errors.exceptions.captured import unwrap_spark_exception
 # from polarspark.loose_version import LooseVersion
 # from polarspark.rdd import _load_from_socket
 from polarspark.sql.pandas.serializers import ArrowCollectSerializer
@@ -138,9 +137,7 @@ class PandasConversionMixin:
             else:
                 results = list(batch_stream)
         finally:
-            with unwrap_spark_exception():
-                # Join serving thread and raise any exceptions from collectAsArrowToPython
-                jsocket_auth_server.getResult()
+            pass
 
         # Separate RecordBatches from batch order indices in results
         batches = results[:-1]

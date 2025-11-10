@@ -325,7 +325,7 @@ class DataFrameReader(OptionUtils):
                     pl.scan_csv,
                     infer_schema=False,
                     has_header=False,
-                    schema={"col": pl.String}
+                    schema={"value": pl.String}
                 )
             ),
             "csv": partial(self._read_ldf, reader=pl.scan_csv),
@@ -523,7 +523,9 @@ class DataFrameReader(OptionUtils):
         +---+
         >>> _ = spark.sql("DROP TABLE tblA")
         """
-        return self._df(self._jreader.table(tableName))
+        ldf = self._spark._pl_ctx.execute(f"select * from {tableName}") # noqa
+        from polarspark.sql.dataframe import DataFrame
+        return DataFrame(ldf, self._spark)
 
     def parquet(self, *paths: str, **options: "OptionalPrimitiveType") -> "DataFrame":
         """

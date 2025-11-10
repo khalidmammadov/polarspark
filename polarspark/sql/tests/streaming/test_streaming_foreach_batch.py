@@ -55,7 +55,7 @@ class StreamingTestsForeachBatchMixin:
             batch_df.write.format("parquet").saveAsTable("test_table2")
 
         try:
-            df = self.spark.readStream.format("text").load("python/test_support/sql/streaming")
+            df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
             q = df.writeStream.foreachBatch(collectBatch).start()
             q.processAllAvailable()
             collected = self.spark.sql("SELECT * FROM test_table2").collect()
@@ -74,7 +74,7 @@ class StreamingTestsForeachBatchMixin:
             raise RuntimeError("this should fail the query")
 
         try:
-            df = self.spark.readStream.format("text").load("python/test_support/sql/streaming")
+            df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
             q = df.writeStream.foreachBatch(collectBatch).start()
             q.processAllAvailable()
             self.fail("Expected a failure")
@@ -90,7 +90,7 @@ class StreamingTestsForeachBatchMixin:
     def test_streaming_foreach_batch_graceful_stop(self):
         # SPARK-39218: Make foreachBatch streaming query stop gracefully
         def func(batch_df, _):
-            batch_df.sparkSession._jvm.java.lang.Thread.sleep(10000)
+            time.sleep(10)
 
         q = self.spark.readStream.format("rate").load().writeStream.foreachBatch(func).start()
         time.sleep(3)  # 'rowsPerSecond' defaults to 1. Waits 3 secs out for the input.
@@ -108,7 +108,7 @@ class StreamingTestsForeachBatchMixin:
                 df1 = spark.createDataFrame([("structured",), ("streaming",)])
                 df1.union(df).write.mode("append").saveAsTable(table_name)
 
-            df = self.spark.readStream.format("text").load("python/test_support/sql/streaming")
+            df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
             q = df.writeStream.foreachBatch(func).start()
             q.processAllAvailable()
             q.stop()
@@ -116,7 +116,7 @@ class StreamingTestsForeachBatchMixin:
             actual = self.spark.read.table(table_name)
             df = (
                 self.spark.read.format("text")
-                .load(path="python/test_support/sql/streaming/")
+                .load(path="polarspark/test_support/sql/streaming/")
                 .union(self.spark.createDataFrame([("structured",), ("streaming",)]))
             )
             self.assertEqual(sorted(df.collect()), sorted(actual.collect()))
@@ -129,16 +129,16 @@ class StreamingTestsForeachBatchMixin:
                 if batch_id > 0:  # only process once
                     return
                 spark = df.sparkSession
-                df1 = spark.read.format("text").load("python/test_support/sql/streaming")
+                df1 = spark.read.format("text").load("polarspark/test_support/sql/streaming")
                 df1.union(df).write.mode("append").saveAsTable(table_name)
 
-            df = self.spark.readStream.format("text").load("python/test_support/sql/streaming")
+            df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
             q = df.writeStream.foreachBatch(func).start()
             q.processAllAvailable()
             q.stop()
 
             actual = self.spark.read.table(table_name)
-            df = self.spark.read.format("text").load(path="python/test_support/sql/streaming/")
+            df = self.spark.read.format("text").load(path="polarspark/test_support/sql/streaming/")
             df = df.union(df)
             self.assertEqual(sorted(df.collect()), sorted(actual.collect()))
 
@@ -192,7 +192,7 @@ class StreamingTestsForeachBatchMixin:
                     return
                 time.sleep(1)
                 spark = df.sparkSession
-                df1 = spark.read.format("text").load("python/test_support/sql/streaming")
+                df1 = spark.read.format("text").load("polarspark/test_support/sql/streaming")
                 df1.write.mode("append").saveAsTable(table_name)
 
             df = self.spark.readStream.format("rate").load()
@@ -201,7 +201,7 @@ class StreamingTestsForeachBatchMixin:
             q.stop()
 
             actual = self.spark.read.table(table_name)
-            df = self.spark.read.format("text").load("python/test_support/sql/streaming")
+            df = self.spark.read.format("text").load("polarspark/test_support/sql/streaming")
             self.assertEqual(sorted(df.collect()), sorted(actual.collect()))
 
     def test_streaming_foreach_batch_external_column(self):
@@ -216,7 +216,7 @@ class StreamingTestsForeachBatchMixin:
                 result_df = df.select(col.alias("result"))
                 result_df.write.mode("append").saveAsTable(table_name)
 
-            df = self.spark.readStream.format("text").load("python/test_support/sql/streaming")
+            df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
             q = df.writeStream.foreachBatch(func).start()
             q.processAllAvailable()
             q.stop()

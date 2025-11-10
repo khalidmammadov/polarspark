@@ -2918,7 +2918,6 @@ def _data_type_from_ddl(ty: str) -> DataType:
         if not isinstance(_ty, str):
             return
         _ty = _ty.lower()
-        print(_ty)
         _ty, _args = _parse_type(_ty)
 
         if _ty == "struct":

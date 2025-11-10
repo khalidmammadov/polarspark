@@ -18,7 +18,8 @@
 import json
 import uuid
 from typing import Any, Dict, List, Optional
-
+from concurrent.futures import Future
+import traceback
 # from py4j.java_gateway import JavaObject, java_import
 
 from polarspark.errors import StreamingQueryException, PySparkValueError
@@ -45,8 +46,9 @@ class StreamingQuery:
     This API is evolving.
     """
 
-    def __init__(self, writer) -> None:
-        self._writer = writer
+    def __init__(self, name, future: Future) -> None:
+        self._name = name
+        self._future = future
         self._id = str(uuid.uuid4())
 
     @property
@@ -142,7 +144,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._writer._query_name # noqa
+        return self._name # noqa
 
     @property
     def isActive(self) -> bool:
@@ -168,7 +170,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._writer._active # noqa
+        return self._future.running() # noqa
 
     def awaitTermination(self, timeout: Optional[int] = None) -> Optional[bool]:
         """
@@ -212,20 +214,35 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        if not self._writer._handle: # noqa
+        if not self._future: # noqa
             return
 
+        ex = None
         if timeout is not None:
             if not isinstance(timeout, (int, float)) or timeout <= 0:
                 raise PySparkValueError(
                     error_class="VALUE_NOT_POSITIVE",
                     message_parameters={"arg_name": "timeout", "arg_value": type(timeout).__name__},
                 )
-            self._writer._handle.join(timeout * 1000) # noqa
+            try:
+                self._future.result(timeout) # noqa
+            except TimeoutError:
+                return False
+            except Exception as e:
+                ex = e
         else:
-            self._writer._handle.join() # noqa
+            try:
+                self._future.result() # noqa
+            except Exception as e:
+                ex = e
 
-        return self._writer._handle.is_alive() # noqa
+        if ex:
+            raise CapturedStreamingQueryException(
+                "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)),
+                traceback.format_exc()
+            )
+
+        return self._future.done() # noqa
 
     @property
     def status(self) -> Dict[str, Any]:
@@ -376,8 +393,7 @@ class StreamingQuery:
         >>> sq.isActive
         False
         """
-        # Let the thread run till the end for now
-        return None
+        self._future.cancel() # noqa
 
     def explain(self, extended: bool = False) -> None:
         """
@@ -436,13 +452,16 @@ class StreamingQuery:
         :class:`StreamingQueryException`
             the StreamingQueryException if the query was terminated by an exception, or None.
         """
-        if self._jsq.exception().isDefined():
-            je = self._jsq.exception().get()
-            msg = je.toString().split(": ", 1)[1]  # Drop the Java StreamingQueryException type info
-            stackTrace = "\n\t at ".join(map(lambda x: x.toString(), je.getStackTrace()))
-            return CapturedStreamingQueryException(msg, stackTrace, je.getCause())
-        else:
-            return None
+        try:
+            ex = self._future.exception()
+        except Exception as e:
+            ex = e
+
+        if ex:
+            return CapturedStreamingQueryException(
+                "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)),
+                traceback.format_exc()
+            )
 
 
 class StreamingQueryManager:

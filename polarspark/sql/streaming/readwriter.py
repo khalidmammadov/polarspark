@@ -16,7 +16,7 @@
 #
 
 import sys
-from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Iterator
 from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING, Union
 
@@ -317,9 +317,10 @@ class DataStreamReader(OptionUtils):
                     .format(self._format)
                     .load(path)
                     )
+        elif self._format == "rate":
+            return self._spark.createDataFrame([(1,),(2,),(3,)], schema="value: int")
         else:
             raise NotImplementedError()
-            # return self._df(self._jreader.load())
 
     def json(
         self,
@@ -925,12 +926,14 @@ class DataStreamWriter:
         self._output_mode = None
         self._query_name = None
         self._foreach_func = None
-        self._handle = None
+
+        self._executor = ThreadPoolExecutor(max_workers=1)
+        self._future = None
 
         self._active = False # Thread safe due to GIL
 
     def _sq(self) -> StreamingQuery:
-        return StreamingQuery(self)
+        return StreamingQuery(self._query_name, self._future)
 
     def outputMode(self, outputMode: str) -> "DataStreamWriter":
         """Specifies how data of a streaming DataFrame/Dataset is written to a streaming sink.
@@ -1578,14 +1581,13 @@ class DataStreamWriter:
         self._active = True
         def starter():
             if self._foreach_func:
-                self._foreach_func(self._df, 1)
+                self._foreach_func(self._df, 0)
 
             self._active = False
 
-        self._handle = Thread(target=starter)
-        self._handle.start()
+        self._future = self._executor.submit(starter)
 
-        return StreamingQuery(self)
+        return StreamingQuery(self._query_name, self._future)
 
         # DELETE:
         # self._df.write.options(**self._options).format(self._format).save(path)

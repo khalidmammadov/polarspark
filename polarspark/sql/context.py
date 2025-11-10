@@ -40,7 +40,6 @@ from polarspark.sql.readwriter import DataFrameReader
 # from polarspark.sql.streaming import DataStreamReader
 # from polarspark.sql.udf import UDFRegistration  # noqa: F401
 # from polarspark.sql.udtf import UDTFRegistration
-from polarspark.errors.exceptions.captured import install_exception_handler
 from polarspark.context import SparkContext
 from polarspark.rdd import RDD
 from polarspark.sql.types import AtomicType, DataType, StructType
@@ -123,7 +122,6 @@ class SQLContext:
         self.sparkSession = sparkSession
         # self._jsqlContext = jsqlContext
         # _monkey_patch_RDD(self.sparkSession)
-        install_exception_handler()
         if (
             SQLContext._instantiatedContext is None
             # or SQLContext._instantiatedContext._sc._jsc is None
