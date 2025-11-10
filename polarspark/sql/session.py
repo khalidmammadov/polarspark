@@ -69,7 +69,6 @@ from polarspark.sql.types import (
     _to_polars_type,
 )
 
-from polarspark.errors.exceptions.captured import install_exception_handler
 from polarspark.sql.utils import is_timestamp_ntz_preferred, to_str, try_remote_session_classmethod
 from polarspark.errors import PySparkValueError, PySparkTypeError, PySparkRuntimeError
 
@@ -1602,7 +1601,7 @@ class SparkSession(SparkConversionMixin):
         |  4|
         +---+
         """
-        return DataFrame(self._jsparkSession.table(tableName), self)
+        return DataFrame(self._pl_ctx.execute(f"select * from {tableName}"), self)
 
     @property
     def read(self) -> DataFrameReader:

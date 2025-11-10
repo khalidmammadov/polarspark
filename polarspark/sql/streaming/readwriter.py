@@ -16,6 +16,7 @@
 #
 
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Iterator
 from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING, Union
 
@@ -24,7 +25,7 @@ from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING,
 # from polarspark.sql.column import _to_seq
 from polarspark.sql.readwriter import OptionUtils, to_str
 from polarspark.sql.streaming.query import StreamingQuery
-from polarspark.sql.types import Row, StructType
+from polarspark.sql.types import Row, StructType, DataType
 from polarspark.sql.utils import ForeachBatchFunction
 from polarspark.errors import (
     PySparkTypeError,
@@ -78,6 +79,7 @@ class DataStreamReader(OptionUtils):
         self._spark = spark
 
         self._format = None
+        self._options = {}
 
     # def _df(self, jdf: JavaObject) -> "DataFrame":
     #     from polarspark.sql.dataframe import DataFrame
@@ -166,20 +168,22 @@ class DataStreamReader(OptionUtils):
          |-- col0: integer (nullable = true)
          |-- col1: string (nullable = true)
         """
-        from polarspark.sql import SparkSession
-
-        spark = SparkSession._getActiveSessionOrCreate()
-        if isinstance(schema, StructType):
-            jschema = spark._jsparkSession.parseDataType(schema.json())
-            self._jreader = self._jreader.schema(jschema)
-        elif isinstance(schema, str):
-            self._jreader = self._jreader.schema(schema)
-        else:
-            raise polarsparkTypeError(
-                error_class="NOT_STR_OR_STRUCT",
-                message_parameters={"arg_name": "schema", "arg_type": type(schema).__name__},
-            )
-        return self
+        # from polarspark.sql import SparkSession
+        #
+        # spark = SparkSession._getActiveSessionOrCreate()
+        # if isinstance(schema, StructType):
+        #     jschema = spark._jsparkSession.parseDataType(schema.json())
+        #     self._jreader = self._jreader.schema(jschema)
+        # elif isinstance(schema, str):
+        #     self._jreader = self._jreader.schema(schema)
+        # else:
+        #     raise polarsparkTypeError(
+        #         error_class="NOT_STR_OR_STRUCT",
+        #         message_parameters={"arg_name": "schema", "arg_type": type(schema).__name__},
+        #     )
+        # TODO: Implement
+        raise NotImplemented
+        # return self
 
     def option(self, key: str, value: "OptionalPrimitiveType") -> "DataStreamReader":
         """Adds an input option for the underlying data source.
@@ -242,8 +246,8 @@ class DataStreamReader(OptionUtils):
         >>> time.sleep(3)
         >>> q.stop()
         """
-        for k in options:
-            self._jreader = self._jreader.option(k, to_str(options[k]))
+        if options:
+            self._options = self._options.update(options)
         return self
 
     def load(
@@ -307,9 +311,16 @@ class DataStreamReader(OptionUtils):
                     error_class="VALUE_NOT_NON_EMPTY_STR",
                     message_parameters={"arg_name": "path", "arg_value": str(path)},
                 )
-            return self._df(self._jreader.load(path))
+            return (self._spark
+                    .read
+                    .options(**self._options)
+                    .format(self._format)
+                    .load(path)
+                    )
+        elif self._format == "rate":
+            return self._spark.createDataFrame([(1,),(2,),(3,)], schema="value: int")
         else:
-            return self._df(self._jreader.load())
+            raise NotImplementedError()
 
     def json(
         self,
@@ -909,10 +920,20 @@ class DataStreamWriter:
     def __init__(self, df: "DataFrame") -> None:
         self._df = df
         self._spark = df.sparkSession
-        self._jwrite = df._jdf.writeStream()
 
-    # def _sq(self, jsq: JavaObject) -> StreamingQuery:
-    #     return StreamingQuery(jsq)
+        self._format = None
+        self._options = {}
+        self._output_mode = None
+        self._query_name = None
+        self._foreach_func = None
+
+        self._executor = ThreadPoolExecutor(max_workers=1)
+        self._future = None
+
+        self._active = False # Thread safe due to GIL
+
+    def _sq(self) -> StreamingQuery:
+        return StreamingQuery(self._query_name, self._future)
 
     def outputMode(self, outputMode: str) -> "DataStreamWriter":
         """Specifies how data of a streaming DataFrame/Dataset is written to a streaming sink.
@@ -956,7 +977,8 @@ class DataStreamWriter:
                 error_class="VALUE_NOT_NON_EMPTY_STR",
                 message_parameters={"arg_name": "outputMode", "arg_value": str(outputMode)},
             )
-        self._jwrite = self._jwrite.outputMode(outputMode)
+        # self._jwrite = self._jwrite.outputMode(outputMode)
+        self._output_mode = outputMode
         return self
 
     def format(self, source: str) -> "DataStreamWriter":
@@ -998,7 +1020,8 @@ class DataStreamWriter:
         +...---------+-----+
         ...
         """
-        self._jwrite = self._jwrite.format(source)
+        # self._jwrite = self._jwrite.format(source)
+        self._format = source
         return self
 
     def option(self, key: str, value: "OptionalPrimitiveType") -> "DataStreamWriter":
@@ -1029,7 +1052,7 @@ class DataStreamWriter:
         >>> time.sleep(3)
         >>> q.stop()
         """
-        self._jwrite = self._jwrite.option(key, to_str(value))
+        self._options[key] = value
         return self
 
     def options(self, **options: "OptionalPrimitiveType") -> "DataStreamWriter":
@@ -1065,8 +1088,7 @@ class DataStreamWriter:
         >>> time.sleep(3)
         >>> q.stop()
         """
-        for k in options:
-            self._jwrite = self._jwrite.option(k, to_str(options[k]))
+        self._options.update(options)
         return self
 
     @overload
@@ -1119,10 +1141,7 @@ class DataStreamWriter:
         +...---------+-----+
         ...
         """
-        if len(cols) == 1 and isinstance(cols[0], (list, tuple)):
-            cols = cols[0]
-        self._jwrite = self._jwrite.partitionBy(_to_seq(self._spark._sc, cols))
-        return self
+        raise NotImplementedError()
 
     def queryName(self, queryName: str) -> "DataStreamWriter":
         """Specifies the name of the :class:`StreamingQuery` that can be started with
@@ -1157,7 +1176,7 @@ class DataStreamWriter:
                 error_class="VALUE_NOT_NON_EMPTY_STR",
                 message_parameters={"arg_name": "queryName", "arg_value": str(queryName)},
             )
-        self._jwrite = self._jwrite.queryName(queryName)
+        self._query_name = queryName
         return self
 
     @overload
@@ -1232,64 +1251,8 @@ class DataStreamWriter:
         >>> df.writeStream.trigger(availableNow=True)
         <...streaming.readwriter.DataStreamWriter object ...>
         """
-        params = [processingTime, once, continuous, availableNow]
+        raise NotImplementedError()
 
-        if params.count(None) == 4:
-            raise PySparkValueError(
-                error_class="ONLY_ALLOW_SINGLE_TRIGGER",
-                message_parameters={},
-            )
-        elif params.count(None) < 3:
-            raise PySparkValueError(
-                error_class="ONLY_ALLOW_SINGLE_TRIGGER",
-                message_parameters={},
-            )
-
-        jTrigger = None
-        assert self._spark._sc._jvm is not None
-        if processingTime is not None:
-            if type(processingTime) != str or len(processingTime.strip()) == 0:
-                raise PySparkValueError(
-                    error_class="VALUE_NOT_NON_EMPTY_STR",
-                    message_parameters={
-                        "arg_name": "processingTime",
-                        "arg_value": str(processingTime),
-                    },
-                )
-            interval = processingTime.strip()
-            jTrigger = self._spark._sc._jvm.org.apache.spark.sql.streaming.Trigger.ProcessingTime(
-                interval
-            )
-
-        elif once is not None:
-            if once is not True:
-                raise PySparkValueError(
-                    error_class="VALUE_NOT_TRUE",
-                    message_parameters={"arg_name": "once", "arg_value": str(once)},
-                )
-
-            jTrigger = self._spark._sc._jvm.org.apache.spark.sql.streaming.Trigger.Once()
-
-        elif continuous is not None:
-            if type(continuous) != str or len(continuous.strip()) == 0:
-                raise PySparkValueError(
-                    error_class="VALUE_NOT_NON_EMPTY_STR",
-                    message_parameters={"arg_name": "continuous", "arg_value": str(continuous)},
-                )
-            interval = continuous.strip()
-            jTrigger = self._spark._sc._jvm.org.apache.spark.sql.streaming.Trigger.Continuous(
-                interval
-            )
-        else:
-            if availableNow is not True:
-                raise PySparkValueError(
-                    error_class="VALUE_NOT_TRUE",
-                    message_parameters={"arg_name": "availableNow", "arg_value": str(availableNow)},
-                )
-            jTrigger = self._spark._sc._jvm.org.apache.spark.sql.streaming.Trigger.AvailableNow()
-
-        self._jwrite = self._jwrite.trigger(jTrigger)
-        return self
 
     @staticmethod
     def _construct_foreach_function(
@@ -1488,20 +1451,7 @@ class DataStreamWriter:
         >>> q.stop()
         """
 
-        from polarspark.rdd import _wrap_function
-        from polarspark.serializers import CPickleSerializer, AutoBatchedSerializer
-
-        func = self._construct_foreach_function(f)
-        serializer = AutoBatchedSerializer(CPickleSerializer())
-        wrapped_func = _wrap_function(self._spark._sc, func, serializer, serializer)
-        assert self._spark._sc._jvm is not None
-        jForeachWriter = (
-            self._spark._sc._jvm.org.apache.spark.sql.execution.python.PythonForeachWriter(
-                wrapped_func, self._df._jdf.schema()
-            )
-        )
-        self._jwrite.foreach(jForeachWriter)
-        return self
+        raise NotImplementedError()
 
     def foreachBatch(self, func: Callable[["DataFrame", int], None]) -> "DataStreamWriter":
         """
@@ -1541,15 +1491,7 @@ class DataStreamWriter:
         >>> # if in Spark Connect, my_value = -1, else my_value = 100
         """
 
-        from polarspark.java_gateway import ensure_callback_server_started
-
-        gw = self._spark._sc._gateway
-        assert gw is not None
-        java_import(gw.jvm, "org.apache.spark.sql.execution.streaming.sources.*")
-
-        wrapped_func = ForeachBatchFunction(self._spark, func)
-        gw.jvm.PythonForeachBatchHelper.callForeachBatch(self._jwrite, wrapped_func)
-        ensure_callback_server_started(gw)
+        self._foreach_func = func
         return self
 
     def start(
@@ -1635,10 +1577,20 @@ class DataStreamWriter:
             self.format(format)
         if queryName is not None:
             self.queryName(queryName)
-        if path is None:
-            return self._sq(self._jwrite.start())
-        else:
-            return self._sq(self._jwrite.start(path))
+
+        self._active = True
+        def starter():
+            if self._foreach_func:
+                self._foreach_func(self._df, 0)
+
+            self._active = False
+
+        self._future = self._executor.submit(starter)
+
+        return StreamingQuery(self._query_name, self._future)
+
+        # DELETE:
+        # self._df.write.options(**self._options).format(self._format).save(path)
 
     def toTable(
         self,
@@ -1731,7 +1683,8 @@ class DataStreamWriter:
             self.format(format)
         if queryName is not None:
             self.queryName(queryName)
-        return self._sq(self._jwrite.toTable(tableName))
+
+        raise NotImplementedError
 
 
 def _test() -> None:
