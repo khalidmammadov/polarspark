@@ -342,7 +342,7 @@ class DataFrameReader(OptionUtils):
         from polarspark.sql.dataframe import DataFrame
         ldf = reader(path, **self._options)
         sample = ldf.first().collect()
-        df = DataFrame(ldf, self._spark)
+        df = DataFrame(None, lambda _: ldf, self._spark)
         df._schema = schema_from_polars(sample)
         return df
 
@@ -525,7 +525,7 @@ class DataFrameReader(OptionUtils):
         """
         ldf = self._spark._pl_ctx.execute(f"select * from {tableName}") # noqa
         from polarspark.sql.dataframe import DataFrame
-        return DataFrame(ldf, self._spark)
+        return DataFrame(None, lambda _: ldf, self._spark)
 
     def parquet(self, *paths: str, **options: "OptionalPrimitiveType") -> "DataFrame":
         """
@@ -1641,11 +1641,11 @@ class DataFrameWriter(OptionUtils):
         else:
             # self._jwrite.save(path)
             writers = {
-                "csv": self._df._ldf.sink_csv,
-                "json": self._df._ldf.sink_ndjson,
-                "parquet": self._df._ldf.sink_parquet,
-                "delta": self._df._ldf.collect().write_delta,
-                "excel": self._df._ldf.collect().write_excel,
+                "csv": self._df._gather().sink_csv,
+                "json": self._df._gather().sink_ndjson,
+                "parquet": self._df._gather().sink_parquet,
+                "delta": self._df._gather().collect().write_delta,
+                "excel": self._df._gather().collect().write_excel,
             }
             write = writers[self._format]
             write(path, **options)
@@ -1773,7 +1773,7 @@ class DataFrameWriter(OptionUtils):
             self.format(format)
 
         # Register immutable (no insert supported yet) virtual table for now
-        self._spark._pl_ctx.register(name, self._df._ldf) # noqa
+        self._spark._pl_ctx.register(name, self._df._gather()) # noqa
         # TODO: Add mode support for inserts and overwrites
 
     def json(

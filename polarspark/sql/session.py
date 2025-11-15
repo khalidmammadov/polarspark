@@ -843,7 +843,7 @@ class SparkSession(SparkConversionMixin):
         else:
             ldf = pl.LazyFrame(pl.int_range(int(start), int(end), int(step), eager=True).alias("id"))
 
-        return DataFrame(ldf, self)
+        return self._create_base_dataframe(ldf)
 
     def _inferSchemaFromList(
         self, data: Iterable[Any], names: Optional[List[str]] = None
@@ -1401,24 +1401,20 @@ class SparkSession(SparkConversionMixin):
             def prepare(obj):
                 verify_func(obj)
                 return (obj,)
-
         else:
-
             def prepare(obj: Any) -> Any:
                 return obj
 
         if isinstance(data, RDD):
             raise NotImplementedError("Creating DataFrame from RDD is not supported yet")
-            # rdd, struct = self._createFromRDD(data.map(prepare), schema, samplingRatio)
-        else:
-            ldf, struct = self._createFromLocal(map(prepare, data), schema)
+        ldf, struct = self._createFromLocal(map(prepare, data), schema)
 
-        df = DataFrame(ldf, self)
+        df = self._create_base_dataframe(ldf)
         df._schema = struct
         return df
 
-    def _create_dataframe_simple(self, ldf):
-        return DataFrame(ldf, self)
+    def _create_base_dataframe(self, ldf):
+        return DataFrame(None, lambda _: ldf, self)
 
     def sql(
         self, sqlQuery: str, args: Optional[Union[Dict[str, Any], List]] = None, **kwargs: Any
@@ -1568,7 +1564,7 @@ class SparkSession(SparkConversionMixin):
         # finally:
         #     if len(kwargs) > 0:
         #         formatter.clear()
-        return DataFrame(self._pl_ctx.execute(sqlQuery), self)
+        return self._create_base_dataframe(self._pl_ctx.execute(sqlQuery))
 
     def table(self, tableName: str) -> DataFrame:
         """Returns the specified table as a :class:`DataFrame`.
@@ -1601,7 +1597,7 @@ class SparkSession(SparkConversionMixin):
         |  4|
         +---+
         """
-        return DataFrame(self._pl_ctx.execute(f"select * from {tableName}"), self)
+        return self.sql(f"select * from {tableName}")
 
     @property
     def read(self) -> DataFrameReader:

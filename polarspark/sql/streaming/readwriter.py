@@ -75,16 +75,10 @@ class DataStreamReader(OptionUtils):
     """
 
     def __init__(self, spark: "SparkSession") -> None:
-        # self._jreader = spark._jsparkSession.readStream()
         self._spark = spark
 
         self._format = None
         self._options = {}
-
-    # def _df(self, jdf: JavaObject) -> "DataFrame":
-    #     from polarspark.sql.dataframe import DataFrame
-    #
-    #     return DataFrame(jdf, self._spark)
 
     def format(self, source: str) -> "DataStreamReader":
         """Specifies the input data source format.
@@ -123,7 +117,6 @@ class DataStreamReader(OptionUtils):
         ...     time.sleep(3)
         ...     q.stop()
         """
-        # self._jreader = self._jreader.format(source)
         self._format = source
         return self
 
@@ -731,7 +724,8 @@ class DataStreamReader(OptionUtils):
             unescapedQuoteHandling=unescapedQuoteHandling,
         )
         if isinstance(path, str):
-            return self._df(self._jreader.csv(path))
+            self.format("csv")
+            return self.load(path)
         else:
             raise PySparkTypeError(
                 error_class="NOT_STR",
@@ -1580,17 +1574,16 @@ class DataStreamWriter:
 
         self._active = True
         def starter():
+            # Slice self._df here and call in loop below??
             if self._foreach_func:
                 self._foreach_func(self._df, 0)
-
+            else:
+                self._df.write.format(self._format).save(path)
             self._active = False
 
         self._future = self._executor.submit(starter)
 
         return StreamingQuery(self._query_name, self._future)
-
-        # DELETE:
-        # self._df.write.options(**self._options).format(self._format).save(path)
 
     def toTable(
         self,

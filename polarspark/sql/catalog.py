@@ -793,7 +793,7 @@ class Catalog:
 
         # Read existing
         df = self._sparkSession.read.format(source).schema(schema).options(**options).load(path)
-        self._sparkSession._pl_ctx.register(tableName, df._ldf)
+        self._sparkSession._pl_ctx.register(tableName, df._gather()) # noqa
         return df
 
     def dropTempView(self, viewName: str) -> bool:
