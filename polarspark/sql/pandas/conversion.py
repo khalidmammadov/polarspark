@@ -86,7 +86,7 @@ class PandasConversionMixin:
         from polarspark.sql.pandas.utils import require_minimum_pandas_version
 
         require_minimum_pandas_version()
-        return self._gather().collect().to_pandas(use_pyarrow_extension_array=True)
+        return self._gather_first().collect().to_pandas(use_pyarrow_extension_array=True)
 
     def _collect_as_arrow(self, split_batches: bool = False) -> List["pa.RecordBatch"]:
         """

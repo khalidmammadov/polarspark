@@ -16,11 +16,9 @@
 #
 
 import json
-import uuid
-from typing import Any, Dict, List, Optional
-from concurrent.futures import Future
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from concurrent.futures import Future, TimeoutError
 import traceback
-# from py4j.java_gateway import JavaObject, java_import
 
 from polarspark.errors import StreamingQueryException, PySparkValueError
 from polarspark.errors.exceptions.captured import (
@@ -29,6 +27,9 @@ from polarspark.errors.exceptions.captured import (
 # from polarspark.sql.streaming.listener import StreamingQueryListener
 
 __all__ = ["StreamingQuery", "StreamingQueryManager"]
+
+if TYPE_CHECKING:
+    from polarspark.sql.dataframe import DataFrame
 
 
 class StreamingQuery:
@@ -46,10 +47,12 @@ class StreamingQuery:
     This API is evolving.
     """
 
-    def __init__(self, name, future: Future) -> None:
-        self._name = name
+    def __init__(self, id, name, future: Future, df: "DataFrame", progress: list) -> None:
+        self._name = name or id
         self._future = future
-        self._id = str(uuid.uuid4())
+        self._id = id
+        self._df = df
+        self._progress = progress
 
     @property
     def id(self) -> str:
@@ -303,7 +306,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return [json.loads(p.json()) for p in self._jsq.recentProgress()]
+        return list(reversed(self._progress))
 
     @property
     def lastProgress(self) -> Optional[Dict[str, Any]]:
@@ -332,10 +335,14 @@ class StreamingQuery:
         >>> sq.lastProgress
         >>> sq.stop()
         """
-        lastProgress = self._jsq.lastProgress()
-        if lastProgress:
-            return json.loads(lastProgress.json())
-        else:
+        # lastProgress = self._jsq.lastProgress()
+        # if lastProgress:
+        #     return json.loads(lastProgress.json())
+        # else:
+        #     return None
+        try:
+            return next(reversed(self._progress))
+        except StopIteration:
             return None
 
     def processAllAvailable(self) -> None:
@@ -436,9 +443,7 @@ class StreamingQuery:
         ...
         >>> sq.stop()
         """
-        # Cannot call `_jsq.explain(...)` because it will print in the JVM process.
-        # We should print it in the Python process.
-        print(self._jsq.explainInternal(extended))
+        self._df.explain(extended)
 
     def exception(self) -> Optional[StreamingQueryException]:
         """
@@ -453,7 +458,9 @@ class StreamingQuery:
             the StreamingQueryException if the query was terminated by an exception, or None.
         """
         try:
-            ex = self._future.exception()
+            ex = self._future.exception(0.1)
+        except TimeoutError as _:
+            return None
         except Exception as e:
             ex = e
 
@@ -462,6 +469,7 @@ class StreamingQuery:
                 "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)),
                 traceback.format_exc()
             )
+        return None
 
 
 class StreamingQueryManager:
@@ -477,9 +485,8 @@ class StreamingQueryManager:
     This API is evolving.
     """
 
-    def __init__(self) -> None: # , jsqm: JavaObject
-        # self._jsqm = jsqm
-        pass
+    def __init__(self) -> None:
+        self._queries: Dict[str, StreamingQuery] = {}
 
     @property
     def active(self) -> List[StreamingQuery]:
@@ -513,7 +520,10 @@ class StreamingQueryManager:
         ['this_query']
         >>> sq.stop()
         """
-        return [StreamingQuery(jsq) for jsq in self._jsqm.active()]
+        return [q for q in self._queries.values() if q.isActive]
+
+    def _add(self, q: StreamingQuery):
+        self._queries[q.id] = q
 
     def get(self, id: str) -> Optional[StreamingQuery]:
         """
@@ -557,11 +567,7 @@ class StreamingQueryManager:
         True
         >>> sq.stop()
         """
-        query = self._jsqm.get(id)
-        if query is not None:
-            return StreamingQuery(query)
-        else:
-            return None
+        return self._queries.get(id)
 
     def awaitAnyTermination(self, timeout: Optional[int] = None) -> Optional[bool]:
         """
@@ -619,9 +625,11 @@ class StreamingQueryManager:
                     error_class="VALUE_NOT_POSITIVE",
                     message_parameters={"arg_name": "timeout", "arg_value": type(timeout).__name__},
                 )
-            return self._jsqm.awaitAnyTermination(int(timeout * 1000))
+            raise NotImplementedError()
+        #     return self._jsqm.awaitAnyTermination(int(timeout * 1000))
         else:
-            return self._jsqm.awaitAnyTermination()
+        #     return self._jsqm.awaitAnyTermination()
+            raise NotImplementedError()
 
     def resetTerminated(self) -> None:
         """
@@ -637,7 +645,8 @@ class StreamingQueryManager:
         --------
         >>> spark.streams.resetTerminated()
         """
-        self._jsqm.resetTerminated()
+        # self._jsqm.resetTerminated()
+        raise NotImplementedError()
 
     # def addListener(self, listener: StreamingQueryListener) -> None:
     #     """

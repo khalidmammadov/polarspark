@@ -342,7 +342,9 @@ class DataFrameReader(OptionUtils):
         from polarspark.sql.dataframe import DataFrame
         ldf = reader(path, **self._options)
         sample = ldf.first().collect()
-        df = DataFrame(None, lambda _: ldf, self._spark)
+        def df_generator():
+            yield ldf
+        df = DataFrame(None, df_generator, self._spark)
         df._schema = schema_from_polars(sample)
         return df
 
@@ -376,7 +378,9 @@ class DataFrameReader(OptionUtils):
             pdf = reader(p, **self._options)
             pdfs.append(pdf)
         pdf = reduce(lambda a, b: pl.concat([a, b]), pdfs)
-        df = DataFrame(pdf.lazy(), self._spark)
+        def df_generator():
+            yield pdf.lazy()
+        df = DataFrame(None, df_generator, self._spark)
         df._schema = schema_from_polars(pdf)
         return df
 
@@ -525,7 +529,9 @@ class DataFrameReader(OptionUtils):
         """
         ldf = self._spark._pl_ctx.execute(f"select * from {tableName}") # noqa
         from polarspark.sql.dataframe import DataFrame
-        return DataFrame(None, lambda _: ldf, self._spark)
+        def df_generator():
+            yield ldf
+        return DataFrame(None, df_generator, self._spark)
 
     def parquet(self, *paths: str, **options: "OptionalPrimitiveType") -> "DataFrame":
         """
@@ -1616,7 +1622,6 @@ class DataFrameWriter(OptionUtils):
             self.partitionBy(partitionBy)
         if format is not None:
             self.format(format)
-
         # Create dir with target file name
         p = Path(path)
         if self._format != "delta":
@@ -1633,22 +1638,21 @@ class DataFrameWriter(OptionUtils):
         if not p.exists():
             p.mkdir(parents=True)
 
-
         if path is None:
             pass
             # FIX check what is default path or table?
             # self._jwrite.save()
         else:
-            # self._jwrite.save(path)
-            writers = {
-                "csv": self._df._gather().sink_csv,
-                "json": self._df._gather().sink_ndjson,
-                "parquet": self._df._gather().sink_parquet,
-                "delta": self._df._gather().collect().write_delta,
-                "excel": self._df._gather().collect().write_excel,
-            }
-            write = writers[self._format]
-            write(path, **options)
+            for ldf in self._df._gather(): # noqa
+                writers = {
+                    "csv": ldf.sink_csv,
+                    "json": ldf.sink_ndjson,
+                    "parquet": ldf.sink_parquet,
+                    "delta": ldf.collect().write_delta,
+                    "excel": ldf.collect().write_excel,
+                }
+                write = writers[self._format]
+                write(path, **options)
 
     def insertInto(self, tableName: str, overwrite: Optional[bool] = None) -> None:
         """Inserts the content of the :class:`DataFrame` to the specified table.
@@ -1773,7 +1777,7 @@ class DataFrameWriter(OptionUtils):
             self.format(format)
 
         # Register immutable (no insert supported yet) virtual table for now
-        self._spark._pl_ctx.register(name, self._df._gather()) # noqa
+        self._spark._pl_ctx.register(name, self._df._gather_first()) # noqa
         # TODO: Add mode support for inserts and overwrites
 
     def json(

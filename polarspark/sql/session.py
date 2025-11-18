@@ -37,6 +37,7 @@ from typing import (
     no_type_check,
     overload,
     TYPE_CHECKING,
+    Generator,
 )
 
 import polars as pl
@@ -511,6 +512,8 @@ class SparkSession(SparkConversionMixin):
         ):
             SparkSession._instantiatedSession = self
             SparkSession._activeSession = self
+
+        self._stream_manager = None
 
     def _repr_html_(self) -> str:
         return """
@@ -1414,7 +1417,9 @@ class SparkSession(SparkConversionMixin):
         return df
 
     def _create_base_dataframe(self, ldf):
-        return DataFrame(None, lambda _: ldf, self)
+        def df_generator() -> Generator[pl.LazyFrame, None, None]:
+            yield ldf
+        return DataFrame(None, df_generator, self)
 
     def sql(
         self, sqlQuery: str, args: Optional[Union[Dict[str, Any], List]] = None, **kwargs: Any
@@ -1708,8 +1713,9 @@ class SparkSession(SparkConversionMixin):
         >>> sq.stop()
         """
         from polarspark.sql.streaming import StreamingQueryManager
-
-        return StreamingQueryManager(self._jsparkSession.streams())
+        if not self._stream_manager:
+            self._stream_manager = StreamingQueryManager()
+        return self._stream_manager
 
     def stop(self) -> None:
         """
