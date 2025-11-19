@@ -51,7 +51,6 @@ class StreamingTestsMixin:
             query.explain()
 
         except Exception as e:
-            raise e
             self.fail(
                 "Streaming query functions sanity check shouldn't throw any error. "
                 "Error message: " + str(e)

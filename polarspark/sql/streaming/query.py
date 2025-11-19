@@ -24,7 +24,10 @@ from polarspark.errors import StreamingQueryException, PySparkValueError
 from polarspark.errors.exceptions.captured import (
     StreamingQueryException as CapturedStreamingQueryException,
 )
-# from polarspark.sql.streaming.listener import StreamingQueryListener
+from polarspark.sql.streaming.listener import (
+    StreamingQueryListener,
+    StreamingQueryProgress,
+)
 
 __all__ = ["StreamingQuery", "StreamingQueryManager"]
 
@@ -48,7 +51,7 @@ class StreamingQuery:
     """
 
     def __init__(self, id, name, future: Future, df: "DataFrame", progress: list) -> None:
-        self._name = name or id
+        self._name = name
         self._future = future
         self._id = id
         self._df = df
@@ -306,7 +309,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return list(reversed(self._progress))
+        return [StreamingQueryProgress.fromJson(p) for p in reversed(self._progress)]
 
     @property
     def lastProgress(self) -> Optional[Dict[str, Any]]:
@@ -335,13 +338,8 @@ class StreamingQuery:
         >>> sq.lastProgress
         >>> sq.stop()
         """
-        # lastProgress = self._jsq.lastProgress()
-        # if lastProgress:
-        #     return json.loads(lastProgress.json())
-        # else:
-        #     return None
         try:
-            return next(reversed(self._progress))
+            return StreamingQueryProgress.fromJson(next(reversed(self._progress)))
         except StopIteration:
             return None
 

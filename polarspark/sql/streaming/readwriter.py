@@ -18,6 +18,7 @@ import itertools
 import sys
 import time
 import uuid
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Iterator
 from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING, Union, Generator
@@ -931,8 +932,8 @@ class DataStreamWriter:
         self._format = None
         self._options = {}
         self._output_mode = None
-        self._query_name = None
         self._query_id = str(uuid.uuid4())
+        self._query_name = self._query_id
         self._foreach_func = None
 
         self._executor = ThreadPoolExecutor(max_workers=1)
@@ -1499,6 +1500,46 @@ class DataStreamWriter:
         self._foreach_func = func
         return self
 
+    def _get_state(self, row_num: int):
+        return {
+              "operatorName": "stateOperator1",
+              "numRowsTotal": row_num,
+              "numRowsUpdated": 0,
+              "numRowsRemoved": 0,
+              "allUpdatesTimeMs": 0,
+              "allRemovalsTimeMs": 0,
+              "commitTimeMs": 0,
+              "memoryUsedBytes": 0,
+              "numRowsDroppedByWatermark": 0,
+              "numShufflePartitions": 0,
+              "numStateStoreInstances": 0,
+              "customMetrics": {
+                "numExpiredStateRows": 0,
+                "numTotalStateRows": 0
+              }
+            }
+
+    def _get_source(self):
+        return {
+                "description": "",
+                "startOffset": 0,
+                "endOffset": 0,
+                "latestOffset": 0,
+                "numInputRows": 1,
+                "inputRowsPerSecond": 0,
+                "processedRowsPerSecond": 0,
+                "metrics": {
+                    "avgBatchLatency": 0,
+                    "maxOffsetLag": 0
+                }
+            }
+
+    def _get_sink(self, row_num: int):
+        return {
+                "description": "",
+                "numOutputRows": row_num,
+        }
+
     def start(
         self,
         path: Optional[str] = None,
@@ -1584,16 +1625,28 @@ class DataStreamWriter:
             self.queryName(queryName)
 
         self._active = True
+        run_id = str(uuid.uuid4())
         progress = []
         def starter():
             if self._foreach_func:
                 self._foreach_func(self._df, 0)
             else:
                 if self._format in ["memory", "noop"]:
-                    for ldf in self._df._gather(): # noqa
-                        print(ldf.collect())
+                    for i, ldf in enumerate(self._df._gather()): # noqa
+                        t = time.process_time()
+                        rows = ldf.collect()
+                        print(rows)
+                        duration = time.process_time() - t
                         progress.append({"name": self._query_name,
-                                         "id": self._query_id}
+                                         "id": self._query_id,
+                                         "timestamp": str(datetime.now()),
+                                         "batchId": i,
+                                         "batchDuration": duration,
+                                         "runId": run_id,
+                                         "stateOperators": [self._get_state(len(rows))],
+                                         "sources": [self._get_source()],
+                                         "sink": self._get_sink(len(rows))
+                                         }
                                         )
                 else:
                     self._df.write.format(self._format).save(path)
