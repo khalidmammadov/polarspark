@@ -22,6 +22,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Iterator
 from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING, Union, Generator
+from dataclasses import dataclass
 
 # from py4j.java_gateway import java_import, JavaObject
 
@@ -83,6 +84,7 @@ class DataStreamReader(OptionUtils):
 
         self._format = None
         self._options = {}
+        self._schema = None
 
     def format(self, source: str) -> "DataStreamReader":
         """Specifies the input data source format.
@@ -165,22 +167,14 @@ class DataStreamReader(OptionUtils):
          |-- col0: integer (nullable = true)
          |-- col1: string (nullable = true)
         """
-        # from polarspark.sql import SparkSession
-        #
-        # spark = SparkSession._getActiveSessionOrCreate()
-        # if isinstance(schema, StructType):
-        #     jschema = spark._jsparkSession.parseDataType(schema.json())
-        #     self._jreader = self._jreader.schema(jschema)
-        # elif isinstance(schema, str):
-        #     self._jreader = self._jreader.schema(schema)
-        # else:
-        #     raise polarsparkTypeError(
-        #         error_class="NOT_STR_OR_STRUCT",
-        #         message_parameters={"arg_name": "schema", "arg_type": type(schema).__name__},
-        #     )
-        # TODO: Implement
-        raise NotImplemented
-        # return self
+
+        if not isinstance(schema, (StructType, str)):
+            raise PySparkTypeError(
+                error_class="NOT_STR_OR_STRUCT",
+                message_parameters={"arg_name": "schema", "arg_type": type(schema).__name__},
+            )
+        self._schema = schema
+        return self
 
     def option(self, key: str, value: "OptionalPrimitiveType") -> "DataStreamReader":
         """Adds an input option for the underlying data source.
@@ -208,7 +202,7 @@ class DataStreamReader(OptionUtils):
         >>> time.sleep(3)
         >>> q.stop()
         """
-        self._jreader = self._jreader.option(key, to_str(value))
+        self._options[key] = to_str(value)
         return self
 
     def options(self, **options: "OptionalPrimitiveType") -> "DataStreamReader":
@@ -304,11 +298,12 @@ class DataStreamReader(OptionUtils):
         if schema is not None:
             self.schema(schema)
         self.options(**options)
-        if path is not None:
-            if type(path) != str or len(path.strip()) == 0:
+        _path = path or self._options.get("path")
+        if _path is not None:
+            if type(_path) != str or len(_path.strip()) == 0:
                 raise PySparkValueError(
                     error_class="VALUE_NOT_NON_EMPTY_STR",
-                    message_parameters={"arg_name": "path", "arg_value": str(path)},
+                    message_parameters={"arg_name": "path", "arg_value": str(_path)},
                 )
 
             def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
@@ -316,7 +311,8 @@ class DataStreamReader(OptionUtils):
                        .read
                        .options(**self._options)
                        .format(self._format)
-                       .load(path)
+                       .schema(self._schema)
+                       .load(_path)
                        ._gather_first()
                 )
             return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
@@ -895,6 +891,13 @@ class DataStreamReader(OptionUtils):
             )
 
 
+@dataclass(frozen=True)
+class Trigger:
+    processingTime: Optional[str] = None,
+    once: Optional[bool] = None,
+    availableNow: Optional[bool] = None,
+
+
 class DataStreamWriter:
     """
     Interface used to write a streaming :class:`DataFrame <pyspark.sql.DataFrame>` to external
@@ -932,9 +935,12 @@ class DataStreamWriter:
         self._format = None
         self._options = {}
         self._output_mode = None
+
+        # Streaming
         self._query_id = str(uuid.uuid4())
-        self._query_name = self._query_id
+        self._query_name = None
         self._foreach_func = None
+        self._trigger = Trigger()
 
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future = None
@@ -1257,7 +1263,56 @@ class DataStreamWriter:
         >>> df.writeStream.trigger(availableNow=True)
         <...streaming.readwriter.DataStreamWriter object ...>
         """
-        raise NotImplementedError()
+        params = [processingTime, once, continuous, availableNow]
+
+        if params.count(None) == 4:
+            raise PySparkValueError(
+                error_class="ONLY_ALLOW_SINGLE_TRIGGER",
+                message_parameters={},
+            )
+        elif params.count(None) < 3:
+            raise PySparkValueError(
+                error_class="ONLY_ALLOW_SINGLE_TRIGGER",
+                message_parameters={},
+            )
+
+        processing_time = processingTime
+        if processingTime is not None:
+            if type(processingTime) != str or len(processingTime.strip()) == 0:
+                raise PySparkValueError(
+                    error_class="VALUE_NOT_NON_EMPTY_STR",
+                    message_parameters={
+                        "arg_name": "processingTime",
+                        "arg_value": str(processingTime),
+                    },
+                )
+            processing_time = processingTime.strip()
+        elif once is not None:
+            if once is not True:
+                raise PySparkValueError(
+                    error_class="VALUE_NOT_TRUE",
+                    message_parameters={"arg_name": "once", "arg_value": str(once)},
+                )
+        elif continuous is not None:
+            if type(continuous) != str or len(continuous.strip()) == 0:
+                raise PySparkValueError(
+                    error_class="VALUE_NOT_NON_EMPTY_STR",
+                    message_parameters={"arg_name": "continuous", "arg_value": str(continuous)},
+                )
+            raise NotImplementedError()
+        else:
+            if availableNow is not True:
+                raise PySparkValueError(
+                    error_class="VALUE_NOT_TRUE",
+                    message_parameters={"arg_name": "availableNow", "arg_value": str(availableNow)},
+                )
+
+        self._trigger = Trigger(
+            processingTime=processing_time,
+            once=once,
+            availableNow=availableNow,
+        )
+        return self
 
 
     @staticmethod
