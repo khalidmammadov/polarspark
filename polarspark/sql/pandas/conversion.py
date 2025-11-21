@@ -86,7 +86,7 @@ class PandasConversionMixin:
         from polarspark.sql.pandas.utils import require_minimum_pandas_version
 
         require_minimum_pandas_version()
-        return self._ldf.collect().to_pandas(use_pyarrow_extension_array=True)
+        return self._gather_first().collect().to_pandas(use_pyarrow_extension_array=True)
 
     def _collect_as_arrow(self, split_batches: bool = False) -> List["pa.RecordBatch"]:
         """
@@ -216,7 +216,7 @@ class SparkConversionMixin:
 
         require_minimum_pandas_version()
 
-        return self._create_dataframe_simple(pl.from_pandas(data).lazy())
+        return self._create_base_dataframe(pl.from_pandas(data).lazy())
 
     def _convert_from_pandas(
         self, pdf: "PandasDataFrameLike", schema: Union[StructType, str, List[str]], timezone: str

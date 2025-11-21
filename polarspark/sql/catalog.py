@@ -598,7 +598,9 @@ class Catalog:
                 "a future version. Use listColumns(`dbName.tableName`) instead.",
                 FutureWarning,
             )
-        df = DataFrame(self._sparkSession._pl_ctx.execute(f"select * from {tableName}"), self._sparkSession, alias=tableName)
+        def df_generator():
+            yield self._sparkSession._pl_ctx.execute(f"select * from {tableName}") # noqa
+        df = DataFrame(None, df_generator, self._sparkSession, alias=tableName)
 
         columns = []
         for cname, ctype in df.dtypes:
@@ -793,7 +795,7 @@ class Catalog:
 
         # Read existing
         df = self._sparkSession.read.format(source).schema(schema).options(**options).load(path)
-        self._sparkSession._pl_ctx.register(tableName, df._ldf)
+        self._sparkSession._pl_ctx.register(tableName, df._gather_first()) # noqa
         return df
 
     def dropTempView(self, viewName: str) -> bool:

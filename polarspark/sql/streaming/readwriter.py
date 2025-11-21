@@ -14,15 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+import itertools
 import sys
+import time
+import uuid
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Iterator
-from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING, Union
+from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING, Union, Generator
 
 # from py4j.java_gateway import java_import, JavaObject
 
 # from polarspark.sql.column import _to_seq
+import polars as pl
 from polarspark.sql.readwriter import OptionUtils, to_str
 from polarspark.sql.streaming.query import StreamingQuery
 from polarspark.sql.types import Row, StructType, DataType
@@ -75,16 +79,10 @@ class DataStreamReader(OptionUtils):
     """
 
     def __init__(self, spark: "SparkSession") -> None:
-        # self._jreader = spark._jsparkSession.readStream()
         self._spark = spark
 
         self._format = None
         self._options = {}
-
-    # def _df(self, jdf: JavaObject) -> "DataFrame":
-    #     from polarspark.sql.dataframe import DataFrame
-    #
-    #     return DataFrame(jdf, self._spark)
 
     def format(self, source: str) -> "DataStreamReader":
         """Specifies the input data source format.
@@ -123,7 +121,6 @@ class DataStreamReader(OptionUtils):
         ...     time.sleep(3)
         ...     q.stop()
         """
-        # self._jreader = self._jreader.format(source)
         self._format = source
         return self
 
@@ -300,6 +297,8 @@ class DataStreamReader(OptionUtils):
         ...     time.sleep(3)
         ...     q.stop()
         """
+        from polarspark.sql.dataframe import DataFrame
+
         if format is not None:
             self.format(format)
         if schema is not None:
@@ -311,14 +310,22 @@ class DataStreamReader(OptionUtils):
                     error_class="VALUE_NOT_NON_EMPTY_STR",
                     message_parameters={"arg_name": "path", "arg_value": str(path)},
                 )
-            return (self._spark
-                    .read
-                    .options(**self._options)
-                    .format(self._format)
-                    .load(path)
-                    )
+
+            def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
+                yield (self._spark # noqa
+                       .read
+                       .options(**self._options)
+                       .format(self._format)
+                       .load(path)
+                       ._gather_first()
+                )
+            return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
+
         elif self._format == "rate":
-            return self._spark.createDataFrame([(1,),(2,),(3,)], schema="value: int")
+            def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
+                for i in itertools.count():
+                    yield pl.LazyFrame({"value", i})
+            return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
         else:
             raise NotImplementedError()
 
@@ -731,7 +738,8 @@ class DataStreamReader(OptionUtils):
             unescapedQuoteHandling=unescapedQuoteHandling,
         )
         if isinstance(path, str):
-            return self._df(self._jreader.csv(path))
+            self.format("csv")
+            return self.load(path)
         else:
             raise PySparkTypeError(
                 error_class="NOT_STR",
@@ -924,16 +932,14 @@ class DataStreamWriter:
         self._format = None
         self._options = {}
         self._output_mode = None
-        self._query_name = None
+        self._query_id = str(uuid.uuid4())
+        self._query_name = self._query_id
         self._foreach_func = None
 
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future = None
 
         self._active = False # Thread safe due to GIL
-
-    def _sq(self) -> StreamingQuery:
-        return StreamingQuery(self._query_name, self._future)
 
     def outputMode(self, outputMode: str) -> "DataStreamWriter":
         """Specifies how data of a streaming DataFrame/Dataset is written to a streaming sink.
@@ -1494,6 +1500,46 @@ class DataStreamWriter:
         self._foreach_func = func
         return self
 
+    def _get_state(self, row_num: int):
+        return {
+              "operatorName": "stateOperator1",
+              "numRowsTotal": row_num,
+              "numRowsUpdated": 0,
+              "numRowsRemoved": 0,
+              "allUpdatesTimeMs": 0,
+              "allRemovalsTimeMs": 0,
+              "commitTimeMs": 0,
+              "memoryUsedBytes": 0,
+              "numRowsDroppedByWatermark": 0,
+              "numShufflePartitions": 0,
+              "numStateStoreInstances": 0,
+              "customMetrics": {
+                "numExpiredStateRows": 0,
+                "numTotalStateRows": 0
+              }
+            }
+
+    def _get_source(self):
+        return {
+                "description": "",
+                "startOffset": 0,
+                "endOffset": 0,
+                "latestOffset": 0,
+                "numInputRows": 1,
+                "inputRowsPerSecond": 0,
+                "processedRowsPerSecond": 0,
+                "metrics": {
+                    "avgBatchLatency": 0,
+                    "maxOffsetLag": 0
+                }
+            }
+
+    def _get_sink(self, row_num: int):
+        return {
+                "description": "",
+                "numOutputRows": row_num,
+        }
+
     def start(
         self,
         path: Optional[str] = None,
@@ -1579,18 +1625,41 @@ class DataStreamWriter:
             self.queryName(queryName)
 
         self._active = True
+        run_id = str(uuid.uuid4())
+        progress = []
         def starter():
             if self._foreach_func:
                 self._foreach_func(self._df, 0)
-
+            else:
+                if self._format in ["memory", "noop"]:
+                    for i, ldf in enumerate(self._df._gather()): # noqa
+                        t = time.process_time()
+                        rows = ldf.collect()
+                        print(rows)
+                        duration = time.process_time() - t
+                        progress.append({"name": self._query_name,
+                                         "id": self._query_id,
+                                         "timestamp": str(datetime.now()),
+                                         "batchId": i,
+                                         "batchDuration": duration,
+                                         "runId": run_id,
+                                         "stateOperators": [self._get_state(len(rows))],
+                                         "sources": [self._get_source()],
+                                         "sink": self._get_sink(len(rows))
+                                         }
+                                        )
+                else:
+                    self._df.write.format(self._format).save(path)
             self._active = False
 
         self._future = self._executor.submit(starter)
-
-        return StreamingQuery(self._query_name, self._future)
-
-        # DELETE:
-        # self._df.write.options(**self._options).format(self._format).save(path)
+        query = StreamingQuery(self._query_id,
+                               self._query_name,
+                               self._future,
+                               self._df,
+                               progress)
+        self._spark.streams._add(query) # noqa
+        return query
 
     def toTable(
         self,
