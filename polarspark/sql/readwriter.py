@@ -77,7 +77,7 @@ class DataFrameReader(OptionUtils):
         self._options = {}
         self._format = None
         self._spark = spark
-        self._schema = None
+        self._schema: Optional[StructType] = None
 
     def format(self, source: str) -> "DataFrameReader":
         """Specifies the input data source format.
@@ -310,24 +310,34 @@ class DataFrameReader(OptionUtils):
             self.schema(schema)
         self.options(**options)
 
-        readers = {
-            "text": partial(
-                self._read_ldf,
-                reader=partial(
-                    pl.scan_csv,
-                    infer_schema=False,
-                    has_header=False,
-                    schema={"value": pl.String}
+        def get_reader(source: str):
+            if source == "text":
+                _col = self._schema.names[0] if self._schema else "value"
+                return partial(
+                    self._read_ldf,
+                    reader=partial(
+                        pl.scan_csv,
+                        infer_schema=False,
+                        has_header=False,
+                        schema={_col: pl.String}
+                    )
                 )
-            ),
-            "csv": partial(self._read_ldf, reader=pl.scan_csv),
-            "json": partial(self._read_paths_with_concat, reader=pl.read_json),
-            "parquet": partial(self._read_ldf, reader=pl.scan_parquet),
-            "delta": partial(self._read_ldf, reader=pl.scan_delta),
-            "avro": partial(self._read_paths_with_concat, reader=pl.read_avro),
-            "excel": partial(self._read_paths_with_concat, reader=pl.read_excel),
-        }
-        reader = readers[self._format]
+            elif source == "csv":
+                return partial(self._read_ldf, reader=pl.scan_csv)
+            elif source == "json":
+                return partial(self._read_paths_with_concat, reader=pl.read_json)
+            elif source == "parquet":
+                return partial(self._read_ldf, reader=pl.scan_parquet)
+            elif source == "delta":
+                return partial(self._read_ldf, reader=pl.scan_delta)
+            elif source == "avro":
+                return partial(self._read_paths_with_concat, reader=pl.read_avro)
+            elif source == "excel":
+                return partial(self._read_paths_with_concat, reader=pl.read_excel)
+            else:
+                raise NotImplementedError(f"Source type {source} not supported")
+
+        reader = get_reader(self._format)
 
         _path = self._options.pop("path", path)
         return reader(_path)
