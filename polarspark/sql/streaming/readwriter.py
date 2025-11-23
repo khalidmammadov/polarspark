@@ -18,6 +18,7 @@ import itertools
 import sys
 import time
 import uuid
+from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Iterator
@@ -36,7 +37,7 @@ from polarspark.errors import (
     PySparkTypeError,
     PySparkValueError,
     PySparkAttributeError,
-    PySparkRuntimeError,
+    PySparkRuntimeError, AnalysisException,
 )
 
 if TYPE_CHECKING:
@@ -942,6 +943,7 @@ class DataStreamWriter:
         self._query_name = None
         self._foreach_func = None
         self._trigger = Trigger()
+        self._partition_by_cols = None
 
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future = None
@@ -1154,7 +1156,8 @@ class DataStreamWriter:
         +...---------+-----+
         ...
         """
-        raise NotImplementedError()
+        self._partition_by_cols = cols
+        return self
 
     def queryName(self, queryName: str) -> "DataStreamWriter":
         """Specifies the name of the :class:`StreamingQuery` that can be started with
@@ -1677,6 +1680,15 @@ class DataStreamWriter:
         run_id = str(uuid.uuid4())
         progress = []
 
+        if self._format not in ["memory", "noop"] and not self._foreach_func:
+            chk = self._options.get("checkpointLocation")
+            if not chk:
+                raise AnalysisException("""
+                checkpointLocation must be specified either through option("checkpointLocation", ...) 
+                or SparkSession.conf.set("spark.sql.streaming.checkpointLocation", ...)
+                """)
+            Path(chk).mkdir(parents=True, exist_ok=True)
+
         def starter():
             if self._foreach_func:
                 self._foreach_func(self._df, 0)
@@ -1701,11 +1713,11 @@ class DataStreamWriter:
                             }
                         )
                 else:
-                    self._df.write.format(self._format).save(path)
+                    self._df.write.options(**self._options).format(self._format).save(path)
             self._active = False
 
         self._future = self._executor.submit(starter)
-        query = StreamingQuery(self._query_id, self._query_name, self._future, self._df, progress)
+        query = StreamingQuery(self, progress)
         self._spark.streams._add(query)  # noqa
         return query
 

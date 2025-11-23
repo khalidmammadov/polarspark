@@ -50,11 +50,8 @@ class StreamingQuery:
     This API is evolving.
     """
 
-    def __init__(self, id, name, future: Future, df: "DataFrame", progress: list) -> None:
-        self._name = name
-        self._future = future
-        self._id = id
-        self._df = df
+    def __init__(self, stream_writer: "DataStreamWriter", progress: list) -> None:
+        self._stream_writer = stream_writer
         self._progress = progress
 
     @property
@@ -88,7 +85,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._id
+        return self._stream_writer._query_id # noqa
 
     @property
     def runId(self) -> str:
@@ -118,7 +115,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._id
+        return self._stream_writer._query_id # noqa
 
     @property
     def name(self) -> str:
@@ -150,7 +147,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._name  # noqa
+        return self._stream_writer._query_name  # noqa
 
     @property
     def isActive(self) -> bool:
@@ -176,7 +173,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._future.running()  # noqa
+        return self._stream_writer._active  # noqa
 
     def awaitTermination(self, timeout: Optional[int] = None) -> Optional[bool]:
         """
@@ -220,8 +217,8 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        if not self._future:  # noqa
-            return
+        if not self._stream_writer._future:  # noqa
+            return None
 
         ex = None
         if timeout is not None:
@@ -231,23 +228,26 @@ class StreamingQuery:
                     message_parameters={"arg_name": "timeout", "arg_value": type(timeout).__name__},
                 )
             try:
-                self._future.result(timeout)  # noqa
+                self._stream_writer._future.result(timeout)  # noqa
             except TimeoutError:
                 return False
             except Exception as e:
                 ex = e
         else:
             try:
-                self._future.result()  # noqa
+                self._stream_writer._future.result()  # noqa
             except Exception as e:
                 ex = e
 
         if ex:
-            raise CapturedStreamingQueryException(
-                "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)), traceback.format_exc()
-            )
+            if self._stream_writer._foreach_func: # noqa
+                raise CapturedStreamingQueryException(
+                    "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)), traceback.format_exc()
+                )
+            else:
+                raise ex
 
-        return self._future.done()  # noqa
+        return self._stream_writer._future.done()  # noqa
 
     @property
     def status(self) -> Dict[str, Any]:
@@ -397,7 +397,7 @@ class StreamingQuery:
         >>> sq.isActive
         False
         """
-        self._future.cancel()  # noqa
+        self._stream_writer._future.cancel()  # noqa
 
     def explain(self, extended: bool = False) -> None:
         """
@@ -440,7 +440,7 @@ class StreamingQuery:
         ...
         >>> sq.stop()
         """
-        self._df.explain(extended)
+        self._stream_writer._df.explain(extended) # noqa
 
     def exception(self) -> Optional[StreamingQueryException]:
         """
@@ -455,7 +455,7 @@ class StreamingQuery:
             the StreamingQueryException if the query was terminated by an exception, or None.
         """
         try:
-            ex = self._future.exception(0.1)
+            ex = self._stream_writer._future.exception(0.1) # noqa
         except TimeoutError as _:
             return None
         except Exception as e:

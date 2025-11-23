@@ -1633,7 +1633,7 @@ class DataFrameWriter(OptionUtils):
         if format is not None:
             self.format(format)
         # Create dir with target file name
-        p = Path(path)
+        p = Path(path or self._options.get("path"))
         if self._format != "delta":
             path = p / f"part-00000-{uuid.uuid4()}-c000{p.suffix}"
         else:
