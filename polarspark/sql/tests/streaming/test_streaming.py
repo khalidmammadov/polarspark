@@ -147,7 +147,7 @@ class StreamingTestsMixin:
         except TypeError:
             pass
 
-    #
+
     def test_stream_read_options(self):
         schema = StructType([StructField("data", StringType(), False)])
         df = (
@@ -173,40 +173,41 @@ class StreamingTestsMixin:
             self.assertTrue(df.isStreaming)
             self.assertEqual(df.schema.simpleString(), "struct<data:string>")
 
-    # def test_stream_save_options(self):
-    #     df = (
-    #         self.spark.readStream.format("text")
-    #         .load("polarspark/test_support/sql/streaming")
-    #         .withColumn("id", lit(1))
-    #     )
-    #     for q in self.spark.streams.active:
-    #         q.stop()
-    #     tmpPath = tempfile.mkdtemp()
-    #     shutil.rmtree(tmpPath)
-    #     self.assertTrue(df.isStreaming)
-    #     out = os.path.join(tmpPath, "out")
-    #     chk = os.path.join(tmpPath, "chk")
-    #     q = (
-    #         df.writeStream.option("checkpointLocation", chk)
-    #         .queryName("this_query")
-    #         .format("parquet")
-    #         .partitionBy("id")
-    #         .outputMode("append")
-    #         .option("path", out)
-    #         .start()
-    #     )
-    #     try:
-    #         self.assertEqual(q.name, "this_query")
-    #         self.assertTrue(q.isActive)
-    #         q.processAllAvailable()
-    #         output_files = []
-    #         for _, _, files in os.walk(out):
-    #             output_files.extend([f for f in files if not f.startswith(".")])
-    #         self.assertTrue(len(output_files) > 0)
-    #         self.assertTrue(len(os.listdir(chk)) > 0)
-    #     finally:
-    #         q.stop()
-    #         shutil.rmtree(tmpPath)
+    def test_stream_save_options(self):
+        df = (
+            self.spark.readStream.format("text")
+            .load("polarspark/test_support/sql/streaming")
+            .withColumn("id", lit(1))
+        )
+        for q in self.spark.streams.active:
+            q.stop()
+        tmpPath = tempfile.mkdtemp()
+        shutil.rmtree(tmpPath)
+        self.assertTrue(df.isStreaming)
+        out = os.path.join(tmpPath, "out")
+        chk = os.path.join(tmpPath, "chk")
+        q = (
+            df.writeStream.option("checkpointLocation", chk)
+            .queryName("this_query")
+            .format("parquet")
+            .partitionBy("id")
+            .outputMode("append")
+            .option("path", out)
+            .start()
+        )
+        try:
+            self.assertEqual(q.name, "this_query")
+            self.assertTrue(q.isActive)
+            q.processAllAvailable()
+            output_files = []
+            for _, _, files in os.walk(out):
+                output_files.extend([f for f in files if not f.startswith(".")])
+            self.assertTrue(len(output_files) > 0)
+            # TODO: Re-enable when checkpointing added
+            # self.assertTrue(len(os.listdir(chk)) > 0)
+        finally:
+            q.stop()
+            shutil.rmtree(tmpPath)
     #
     # def test_stream_save_options_overwrite(self):
     #     df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")

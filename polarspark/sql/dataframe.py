@@ -6565,7 +6565,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
     def _to_df(self, transformer: Callable[[LazyFrame], LazyFrame], alias=None) -> "DataFrame":
         return DataFrame(
-            self, transformer, self.sparkSession, rdds=self.rdds, alias=alias or self._alias
+            self, transformer, self.sparkSession, rdds=self.rdds, alias=alias or self._alias, is_streaming=self._is_streaming
         )
 
     def _gather(self) -> Generator[pl.LazyFrame, None, None]:
