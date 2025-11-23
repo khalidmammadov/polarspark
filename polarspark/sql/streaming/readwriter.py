@@ -306,16 +306,18 @@ class DataStreamReader(OptionUtils):
                     message_parameters={"arg_name": "path", "arg_value": str(_path)},
                 )
 
-            def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
-                yield (self._spark # noqa
-                       .read
-                       .options(**self._options)
-                       .format(self._format)
-                       .schema(self._schema)
-                       .load(_path)
-                       ._gather_first()
+            df_reader = (self._spark # noqa
+                          .read
+                          .options(**self._options)
+                          .format(self._format)
                 )
-            return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
+            if self._schema:
+                df_reader = df_reader.schema(self._schema)
+
+            df = df_reader.load(_path)
+
+            setattr(df, "_is_streaming", True)
+            return df
 
         elif self._format == "rate":
             def ldf_generator() -> Generator[pl.LazyFrame, None, None]:

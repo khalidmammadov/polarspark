@@ -339,10 +339,10 @@ class DataFrameReader(OptionUtils):
 
         reader = get_reader(self._format)
 
-        _path = self._options.pop("path", path)
-        return reader(_path)
+        _path = self._options.pop("path", None) # Remove from options to avoid passing it down
+        return reader(path or _path)
 
-    def _read_ldf(self, path, reader):
+    def _read_ldf(self, path, reader) -> "DataFrame":
         from polarspark.sql.dataframe import DataFrame
         ldf = reader(path, **self._options)
         sample = ldf.first().collect()

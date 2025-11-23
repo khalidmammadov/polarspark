@@ -157,21 +157,21 @@ class StreamingTestsMixin:
         )
         self.assertTrue(df.isStreaming)
         self.assertEqual(df.schema.simpleString(), "struct<data:string>")
-    #
-    # def test_stream_read_options_overwrite(self):
-    #     bad_schema = StructType([StructField("test", IntegerType(), False)])
-    #     schema = StructType([StructField("data", StringType(), False)])
-    #     # SPARK-32516 disables the overwrite behavior by default.
-    #     with self.sql_conf({"spark.sql.legacy.pathOptionBehavior.enabled": True}):
-    #         df = (
-    #             self.spark.readStream.format("csv")
-    #             .option("path", "polarspark/test_support/sql/fake")
-    #             .schema(bad_schema)
-    #             .load(path="polarspark/test_support/sql/streaming", schema=schema, format="text")
-    #         )
-    #         self.assertTrue(df.isStreaming)
-    #         self.assertEqual(df.schema.simpleString(), "struct<data:string>")
-    #
+
+    def test_stream_read_options_overwrite(self):
+        bad_schema = StructType([StructField("test", IntegerType(), False)])
+        schema = StructType([StructField("data", StringType(), False)])
+        # SPARK-32516 disables the overwrite behavior by default.
+        with self.sql_conf({"spark.sql.legacy.pathOptionBehavior.enabled": True}):
+            df = (
+                self.spark.readStream.format("csv")
+                .option("path", "polarspark/test_support/sql/fake")
+                .schema(bad_schema)
+                .load(path="polarspark/test_support/sql/streaming", schema=schema, format="text")
+            )
+            self.assertTrue(df.isStreaming)
+            self.assertEqual(df.schema.simpleString(), "struct<data:string>")
+
     # def test_stream_save_options(self):
     #     df = (
     #         self.spark.readStream.format("text")
