@@ -98,80 +98,80 @@ class StreamingTestsMixin:
             )
         finally:
             query.stop()
+
+    def test_streaming_query_name_edge_case(self):
+        # Query name should be None when not specified
+        q1 = self.spark.readStream.format("rate").load().writeStream.format("noop").start()
+        self.assertEqual(q1.name, None)
+
+        # Cannot set query name to be an empty string
+        error_thrown = False
+        try:
+            (
+                self.spark.readStream.format("rate")
+                .load()
+                .writeStream.format("noop")
+                .queryName("")
+                .start()
+            )
+        except PySparkValueError:
+            error_thrown = True
+
+        self.assertTrue(error_thrown)
+
+    def test_stream_trigger(self):
+        df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
+
+        # Should take at least one arg
+        try:
+            df.writeStream.trigger()
+        except ValueError:
+            pass
+
+        # Should not take multiple args
+        try:
+            df.writeStream.trigger(once=True, processingTime="5 seconds")
+        except ValueError:
+            pass
+
+        # Should not take multiple args
+        try:
+            df.writeStream.trigger(processingTime="5 seconds", continuous="1 second")
+        except ValueError:
+            pass
+
+        # Should take only keyword args
+        try:
+            df.writeStream.trigger("5 seconds")
+            self.fail("Should have thrown an exception")
+        except TypeError:
+            pass
     #
-    # def test_streaming_query_name_edge_case(self):
-    #     # Query name should be None when not specified
-    #     q1 = self.spark.readStream.format("rate").load().writeStream.format("noop").start()
-    #     self.assertEqual(q1.name, None)
-    #
-    #     # Cannot set query name to be an empty string
-    #     error_thrown = False
-    #     try:
-    #         (
-    #             self.spark.readStream.format("rate")
-    #             .load()
-    #             .writeStream.format("noop")
-    #             .queryName("")
-    #             .start()
-    #         )
-    #     except PySparkValueError:
-    #         error_thrown = True
-    #
-    #     self.assertTrue(error_thrown)
-    #
-    # def test_stream_trigger(self):
-    #     df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
-    #
-    #     # Should take at least one arg
-    #     try:
-    #         df.writeStream.trigger()
-    #     except ValueError:
-    #         pass
-    #
-    #     # Should not take multiple args
-    #     try:
-    #         df.writeStream.trigger(once=True, processingTime="5 seconds")
-    #     except ValueError:
-    #         pass
-    #
-    #     # Should not take multiple args
-    #     try:
-    #         df.writeStream.trigger(processingTime="5 seconds", continuous="1 second")
-    #     except ValueError:
-    #         pass
-    #
-    #     # Should take only keyword args
-    #     try:
-    #         df.writeStream.trigger("5 seconds")
-    #         self.fail("Should have thrown an exception")
-    #     except TypeError:
-    #         pass
-    #
-    # def test_stream_read_options(self):
-    #     schema = StructType([StructField("data", StringType(), False)])
-    #     df = (
-    #         self.spark.readStream.format("text")
-    #         .option("path", "polarspark/test_support/sql/streaming")
-    #         .schema(schema)
-    #         .load()
-    #     )
-    #     self.assertTrue(df.isStreaming)
-    #     self.assertEqual(df.schema.simpleString(), "struct<data:string>")
-    #
-    # def test_stream_read_options_overwrite(self):
-    #     bad_schema = StructType([StructField("test", IntegerType(), False)])
-    #     schema = StructType([StructField("data", StringType(), False)])
-    #     # SPARK-32516 disables the overwrite behavior by default.
-    #     with self.sql_conf({"spark.sql.legacy.pathOptionBehavior.enabled": True}):
-    #         df = (
-    #             self.spark.readStream.format("csv")
-    #             .option("path", "polarspark/test_support/sql/fake")
-    #             .schema(bad_schema)
-    #             .load(path="polarspark/test_support/sql/streaming", schema=schema, format="text")
-    #         )
-    #         self.assertTrue(df.isStreaming)
-    #         self.assertEqual(df.schema.simpleString(), "struct<data:string>")
-    #
+    def test_stream_read_options(self):
+        schema = StructType([StructField("data", StringType(), False)])
+        df = (
+            self.spark.readStream.format("text")
+            .option("path", "polarspark/test_support/sql/streaming")
+            .schema(schema)
+            .load()
+        )
+        self.assertTrue(df.isStreaming)
+        self.assertEqual(df.schema.simpleString(), "struct<data:string>")
+
+    def test_stream_read_options_overwrite(self):
+        bad_schema = StructType([StructField("test", IntegerType(), False)])
+        schema = StructType([StructField("data", StringType(), False)])
+        # SPARK-32516 disables the overwrite behavior by default.
+        with self.sql_conf({"spark.sql.legacy.pathOptionBehavior.enabled": True}):
+            df = (
+                self.spark.readStream.format("csv")
+                .option("path", "polarspark/test_support/sql/fake")
+                .schema(bad_schema)
+                .load(path="polarspark/test_support/sql/streaming", schema=schema, format="text")
+            )
+            self.assertTrue(df.isStreaming)
+            self.assertEqual(df.schema.simpleString(), "struct<data:string>")
+
     # def test_stream_save_options(self):
     #     df = (
     #         self.spark.readStream.format("text")

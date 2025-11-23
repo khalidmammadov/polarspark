@@ -26,7 +26,7 @@ from polarspark import RDD, since
 #from polarspark.sql.column import _to_seq, _to_java_column, Column
 from polarspark.sql.column import Column
 from polarspark.sql.pandas.conversion import schema_from_polars
-from polarspark.sql.types import StructType
+from polarspark.sql.types import StructType, _parse_datatype_string
 from polarspark.sql import utils
 from polarspark.sql.utils import to_str
 from polarspark.errors import PySparkTypeError, PySparkValueError, PySparkRuntimeError
@@ -74,15 +74,10 @@ class DataFrameReader(OptionUtils):
     """
 
     def __init__(self, spark: "SparkSession"):
-        # self._jreader = spark._jsparkSession.read()
         self._options = {}
         self._format = None
         self._spark = spark
-
-    # def _df(self, jdf: JavaObject) -> "DataFrame":
-    #     from polarspark.sql.dataframe import DataFrame
-    #
-    #     return DataFrame(jdf, self._spark)
+        self._schema: Optional[StructType] = None
 
     def format(self, source: str) -> "DataFrameReader":
         """Specifies the input data source format.
@@ -155,14 +150,11 @@ class DataFrameReader(OptionUtils):
          |-- col0: integer (nullable = true)
          |-- col1: double (nullable = true)
         """
-        from polarspark.sql import SparkSession
 
-        spark = SparkSession._getActiveSessionOrCreate()
         if isinstance(schema, StructType):
-            jschema = spark._jsparkSession.parseDataType(schema.json())
-            self._jreader = self._jreader.schema(jschema)
+            self._schema = schema
         elif isinstance(schema, str):
-            self._jreader = self._jreader.schema(schema)
+            self._schema = _parse_datatype_string(schema)
         else:
             raise PySparkTypeError(
                 error_class="NOT_STR_OR_STRUCT",
@@ -211,7 +203,7 @@ class DataFrameReader(OptionUtils):
         |100|NULL|
         +---+----+
         """
-        self._jreader = self._jreader.option(key, to_str(value))
+        self._options[key] = to_str(value)
         return self
 
     def options(self, **options: "OptionalPrimitiveType") -> "DataFrameReader":
@@ -258,7 +250,7 @@ class DataFrameReader(OptionUtils):
         |100|NULL|
         +---+----+
         """
-        self._options = options
+        self._options.update(options)
         return self
 
     def load(
@@ -318,27 +310,39 @@ class DataFrameReader(OptionUtils):
             self.schema(schema)
         self.options(**options)
 
-        readers = {
-            "text": partial(
-                self._read_ldf,
-                reader=partial(
-                    pl.scan_csv,
-                    infer_schema=False,
-                    has_header=False,
-                    schema={"value": pl.String}
+        def get_reader(source: str):
+            if source == "text":
+                _col = self._schema.names[0] if self._schema else "value"
+                return partial(
+                    self._read_ldf,
+                    reader=partial(
+                        pl.scan_csv,
+                        infer_schema=False,
+                        has_header=False,
+                        schema={_col: pl.String}
+                    )
                 )
-            ),
-            "csv": partial(self._read_ldf, reader=pl.scan_csv),
-            "json": partial(self._read_paths_with_concat, reader=pl.read_json),
-            "parquet": partial(self._read_ldf, reader=pl.scan_parquet),
-            "delta": partial(self._read_ldf, reader=pl.scan_delta),
-            "avro": partial(self._read_paths_with_concat, reader=pl.read_avro),
-            "excel": partial(self._read_paths_with_concat, reader=pl.read_excel),
-        }
-        reader = readers[self._format]
-        return reader(path)
+            elif source == "csv":
+                return partial(self._read_ldf, reader=pl.scan_csv)
+            elif source == "json":
+                return partial(self._read_paths_with_concat, reader=pl.read_json)
+            elif source == "parquet":
+                return partial(self._read_ldf, reader=pl.scan_parquet)
+            elif source == "delta":
+                return partial(self._read_ldf, reader=pl.scan_delta)
+            elif source == "avro":
+                return partial(self._read_paths_with_concat, reader=pl.read_avro)
+            elif source == "excel":
+                return partial(self._read_paths_with_concat, reader=pl.read_excel)
+            else:
+                raise NotImplementedError(f"Source type {source} not supported")
 
-    def _read_ldf(self, path, reader):
+        reader = get_reader(self._format)
+
+        _path = self._options.pop("path", None) # Remove from options to avoid passing it down
+        return reader(path or _path)
+
+    def _read_ldf(self, path, reader) -> "DataFrame":
         from polarspark.sql.dataframe import DataFrame
         ldf = reader(path, **self._options)
         sample = ldf.first().collect()
