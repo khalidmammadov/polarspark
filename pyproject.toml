@@ -28,6 +28,11 @@ build-backend = "setuptools.build_meta"
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+    "flake8==3.9.0",
+    "mypy==0.982",
+#    "pytest-mypy-plugins==1.9.3",
+#    "numpydoc",
+    "black==23.12.1"
 ]
 
 [[tool.uv.index]]
@@ -39,3 +44,13 @@ explicit = true
 [project.urls]
 Homepage = "https://github.com/khalidmammadov/polarspark"
 Issues = "https://github.com/khalidmammadov/polarspark/issues"
+
+
+[tool.black]
+# When changing the version, we have to update
+# GitHub workflow version and dev/reformat-python
+required-version = "23.12.1"
+line-length = 100
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = 'cloudpickle|error_classes.py'

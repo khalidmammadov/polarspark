@@ -303,7 +303,9 @@ class DataFrameTestsMixin:
             .fillna(50, subset=["name", "age"])
             .first()
         )
-        self.spark.createDataFrame([(None, None, None, None)], schema).fillna(50, subset=["name", "age"]).show()
+        self.spark.createDataFrame([(None, None, None, None)], schema).fillna(
+            50, subset=["name", "age"]
+        ).show()
         self.assertEqual(row.name, None)
         self.assertEqual(row.age, 50)
         self.assertEqual(row.height, None)
@@ -1345,7 +1347,9 @@ class DataFrameTestsMixin:
         data = [(1, "foo", 16777220), (None, "bar", None)]
         df = self.spark.createDataFrame(data, schema)
         types = df.toPandas().dtypes
-        self.assertEqual(types.iloc[0], _at(pa.int32()))  # doesn't convert to np.int32 due to NaN value.
+        self.assertEqual(
+            types.iloc[0], _at(pa.int32())
+        )  # doesn't convert to np.int32 due to NaN value.
         self.assertEqual(types.iloc[1], _at(pa.large_string()))
         self.assertEqual(types.iloc[2], _at(pa.int32()))
 
@@ -1403,8 +1407,8 @@ class DataFrameTestsMixin:
             CAST(NULL AS STRING) AS string,
             CAST(NULL AS TIMESTAMP) AS timestamp,
             """
-#            CAST(NULL AS TIMESTAMP_NTZ) AS timestamp_ntz,
-#            INTERVAL '1563:04' MINUTE TO SECOND AS day_time_interval
+        #            CAST(NULL AS TIMESTAMP_NTZ) AS timestamp_ntz,
+        #            INTERVAL '1563:04' MINUTE TO SECOND AS day_time_interval
         pdf = self.spark.sql(sql).toPandas()
         types = pdf.dtypes
         self.assertEqual(types.iloc[0], _at(pa.int8()))

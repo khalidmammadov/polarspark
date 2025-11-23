@@ -33,10 +33,8 @@ if TYPE_CHECKING:
 
 __all__ = ["GroupedData"]
 
-aliases = {
-    "avg": "mean",
-    "count": "len"
-}
+aliases = {"avg": "mean", "count": "len"}
+
 
 def dfapi(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
     def _api(self: "GroupedData") -> DataFrame:
@@ -44,7 +42,7 @@ def dfapi(f: Callable[..., DataFrame]) -> Callable[..., DataFrame]:
         name = alias or f.__name__
         pdf = getattr(self._pgd, name)()
         if alias:
-            pdf = pdf.rename({alias:f.__name__})
+            pdf = pdf.rename({alias: f.__name__})
         return DataFrame(pdf, self.session)
 
     _api.__name__ = f.__name__
@@ -83,11 +81,9 @@ class GroupedData(PandasGroupedOpsMixin):
         Supports Spark Connect.
     """
 
-    def __init__(self,
-                 pgd: LazyGroupBy,
-                 df: DataFrame,
-                 pivot_col: str=None,
-                 pivot_values: List[str] = None ):#, by: list[pl.Expr] = None):
+    def __init__(
+        self, pgd: LazyGroupBy, df: DataFrame, pivot_col: str = None, pivot_values: List[str] = None
+    ):  # , by: list[pl.Expr] = None):
         self._pgd = pgd
         self._df = df
         self._pivot_col = pivot_col
@@ -542,12 +538,10 @@ class GroupedData(PandasGroupedOpsMixin):
         |2012|20000| 15000|
         |2013|30000| 48000|
         +----+-----+------+
-        # """
+        #"""
         if values is None:
-            values = [r[0]
-                      for r in
-                      self._df.select(col(pivot_col)).distinct().collect()]
-        return GroupedData(self._pgd, self._df, pivot_col = pivot_col, pivot_values = values)
+            values = [r[0] for r in self._df.select(col(pivot_col)).distinct().collect()]
+        return GroupedData(self._pgd, self._df, pivot_col=pivot_col, pivot_values=values)
 
 
 def _test() -> None:

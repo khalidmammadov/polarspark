@@ -86,6 +86,7 @@ class Catalog:
     .. versionchanged:: 3.4.0
         Supports Spark Connect.
     """
+
     _default_catalog = "spark_catalog"
     _default_database = "default"
     _current_catalog = _default_catalog
@@ -93,7 +94,6 @@ class Catalog:
     _all_catalogs = [_default_catalog]
     _all_databases = {_default_database: _default_catalog}
     _cached_tables = {}
-
 
     def __init__(self, sparkSession: SparkSession) -> None:
         """Create a new Catalog that wraps the underlying JVM object."""
@@ -162,9 +162,7 @@ class Catalog:
             it = [s for s in self._all_catalogs if re.match(self._regex_pattern, s)]
         catalogs = []
         for i in it:
-            catalogs.append(
-                CatalogMetadata(name=i, description="")
-            )
+            catalogs.append(CatalogMetadata(name=i, description=""))
         return catalogs
 
     def currentDatabase(self) -> str:
@@ -229,7 +227,11 @@ class Catalog:
         if pattern is None:
             it = self._all_catalogs
         else:
-            it = {db: cat for db, cat in self._all_databases.items() if re.match(self._regex_pattern, db)}
+            it = {
+                db: cat
+                for db, cat in self._all_databases.items()
+                if re.match(self._regex_pattern, db)
+            }
         databases = []
         for db, cat in it:
             databases.append(
@@ -365,7 +367,9 @@ class Catalog:
             # Get for the current/only database for now
             it = self._sparkSession._pl_ctx.tables()
         else:
-            it = [s for s in self._sparkSession._pl_ctx.tables() if re.match(self._regex_pattern, s)]
+            it = [
+                s for s in self._sparkSession._pl_ctx.tables() if re.match(self._regex_pattern, s)
+            ]
         tables = []
         for t in it:
             namespace = [self._current_database]
@@ -598,8 +602,10 @@ class Catalog:
                 "a future version. Use listColumns(`dbName.tableName`) instead.",
                 FutureWarning,
             )
+
         def df_generator():
-            yield self._sparkSession._pl_ctx.execute(f"select * from {tableName}") # noqa
+            yield self._sparkSession._pl_ctx.execute(f"select * from {tableName}")  # noqa
+
         df = DataFrame(None, df_generator, self._sparkSession, alias=tableName)
 
         columns = []
@@ -795,7 +801,7 @@ class Catalog:
 
         # Read existing
         df = self._sparkSession.read.format(source).schema(schema).options(**options).load(path)
-        self._sparkSession._pl_ctx.register(tableName, df._gather_first()) # noqa
+        self._sparkSession._pl_ctx.register(tableName, df._gather_first())  # noqa
         return df
 
     def dropTempView(self, viewName: str) -> bool:
@@ -991,7 +997,7 @@ class Catalog:
         ldf = self._sparkSession._pl_ctx.execute(f"select * from {tableName}")
 
         self._sparkSession._pl_ctx.register(tableName, ldf.collect())
-        self._cached_tables[tableName]  = ldf
+        self._cached_tables[tableName] = ldf
 
     def uncacheTable(self, tableName: str) -> None:
         """Removes the specified table from the in-memory cache.
@@ -1037,7 +1043,6 @@ class Catalog:
         self._sparkSession._pl_ctx.register(tableName, self._cached_tables[tableName])
         # Delete cached link
         self._cached_tables.pop(tableName)
-
 
     def clearCache(self) -> None:
         """Removes all cached tables from the in-memory cache.

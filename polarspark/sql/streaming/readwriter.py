@@ -41,6 +41,7 @@ from polarspark.errors import (
 
 if TYPE_CHECKING:
     from polarspark.sql.session import SparkSession
+
     # from polarspark.sql._typing import SupportsProcess, OptionalPrimitiveType
     from polarspark.sql.dataframe import DataFrame
 
@@ -306,11 +307,7 @@ class DataStreamReader(OptionUtils):
                     message_parameters={"arg_name": "path", "arg_value": str(_path)},
                 )
 
-            df_reader = (self._spark # noqa
-                          .read
-                          .options(**self._options)
-                          .format(self._format)
-                )
+            df_reader = self._spark.read.options(**self._options).format(self._format)  # noqa
             if self._schema:
                 df_reader = df_reader.schema(self._schema)
 
@@ -320,9 +317,11 @@ class DataStreamReader(OptionUtils):
             return df
 
         elif self._format == "rate":
+
             def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
                 for i in itertools.count():
                     yield pl.LazyFrame({"value", i})
+
             return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
         else:
             raise NotImplementedError()
@@ -895,9 +894,9 @@ class DataStreamReader(OptionUtils):
 
 @dataclass(frozen=True)
 class Trigger:
-    processingTime: Optional[str] = None,
-    once: Optional[bool] = None,
-    availableNow: Optional[bool] = None,
+    processingTime: Optional[str] = (None,)
+    once: Optional[bool] = (None,)
+    availableNow: Optional[bool] = (None,)
 
 
 class DataStreamWriter:
@@ -947,7 +946,7 @@ class DataStreamWriter:
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future = None
 
-        self._active = False # Thread safe due to GIL
+        self._active = False  # Thread safe due to GIL
 
     def outputMode(self, outputMode: str) -> "DataStreamWriter":
         """Specifies how data of a streaming DataFrame/Dataset is written to a streaming sink.
@@ -1316,7 +1315,6 @@ class DataStreamWriter:
         )
         return self
 
-
     @staticmethod
     def _construct_foreach_function(
         f: Union[Callable[[Row], None], "SupportsProcess"]
@@ -1559,42 +1557,36 @@ class DataStreamWriter:
 
     def _get_state(self, row_num: int):
         return {
-              "operatorName": "stateOperator1",
-              "numRowsTotal": row_num,
-              "numRowsUpdated": 0,
-              "numRowsRemoved": 0,
-              "allUpdatesTimeMs": 0,
-              "allRemovalsTimeMs": 0,
-              "commitTimeMs": 0,
-              "memoryUsedBytes": 0,
-              "numRowsDroppedByWatermark": 0,
-              "numShufflePartitions": 0,
-              "numStateStoreInstances": 0,
-              "customMetrics": {
-                "numExpiredStateRows": 0,
-                "numTotalStateRows": 0
-              }
-            }
+            "operatorName": "stateOperator1",
+            "numRowsTotal": row_num,
+            "numRowsUpdated": 0,
+            "numRowsRemoved": 0,
+            "allUpdatesTimeMs": 0,
+            "allRemovalsTimeMs": 0,
+            "commitTimeMs": 0,
+            "memoryUsedBytes": 0,
+            "numRowsDroppedByWatermark": 0,
+            "numShufflePartitions": 0,
+            "numStateStoreInstances": 0,
+            "customMetrics": {"numExpiredStateRows": 0, "numTotalStateRows": 0},
+        }
 
     def _get_source(self):
         return {
-                "description": "",
-                "startOffset": 0,
-                "endOffset": 0,
-                "latestOffset": 0,
-                "numInputRows": 1,
-                "inputRowsPerSecond": 0,
-                "processedRowsPerSecond": 0,
-                "metrics": {
-                    "avgBatchLatency": 0,
-                    "maxOffsetLag": 0
-                }
-            }
+            "description": "",
+            "startOffset": 0,
+            "endOffset": 0,
+            "latestOffset": 0,
+            "numInputRows": 1,
+            "inputRowsPerSecond": 0,
+            "processedRowsPerSecond": 0,
+            "metrics": {"avgBatchLatency": 0, "maxOffsetLag": 0},
+        }
 
     def _get_sink(self, row_num: int):
         return {
-                "description": "",
-                "numOutputRows": row_num,
+            "description": "",
+            "numOutputRows": row_num,
         }
 
     def start(
@@ -1684,38 +1676,37 @@ class DataStreamWriter:
         self._active = True
         run_id = str(uuid.uuid4())
         progress = []
+
         def starter():
             if self._foreach_func:
                 self._foreach_func(self._df, 0)
             else:
                 if self._format in ["memory", "noop"]:
-                    for i, ldf in enumerate(self._df._gather()): # noqa
+                    for i, ldf in enumerate(self._df._gather()):  # noqa
                         t = time.process_time()
                         rows = ldf.collect()
                         print(rows)
                         duration = time.process_time() - t
-                        progress.append({"name": self._query_name,
-                                         "id": self._query_id,
-                                         "timestamp": str(datetime.now()),
-                                         "batchId": i,
-                                         "batchDuration": duration,
-                                         "runId": run_id,
-                                         "stateOperators": [self._get_state(len(rows))],
-                                         "sources": [self._get_source()],
-                                         "sink": self._get_sink(len(rows))
-                                         }
-                                        )
+                        progress.append(
+                            {
+                                "name": self._query_name,
+                                "id": self._query_id,
+                                "timestamp": str(datetime.now()),
+                                "batchId": i,
+                                "batchDuration": duration,
+                                "runId": run_id,
+                                "stateOperators": [self._get_state(len(rows))],
+                                "sources": [self._get_source()],
+                                "sink": self._get_sink(len(rows)),
+                            }
+                        )
                 else:
                     self._df.write.format(self._format).save(path)
             self._active = False
 
         self._future = self._executor.submit(starter)
-        query = StreamingQuery(self._query_id,
-                               self._query_name,
-                               self._future,
-                               self._df,
-                               progress)
-        self._spark.streams._add(query) # noqa
+        query = StreamingQuery(self._query_id, self._query_name, self._future, self._df, progress)
+        self._spark.streams._add(query)  # noqa
         return query
 
     def toTable(

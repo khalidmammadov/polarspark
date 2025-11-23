@@ -61,15 +61,14 @@ def _func_op(name: str, doc: str = "") -> Callable[["Column"], "Column"]:
 
 
 def _bin_op(
-    name: str,
-    doc: str = "binary operator",
-    alias: str = None
+    name: str, doc: str = "binary operator", alias: str = None
 ) -> Callable[
     ["Column", Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"]], "Column"
 ]:
     """Create a method for given binary operator"""
 
     alias = alias or name
+
     def _(
         self: "Column",
         other: Union["Column", "LiteralType", "DecimalLiteral", "DateTimeLiteral"],
@@ -81,7 +80,9 @@ def _bin_op(
             oc = other
             ostr = str(other)
         new_expr = getattr(self._expr, name)(oc)
-        return Column(new_expr, col_expr=[self, name, other]).alias(f"({self._name} {alias} {ostr})")
+        return Column(new_expr, col_expr=[self, name, other]).alias(
+            f"({self._name} {alias} {ostr})"
+        )
 
     _.__doc__ = doc
     return _
@@ -126,7 +127,7 @@ def _like_to_regex(like_expression, case_insensitive=False):
     # Escape all regex metacharacters except for '%' and '_'
     escaped = re.escape(like_expression)
     # Replace escaped '%' with regex '.*' and escaped '_' with regex '.'
-    regex_pattern = escaped.replace(r'%', '.*').replace(r'_', '.')
+    regex_pattern = escaped.replace(r"%", ".*").replace(r"_", ".")
 
     if case_insensitive:
         regex_pattern = _expand_case_insensitivity(regex_pattern)
@@ -141,7 +142,7 @@ def _expand_case_insensitivity(pattern):
         return f"[{char.lower()}{char.upper()}]"
 
     # Use re.sub to find all alphabetic characters and replace them
-    return re.sub(r'[a-zA-Z]', replace_case_insensitive, pattern)
+    return re.sub(r"[a-zA-Z]", replace_case_insensitive, pattern)
 
 
 class Column:
@@ -175,8 +176,13 @@ class Column:
     Column<...>
     """
 
-    def __init__(self, expr: pl.Expr, name: str = None,
-                 col_expr: Optional[List[Union[str, "Column"]]] = None, desc: bool = False) -> None:
+    def __init__(
+        self,
+        expr: pl.Expr,
+        name: str = None,
+        col_expr: Optional[List[Union[str, "Column"]]] = None,
+        desc: bool = False,
+    ) -> None:
         self._desc = desc
         self._expr: pl.Expr = expr
         self._name = name
@@ -894,9 +900,9 @@ class Column:
                 },
             )
         if isinstance(startPos, int):
-            pc = self._expr.str.slice(startPos-1, length)
+            pc = self._expr.str.slice(startPos - 1, length)
         elif isinstance(startPos, Column):
-            pc = self._expr.str.slice(startPos._expr-1, cast("Column", length)._expr)
+            pc = self._expr.str.slice(startPos._expr - 1, cast("Column", length)._expr)
         else:
             raise PySparkTypeError(
                 error_class="NOT_COLUMN_OR_INT",

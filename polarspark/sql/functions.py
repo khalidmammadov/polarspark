@@ -43,7 +43,7 @@ import polars as pl
 
 from polarspark import SparkContext
 from polarspark.errors import PySparkTypeError, PySparkValueError
-from polarspark.sql.column import Column#, _to_java_column, _to_seq, _create_column_from_literal
+from polarspark.sql.column import Column  # , _to_java_column, _to_seq, _create_column_from_literal
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql.types import ArrayType, DataType, StringType, StructType, _from_numpy_type
 
@@ -104,13 +104,8 @@ def _invoke_function_over_column(name: str, col: Column) -> Column:
     Invokes Polar function identified by name with args
     and wraps the result with :class:`~polarspark.sql.Column`.
     """
-    name_map = {
-        "count": "len",
-        "avg": "mean"
-    }
-    alias = {
-        "__invert__": f"~{str(col._name)}"
-    }
+    name_map = {"count": "len", "avg": "mean"}
+    alias = {"__invert__": f"~{str(col._name)}"}
     alias_str = alias.get(name) or f"{name}({str(col._expr)})"
     func = getattr(col._expr, name_map.get(name) or name)
     return Column(func().alias(alias_str))

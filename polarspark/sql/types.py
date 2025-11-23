@@ -179,14 +179,12 @@ class DataType:
         StructType([StructField('b', StringType(), True), StructField('a', IntegerType(), True)])
         """
 
-        return  _parse_datatype_string(ddl)
+        return _parse_datatype_string(ddl)
 
     @staticmethod
-    def build_formatted_string(data_type: "DataType",
-                               prefix: str,
-                               string_concat: List[str],
-                               depth: int
-                               ):
+    def build_formatted_string(
+        data_type: "DataType", prefix: str, string_concat: List[str], depth: int
+    ):
         if isinstance(data_type, (ArrayType, StructType, MapType)):
             data_type.buildFormattedString(prefix, string_concat, depth - 1)
 
@@ -658,20 +656,15 @@ class ArrayType(DataType):
             return obj
         return obj and [self.elementType.fromInternal(v) for v in obj]
 
-    def buildFormattedString(self,
-                             prefix: str,
-                             string_concat: List[str],
-                             depth: int
-                             ):
+    def buildFormattedString(self, prefix: str, string_concat: List[str], depth: int):
         if depth > 0:
             string_concat.append(
                 f"{prefix}-- element: {self.elementType.typeName} (containsNull = $containsNull)\n"
             )
-            DataType.build_formatted_string(self.elementType,
-                                            f"{prefix}    |",
-                                            string_concat,
-                                            depth
-                                            )
+            DataType.build_formatted_string(
+                self.elementType, f"{prefix}    |", string_concat, depth
+            )
+
 
 class MapType(DataType):
     """Map data type.
@@ -797,29 +790,16 @@ class MapType(DataType):
             (self.keyType.fromInternal(k), self.valueType.fromInternal(v)) for k, v in obj.items()
         )
 
-    def buildFormattedString(self,
-                             prefix: str,
-                             string_concat: List[str],
-                             depth: int
-                             ):
+    def buildFormattedString(self, prefix: str, string_concat: List[str], depth: int):
         if depth > 0:
-            DataType.build_formatted_string(self.keyType,
-                                            f"{prefix}    |",
-                                            string_concat,
-                                            depth
-                                            )
+            DataType.build_formatted_string(self.keyType, f"{prefix}    |", string_concat, depth)
+            string_concat.append(f"{prefix}-- key: {self.keyType.typeName}\n")
             string_concat.append(
-                f"{prefix}-- key: {self.keyType.typeName}\n"
+                f"{prefix}-- value: {self.valueType.typeName} "
+                + f"(valueContainsNull = {self.valueContainsNull})\n"
             )
-            string_concat.append(
-                f"{prefix}-- value: {self.valueType.typeName} " +
-                f"(valueContainsNull = {self.valueContainsNull})\n"
-            )
-            DataType.build_formatted_string(self.valueType,
-                                            f"{prefix}    |",
-                                            string_concat,
-                                            depth
-                                            )
+            DataType.build_formatted_string(self.valueType, f"{prefix}    |", string_concat, depth)
+
 
 class StructField(DataType):
     """A field in :class:`StructType`.
@@ -879,16 +859,16 @@ class StructField(DataType):
 
     def build_formatted_string(self, prefix: str, string_concat: List[str], depth: int):
         if depth > 0:
-            ty_str = self.dataType.typeName() \
-                if isinstance(self.dataType, IntegralType) or isinstance(self.dataType, StructType)\
+            ty_str = (
+                self.dataType.typeName()
+                if isinstance(self.dataType, IntegralType) or isinstance(self.dataType, StructType)
                 else self.dataType.simpleString()
-            string_concat.append(f"{prefix}-- {escape_meta_characters(self.name)}: " +
-                f"{ty_str} (nullable = {self.nullable})\n".lower())
-            DataType.build_formatted_string(self.dataType,
-                                            f"{prefix}    |",
-                                            string_concat,
-                                            depth
-                                            )
+            )
+            string_concat.append(
+                f"{prefix}-- {escape_meta_characters(self.name)}: "
+                + f"{ty_str} (nullable = {self.nullable})\n".lower()
+            )
+            DataType.build_formatted_string(self.dataType, f"{prefix}    |", string_concat, depth)
 
     @classmethod
     def fromJson(cls, json: Dict[str, Any]) -> "StructField":
@@ -1160,11 +1140,7 @@ class StructType(DataType):
             f.build_formatted_string(prefix, string_concat, depth)
         return "".join(string_concat)
 
-    def buildFormattedString(self,
-                             prefix: str,
-                             string_concat: List[str],
-                             depth: int
-                             ):
+    def buildFormattedString(self, prefix: str, string_concat: List[str], depth: int):
         for f in self.fields:
             f.build_formatted_string(prefix, string_concat, depth)
 
@@ -2755,13 +2731,16 @@ class NumpyScalarConverter:
 
 
 def escape_meta_characters(string: str) -> str:
-    return (re.sub(r'\n', r'\\n', string)
-              .replace('\r', r'\\r')
-              .replace('\t', r'\\t')
-              .replace('\f', r'\\f')
-              .replace('\b', r'\\b')
-              .replace('\u000b', r'\\v')
-              .replace('\u0007', r'\\a'))
+    return (
+        re.sub(r"\n", r"\\n", string)
+        .replace("\r", r"\\r")
+        .replace("\t", r"\\t")
+        .replace("\f", r"\\f")
+        .replace("\b", r"\\b")
+        .replace("\u000b", r"\\v")
+        .replace("\u0007", r"\\a")
+    )
+
 
 _TO_PL_TYPE_MAP = {
     "boolean": pl.Boolean,
@@ -2826,29 +2805,29 @@ _TO_SPARK_TYPE_MAP = {
 
 def _split_top_level_commas(s: str) -> list[str]:
     """
-        Split string on commas that are not inside any parentheses.
-        a:int, c:double -> [a:int, c:double]
-        a INT, c DOUBLE -> [a INT, c DOUBLE]
-        a:map<int, long>, c:double -> [a:map<int, long>, c:double]
+    Split string on commas that are not inside any parentheses.
+    a:int, c:double -> [a:int, c:double]
+    a INT, c DOUBLE -> [a INT, c DOUBLE]
+    a:map<int, long>, c:double -> [a:map<int, long>, c:double]
     """
     parts = []
     buf = []
     depth = 0
     for ch in s:
-        if ch in '(<':
+        if ch in "(<":
             depth += 1
             buf.append(ch)
-        elif ch in ')>':
+        elif ch in ")>":
             depth = max(0, depth - 1)
             buf.append(ch)
-        elif ch == ',' and depth == 0:
-            part = ''.join(buf).strip()
+        elif ch == "," and depth == 0:
+            part = "".join(buf).strip()
             if part:
                 parts.append(part)
             buf = []
         else:
             buf.append(ch)
-    last = ''.join(buf).strip()
+    last = "".join(buf).strip()
     if last:
         parts.append(last)
     return parts
@@ -2863,7 +2842,7 @@ def _parse_type(type_str: str) -> tuple[str, list]:
         'array<int>' -> 'array', ['int']
         'struct<a:int, b:map<int, string>>' -> 'struct' -> ['a:int', 'b:map<int, string>']
     """
-    match = re.match(r'^([A-Za-z_]\w*)\s*(?:[<(](.*?)[>)])?$', type_str.strip())
+    match = re.match(r"^([A-Za-z_]\w*)\s*(?:[<(](.*?)[>)])?$", type_str.strip())
     if not match:
         raise ValueError(f"Invalid type string: {type_str!r}")
 
@@ -2885,14 +2864,14 @@ def _parse_type(type_str: str) -> tuple[str, list]:
 
 def _parse_ddl_fields(fields: list[str]) -> list[StructField]:
     """
-        Parse a schema like:
-          ["name: string", "age: int", "money: decimal(10, 10)"]
-        or
-          ["name string", "age int", "money decimal(10, 10)"]
+    Parse a schema like:
+      ["name: string", "age: int", "money: decimal(10, 10)"]
+    or
+      ["name string", "age int", "money decimal(10, 10)"]
     """
     seen = set()
     result = []
-    pattern = re.compile(r'^\s*([A-Za-z_]\w*)\s*[:\s]\s*(.+?)\s*$')
+    pattern = re.compile(r"^\s*([A-Za-z_]\w*)\s*[:\s]\s*(.+?)\s*$")
     for f in fields:
         m = pattern.match(f)
         if not m:
@@ -2914,6 +2893,7 @@ def _data_type_from_ddl(ty: str) -> DataType:
         'array<int>' -> 'array', ['int']
         'struct<a:int, b:map<int, string>>' -> 'struct' -> ['a:int', 'b:map<int, string>']
     """
+
     def to_type(_ty):
         if not isinstance(_ty, str):
             return
@@ -2929,7 +2909,7 @@ def _data_type_from_ddl(ty: str) -> DataType:
         if _dty := _TO_SPARK_TYPE_MAP.get(_ty):
             return _dty(*_args)
 
-    if ty:= to_type(ty):
+    if ty := to_type(ty):
         return ty
 
     raise TypeError(f"Type not supported yet {ty}")

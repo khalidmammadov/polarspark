@@ -46,12 +46,14 @@ from polars.polars import PyDataFrame
 # from build.lib.polarspark.sql.functions import struct
 from polarspark import SparkConf, SparkContext
 from polarspark.rdd import RDD
+
 # from polarspark.sql.column import _to_java_column
 from polarspark.sql.conf import RuntimeConfig
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql.functions import lit
 from polarspark.sql.pandas.conversion import SparkConversionMixin
 from polarspark.sql.readwriter import DataFrameReader
+
 # from polarspark.sql.sql_formatter import SQLStringFormatter
 from polarspark.sql.streaming import DataStreamReader
 from polarspark.sql.types import (
@@ -75,6 +77,7 @@ from polarspark.errors import PySparkValueError, PySparkTypeError, PySparkRuntim
 
 if TYPE_CHECKING:
     from polarspark.sql._typing import AtomicValue, RowLike, OptionalPrimitiveType
+
     # from polarspark.sql.catalog import Catalog
     # from polarspark.sql.pandas._typing import ArrayLike, DataFrameLike as PandasDataFrameLike
     # from polarspark.sql.streaming import StreamingQueryManager
@@ -422,7 +425,7 @@ class SparkSession(SparkConversionMixin):
 
             with self._lock:
                 session = SparkSession._instantiatedSession
-                if session is None: # or session._sc._jsc is None:
+                if session is None:  # or session._sc._jsc is None:
                     sparkConf = SparkConf()
                     for key, value in self._options.items():
                         sparkConf.set(key, value)
@@ -507,9 +510,7 @@ class SparkSession(SparkConversionMixin):
         # If we had an instantiated SparkSession attached with a SparkContext
         # which is stopped now, we need to renew the instantiated SparkSession.
         # Otherwise, we will use invalid SparkSession when we call Builder.getOrCreate.
-        if (
-            SparkSession._instantiatedSession is None
-        ):
+        if SparkSession._instantiatedSession is None:
             SparkSession._instantiatedSession = self
             SparkSession._activeSession = self
 
@@ -844,7 +845,9 @@ class SparkSession(SparkConversionMixin):
         if end is None:
             ldf = pl.LazyFrame(pl.int_range(0, int(start), int(step), eager=True).alias("id"))
         else:
-            ldf = pl.LazyFrame(pl.int_range(int(start), int(end), int(step), eager=True).alias("id"))
+            ldf = pl.LazyFrame(
+                pl.int_range(int(start), int(end), int(step), eager=True).alias("id")
+            )
 
         return self._create_base_dataframe(ldf)
 
@@ -1039,7 +1042,7 @@ class SparkSession(SparkConversionMixin):
         row_count = len(data)
         schema = {f.name: _to_polars_type(f.dataType) for f in struct.fields}
         for tuples in tupled_data:
-            for k, v in zip(cols*row_count, tuples):
+            for k, v in zip(cols * row_count, tuples):
                 arr = pdata.setdefault(k, [])
                 if isinstance(v, array):
                     v = v.tolist()
@@ -1404,7 +1407,9 @@ class SparkSession(SparkConversionMixin):
             def prepare(obj):
                 verify_func(obj)
                 return (obj,)
+
         else:
+
             def prepare(obj: Any) -> Any:
                 return obj
 
@@ -1419,6 +1424,7 @@ class SparkSession(SparkConversionMixin):
     def _create_base_dataframe(self, ldf):
         def df_generator() -> Generator[pl.LazyFrame, None, None]:
             yield ldf
+
         return DataFrame(None, df_generator, self)
 
     def sql(
@@ -1713,6 +1719,7 @@ class SparkSession(SparkConversionMixin):
         >>> sq.stop()
         """
         from polarspark.sql.streaming import StreamingQueryManager
+
         if not self._stream_manager:
             self._stream_manager = StreamingQueryManager()
         return self._stream_manager

@@ -23,7 +23,8 @@ import shutil
 import uuid
 
 from polarspark import RDD, since
-#from polarspark.sql.column import _to_seq, _to_java_column, Column
+
+# from polarspark.sql.column import _to_seq, _to_java_column, Column
 from polarspark.sql.column import Column
 from polarspark.sql.pandas.conversion import schema_from_polars
 from polarspark.sql.types import StructType, _parse_datatype_string
@@ -37,6 +38,7 @@ if TYPE_CHECKING:
     from polarspark.sql._typing import OptionalPrimitiveType, ColumnOrName
     from polarspark.sql.session import SparkSession
     from polarspark.sql.dataframe import DataFrame
+
     # from polarspark.sql.streaming import StreamingQuery
 
 __all__ = ["DataFrameReader", "DataFrameWriter", "DataFrameWriterV2"]
@@ -316,11 +318,8 @@ class DataFrameReader(OptionUtils):
                 return partial(
                     self._read_ldf,
                     reader=partial(
-                        pl.scan_csv,
-                        infer_schema=False,
-                        has_header=False,
-                        schema={_col: pl.String}
-                    )
+                        pl.scan_csv, infer_schema=False, has_header=False, schema={_col: pl.String}
+                    ),
                 )
             elif source == "csv":
                 return partial(self._read_ldf, reader=pl.scan_csv)
@@ -339,21 +338,25 @@ class DataFrameReader(OptionUtils):
 
         reader = get_reader(self._format)
 
-        _path = self._options.pop("path", None) # Remove from options to avoid passing it down
+        _path = self._options.pop("path", None)  # Remove from options to avoid passing it down
         return reader(path or _path)
 
     def _read_ldf(self, path, reader) -> "DataFrame":
         from polarspark.sql.dataframe import DataFrame
+
         ldf = reader(path, **self._options)
         sample = ldf.first().collect()
+
         def df_generator():
             yield ldf
+
         df = DataFrame(None, df_generator, self._spark)
         df._schema = schema_from_polars(sample)
         return df
 
     def _read_paths_with_concat(self, path, reader):
         from polarspark.sql.dataframe import DataFrame
+
         _paths = path
         if isinstance(path, str):
             _paths = [path]
@@ -382,12 +385,13 @@ class DataFrameReader(OptionUtils):
             pdf = reader(p, **self._options)
             pdfs.append(pdf)
         pdf = reduce(lambda a, b: pl.concat([a, b]), pdfs)
+
         def df_generator():
             yield pdf.lazy()
+
         df = DataFrame(None, df_generator, self._spark)
         df._schema = schema_from_polars(pdf)
         return df
-
 
     def json(
         self,
@@ -531,10 +535,12 @@ class DataFrameReader(OptionUtils):
         +---+
         >>> _ = spark.sql("DROP TABLE tblA")
         """
-        ldf = self._spark._pl_ctx.execute(f"select * from {tableName}") # noqa
+        ldf = self._spark._pl_ctx.execute(f"select * from {tableName}")  # noqa
         from polarspark.sql.dataframe import DataFrame
+
         def df_generator():
             yield ldf
+
         return DataFrame(None, df_generator, self._spark)
 
     def parquet(self, *paths: str, **options: "OptionalPrimitiveType") -> "DataFrame":
@@ -1272,7 +1278,7 @@ class DataFrameWriter(OptionUtils):
         +---+------------+
         """
 
-        self._options[key] =to_str(value)
+        self._options[key] = to_str(value)
         return self
 
     def options(self, **options: "OptionalPrimitiveType") -> "DataFrameWriter":
@@ -1637,7 +1643,7 @@ class DataFrameWriter(OptionUtils):
         elif p.exists() and self._mode == "error":
             raise PySparkRuntimeError(
                 error_class="PATH_ALREADY_EXISTS",
-                message_parameters={"path":str(p)},
+                message_parameters={"path": str(p)},
             )
         if not p.exists():
             p.mkdir(parents=True)
@@ -1647,7 +1653,7 @@ class DataFrameWriter(OptionUtils):
             # FIX check what is default path or table?
             # self._jwrite.save()
         else:
-            for ldf in self._df._gather(): # noqa
+            for ldf in self._df._gather():  # noqa
                 writers = {
                     "csv": ldf.sink_csv,
                     "json": ldf.sink_ndjson,
@@ -1781,7 +1787,7 @@ class DataFrameWriter(OptionUtils):
             self.format(format)
 
         # Register immutable (no insert supported yet) virtual table for now
-        self._spark._pl_ctx.register(name, self._df._gather_first()) # noqa
+        self._spark._pl_ctx.register(name, self._df._gather_first())  # noqa
         # TODO: Add mode support for inserts and overwrites
 
     def json(

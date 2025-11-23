@@ -23,6 +23,7 @@ from polarspark._globals import _NoValueType
 from polarspark.errors import IllegalArgumentException
 from polarspark.utils.spark_file_utils import resolve_uri
 
+
 class RuntimeConfig:
     """User-facing configuration API, accessible through `SparkSession.conf`.
 
@@ -34,12 +35,10 @@ class RuntimeConfig:
 
     _defaults = {
         "spark.sql.sources.partitionOverwriteMode": "STATIC",
-        "spark.sql.crossJoin.enabled": True
+        "spark.sql.crossJoin.enabled": True,
     }
 
-    _non_mutable = {
-        "spark.sql.warehouse.dir" : resolve_uri("spark-warehouse")
-    }
+    _non_mutable = {"spark.sql.warehouse.dir": resolve_uri("spark-warehouse")}
 
     _conf: Mapping
 
@@ -52,7 +51,7 @@ class RuntimeConfig:
     def set(self, key: str, value: Union[str, int, bool]) -> None:
         """Sets the given Spark runtime configuration property."""
         if value is None:
-          raise IllegalArgumentException("value can not be None")
+            raise IllegalArgumentException("value can not be None")
         elif isinstance(value, (bool, int)):
             value = str(value).lower()
         if isinstance(value, str):
@@ -85,7 +84,7 @@ class RuntimeConfig:
     def unset(self, key: str) -> None:
         """Resets the configuration property for the given key."""
         # FIX
-        del(self._conf[key])
+        del self._conf[key]
 
     def _checkType(self, obj: Any, identifier: str) -> None:
         """Assert that an object is of type str."""
