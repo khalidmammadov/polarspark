@@ -150,7 +150,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._name # noqa
+        return self._name  # noqa
 
     @property
     def isActive(self) -> bool:
@@ -176,7 +176,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._future.running() # noqa
+        return self._future.running()  # noqa
 
     def awaitTermination(self, timeout: Optional[int] = None) -> Optional[bool]:
         """
@@ -220,7 +220,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        if not self._future: # noqa
+        if not self._future:  # noqa
             return
 
         ex = None
@@ -231,24 +231,23 @@ class StreamingQuery:
                     message_parameters={"arg_name": "timeout", "arg_value": type(timeout).__name__},
                 )
             try:
-                self._future.result(timeout) # noqa
+                self._future.result(timeout)  # noqa
             except TimeoutError:
                 return False
             except Exception as e:
                 ex = e
         else:
             try:
-                self._future.result() # noqa
+                self._future.result()  # noqa
             except Exception as e:
                 ex = e
 
         if ex:
             raise CapturedStreamingQueryException(
-                "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)),
-                traceback.format_exc()
+                "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)), traceback.format_exc()
             )
 
-        return self._future.done() # noqa
+        return self._future.done()  # noqa
 
     @property
     def status(self) -> Dict[str, Any]:
@@ -398,7 +397,7 @@ class StreamingQuery:
         >>> sq.isActive
         False
         """
-        self._future.cancel() # noqa
+        self._future.cancel()  # noqa
 
     def explain(self, extended: bool = False) -> None:
         """
@@ -464,8 +463,7 @@ class StreamingQuery:
 
         if ex:
             return CapturedStreamingQueryException(
-                "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)),
-                traceback.format_exc()
+                "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)), traceback.format_exc()
             )
         return None
 
@@ -626,7 +624,7 @@ class StreamingQueryManager:
             raise NotImplementedError()
         #     return self._jsqm.awaitAnyTermination(int(timeout * 1000))
         else:
-        #     return self._jsqm.awaitAnyTermination()
+            #     return self._jsqm.awaitAnyTermination()
             raise NotImplementedError()
 
     def resetTerminated(self) -> None:

@@ -32,7 +32,14 @@ import tzlocal
 # from polarspark.rdd import _load_from_socket
 from polarspark.sql.pandas.serializers import ArrowCollectSerializer
 from polarspark.sql.pandas.types import _dedup_names
-from polarspark.sql.types import ArrayType, MapType, TimestampType, StructType, DataType, _create_row
+from polarspark.sql.types import (
+    ArrayType,
+    MapType,
+    TimestampType,
+    StructType,
+    DataType,
+    _create_row,
+)
 from polarspark.sql.utils import is_timestamp_ntz_preferred
 from polarspark.traceback_utils import SCCallSiteSync
 from polarspark.errors import PySparkTypeError
@@ -147,7 +154,9 @@ class PandasConversionMixin:
         return [batches[i] for i in batch_order]
 
 
-def schema_from_pandas(pdf: "PandasDataFrameLike", schema: Optional[Union[StructType, List[str]]] = None):
+def schema_from_pandas(
+    pdf: "PandasDataFrameLike", schema: Optional[Union[StructType, List[str]]] = None
+):
     import pyarrow as pa
     from polarspark.sql.pandas.types import from_arrow_type
 
@@ -172,9 +181,7 @@ def schema_from_polars(pdf: pl.DataFrame):
     struct = StructType()
     prefer_timestamp_ntz = is_timestamp_ntz_preferred()
     for name, field in zip(pdf.columns, arrow_schema):
-        struct.add(
-            name, from_arrow_type(field.type, prefer_timestamp_ntz), nullable=field.nullable
-        )
+        struct.add(name, from_arrow_type(field.type, prefer_timestamp_ntz), nullable=field.nullable)
     return struct
 
 

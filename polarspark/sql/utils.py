@@ -41,6 +41,7 @@ from polarspark.errors import (  # noqa: F401
     PySparkNotImplementedError,
 )
 from polarspark.errors.exceptions.captured import CapturedException  # noqa: F401
+
 # from polarspark.find_spark_home import _find_spark_home
 
 if TYPE_CHECKING:
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
     from polarspark.sql.dataframe import DataFrame
     from polarspark.sql.column import Column
     from polarspark.sql.window import Window
+
     # from polarspark.pandas._typing import IndexOpsLike, SeriesOrIndex
 
 has_numpy = False

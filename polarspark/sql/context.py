@@ -37,12 +37,14 @@ from polarspark._globals import _NoValueType
 from polarspark.sql.session import SparkSession
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql.readwriter import DataFrameReader
+
 # from polarspark.sql.streaming import DataStreamReader
 # from polarspark.sql.udf import UDFRegistration  # noqa: F401
 # from polarspark.sql.udtf import UDTFRegistration
 from polarspark.context import SparkContext
 from polarspark.rdd import RDD
 from polarspark.sql.types import AtomicType, DataType, StructType
+
 # from polarspark.sql.streaming import StreamingQueryManager
 
 if TYPE_CHECKING:
@@ -51,6 +53,7 @@ if TYPE_CHECKING:
         RowLike,
         UserDefinedFunctionLike,
     )
+
     # from polarspark.sql.pandas._typing import DataFrameLike as PandasDataFrameLike
 
 __all__ = ["SQLContext", "HiveContext"]
@@ -123,7 +126,8 @@ class SQLContext:
         # self._jsqlContext = jsqlContext
         # _monkey_patch_RDD(self.sparkSession)
         if (
-            SQLContext._instantiatedContext is None
+            SQLContext._instantiatedContext
+            is None
             # or SQLContext._instantiatedContext._sc._jsc is None
         ):
             SQLContext._instantiatedContext = self

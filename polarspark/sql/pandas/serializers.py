@@ -21,7 +21,13 @@ Serializers for PyArrow and pandas conversions. See `pyspark.serializers` for mo
 
 from polarspark.errors import PySparkRuntimeError, PySparkTypeError, PySparkValueError
 from polarspark.loose_version import LooseVersion
-from polarspark.serializers import Serializer, read_int, write_int, UTF8Deserializer, CPickleSerializer
+from polarspark.serializers import (
+    Serializer,
+    read_int,
+    write_int,
+    UTF8Deserializer,
+    CPickleSerializer,
+)
 from polarspark.sql.pandas.types import (
     from_arrow_type,
     to_arrow_type,
@@ -730,6 +736,7 @@ class ApplyInPandasWithStateSerializer(ArrowStreamPandasUDFSerializer):
         import pyarrow as pa
         import json
         from itertools import groupby
+
         # from polarspark.sql.streaming.state import GroupState
 
         def construct_state(state_info_col):

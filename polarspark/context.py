@@ -46,9 +46,11 @@ from typing import (
 
 from polarspark import accumulators
 from polarspark.accumulators import Accumulator
+
 # from polarspark.broadcast import Broadcast, BroadcastPickleRegistry
 from polarspark.conf import SparkConf
 from polarspark.files import SparkFiles
+
 # from polarspark.java_gateway import launch_gateway, local_connect_and_auth
 # from polarspark.serializers import (
 #     CPickleSerializer,
@@ -61,10 +63,13 @@ from polarspark.files import SparkFiles
 #     ChunkedStream,
 # )
 from polarspark.storagelevel import StorageLevel
+
 # from polarspark.resource.information import ResourceInformation
-from polarspark.rdd import RDD#, _load_from_socket
+from polarspark.rdd import RDD  # , _load_from_socket
+
 # from polarspark.taskcontext import TaskContext
 from polarspark.traceback_utils import CallSite, first_spark_call
+
 # from polarspark.status import StatusTracker
 # from polarspark.profiler import ProfilerCollector, BasicProfiler, UDFBasicProfiler, MemoryProfiler
 from polarspark.errors import PySparkRuntimeError
@@ -233,20 +238,20 @@ class SparkContext:
     ) -> None:
         self.environment = environment or {}
         # java gateway must have been launched at this point.
-        if conf is not None: # and conf._jconf is not None: # FIX
+        if conf is not None:  # and conf._jconf is not None: # FIX
             # conf has been initialized in JVM properly, so use conf directly. This represents the
             # scenario that JVM has been launched before SparkConf is created (e.g. SparkContext is
             # created and then stopped, and we create a new SparkConf and new SparkContext again)
             self._conf = conf
         else:
-            self._conf = SparkConf()#_jvm=SparkContext._jvm) #FIX
+            self._conf = SparkConf()  # _jvm=SparkContext._jvm) #FIX
             if conf is not None:
                 for k, v in conf.getAll():
                     self._conf.set(k, v)
 
         # self._batchSize = batchSize  # -1 represents an unlimited batch size
         # self._unbatched_serializer = serializer
-        #FIX
+        # FIX
         # if batchSize == 0:
         #     self.serializer = AutoBatchedSerializer(self._unbatched_serializer)
         # else:
@@ -292,18 +297,18 @@ class SparkContext:
         self.environment["PYTHONHASHSEED"] = os.environ.get("PYTHONHASHSEED", "0")
 
         # Create the Java SparkContext through Py4J
-        #FIX
+        # FIX
         # self._jsc = jsc or self._initialize_context(self._conf._jconf)
         # Reset the SparkConf to the one actually used by the SparkContext in JVM.
-        self._conf = SparkConf()#_jconf=self._jsc.sc().conf()) #FIX
+        self._conf = SparkConf()  # _jconf=self._jsc.sc().conf()) #FIX
 
         # Create a single Accumulator in Java that we'll send all our updates through;
         # they will be passed back to us through a TCP server
-        #FIX
+        # FIX
         # assert self._gateway is not None
         # auth_token = self._gateway.gateway_parameters.auth_token
         # start_update_server = accumulators._start_update_server
-        #FIX
+        # FIX
         # self._accumulatorServer = start_update_server(auth_token)
         # (host, port) = self._accumulatorServer.server_address
         # assert self._jvm is not None
@@ -327,7 +332,7 @@ class SparkContext:
         # This allows other code to determine which Broadcast instances have
         # been pickled, so it can determine which Java broadcast objects to
         # send.
-        #FIX
+        # FIX
         # self._pickled_broadcast_vars = BroadcastPickleRegistry()
 
         SparkFiles._sc = self
@@ -362,7 +367,7 @@ class SparkContext:
                     )
 
         # Create a temporary directory inside spark.local.dir:
-        #FIX
+        # FIX
         # assert self._jvm is not None
         # local_dir = self._jvm.org.apache.spark.util.Utils.getLocalDir(self._jsc.sc().conf())
         # self._temp_dir = self._jvm.org.apache.spark.util.Utils.createTempDir(
@@ -539,7 +544,7 @@ class SparkContext:
         --------
         >>> sc.setLogLevel("WARN")  # doctest :+SKIP
         """
-        #FIX
+        # FIX
         # self._jsc.setLogLevel(logLevel)
 
     @classmethod
@@ -558,7 +563,7 @@ class SparkContext:
             The value of a new Java system property.
         """
         SparkContext._ensure_initialized()
-        #FIX
+        # FIX
         # assert SparkContext._jvm is not None
         # SparkContext._jvm.java.lang.System.setProperty(key, value)
 
@@ -573,7 +578,7 @@ class SparkContext:
         --------
         >>> _ = sc.version
         """
-        #FIX
+        # FIX
         # return self._jsc.version()
         return "4.0.0 FIX ME"
 
@@ -630,35 +635,36 @@ class SparkContext:
         dt = datetime.datetime.now()
         n = int(dt.strftime("%Y%m%d%H%M%S"))
         return n
-#
-#     @property
-#     def defaultParallelism(self) -> int:
-#         """
-#         Default level of parallelism to use when not given by user (e.g. for reduce tasks)
-#
-#         .. versionadded:: 0.7.0
-#
-#         Examples
-#         --------
-#         >>> sc.defaultParallelism > 0
-#         True
-#         """
-#         return self._jsc.sc().defaultParallelism()
-#
-#     @property
-#     def defaultMinPartitions(self) -> int:
-#         """
-#         Default min number of partitions for Hadoop RDDs when not given by user
-#
-#         .. versionadded:: 1.1.0
-#
-#         Examples
-#         --------
-#         >>> sc.defaultMinPartitions > 0
-#         True
-#         """
-#         return self._jsc.sc().defaultMinPartitions()
-#
+
+    #
+    #     @property
+    #     def defaultParallelism(self) -> int:
+    #         """
+    #         Default level of parallelism to use when not given by user (e.g. for reduce tasks)
+    #
+    #         .. versionadded:: 0.7.0
+    #
+    #         Examples
+    #         --------
+    #         >>> sc.defaultParallelism > 0
+    #         True
+    #         """
+    #         return self._jsc.sc().defaultParallelism()
+    #
+    #     @property
+    #     def defaultMinPartitions(self) -> int:
+    #         """
+    #         Default min number of partitions for Hadoop RDDs when not given by user
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         Examples
+    #         --------
+    #         >>> sc.defaultMinPartitions > 0
+    #         True
+    #         """
+    #         return self._jsc.sc().defaultMinPartitions()
+    #
     def stop(self) -> None:
         """
         Shut down the :class:`SparkContext`.
@@ -683,87 +689,88 @@ class SparkContext:
             self._accumulatorServer = None  # type: ignore[assignment]
         with SparkContext._lock:
             SparkContext._active_spark_context = None
-#
-#     def emptyRDD(self) -> RDD[Any]:
-#         """
-#         Create an :class:`RDD` that has no partitions or elements.
-#
-#         .. versionadded:: 1.5.0
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             An empty RDD
-#
-#         Examples
-#         --------
-#         >>> sc.emptyRDD()
-#         EmptyRDD...
-#         >>> sc.emptyRDD().count()
-#         0
-#         """
-#         return RDD(self._jsc.emptyRDD(), self, NoOpSerializer())
-#
-#     def range(
-#         self, start: int, end: Optional[int] = None, step: int = 1, numSlices: Optional[int] = None
-#     ) -> RDD[int]:
-#         """
-#         Create a new RDD of int containing elements from `start` to `end`
-#         (exclusive), increased by `step` every element. Can be called the same
-#         way as python's built-in range() function. If called with a single argument,
-#         the argument is interpreted as `end`, and `start` is set to 0.
-#
-#         .. versionadded:: 1.5.0
-#
-#         Parameters
-#         ----------
-#         start : int
-#             the start value
-#         end : int, optional
-#             the end value (exclusive)
-#         step : int, optional, default 1
-#             the incremental step
-#         numSlices : int, optional
-#             the number of partitions of the new RDD
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             An RDD of int
-#
-#         See Also
-#         --------
-#         :meth:`polarspark.sql.SparkSession.range`
-#
-#         Examples
-#         --------
-#         >>> sc.range(5).collect()
-#         [0, 1, 2, 3, 4]
-#         >>> sc.range(2, 4).collect()
-#         [2, 3]
-#         >>> sc.range(1, 7, 2).collect()
-#         [1, 3, 5]
-#
-#         Generate RDD with a negative step
-#
-#         >>> sc.range(5, 0, -1).collect()
-#         [5, 4, 3, 2, 1]
-#         >>> sc.range(0, 5, -1).collect()
-#         []
-#
-#         Control the number of partitions
-#
-#         >>> sc.range(5, numSlices=1).getNumPartitions()
-#         1
-#         >>> sc.range(5, numSlices=10).getNumPartitions()
-#         10
-#         """
-#         if end is None:
-#             end = start
-#             start = 0
-#
-#         return self.parallelize(range(start, end, step), numSlices)
-#
+
+    #
+    #     def emptyRDD(self) -> RDD[Any]:
+    #         """
+    #         Create an :class:`RDD` that has no partitions or elements.
+    #
+    #         .. versionadded:: 1.5.0
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             An empty RDD
+    #
+    #         Examples
+    #         --------
+    #         >>> sc.emptyRDD()
+    #         EmptyRDD...
+    #         >>> sc.emptyRDD().count()
+    #         0
+    #         """
+    #         return RDD(self._jsc.emptyRDD(), self, NoOpSerializer())
+    #
+    #     def range(
+    #         self, start: int, end: Optional[int] = None, step: int = 1, numSlices: Optional[int] = None
+    #     ) -> RDD[int]:
+    #         """
+    #         Create a new RDD of int containing elements from `start` to `end`
+    #         (exclusive), increased by `step` every element. Can be called the same
+    #         way as python's built-in range() function. If called with a single argument,
+    #         the argument is interpreted as `end`, and `start` is set to 0.
+    #
+    #         .. versionadded:: 1.5.0
+    #
+    #         Parameters
+    #         ----------
+    #         start : int
+    #             the start value
+    #         end : int, optional
+    #             the end value (exclusive)
+    #         step : int, optional, default 1
+    #             the incremental step
+    #         numSlices : int, optional
+    #             the number of partitions of the new RDD
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             An RDD of int
+    #
+    #         See Also
+    #         --------
+    #         :meth:`polarspark.sql.SparkSession.range`
+    #
+    #         Examples
+    #         --------
+    #         >>> sc.range(5).collect()
+    #         [0, 1, 2, 3, 4]
+    #         >>> sc.range(2, 4).collect()
+    #         [2, 3]
+    #         >>> sc.range(1, 7, 2).collect()
+    #         [1, 3, 5]
+    #
+    #         Generate RDD with a negative step
+    #
+    #         >>> sc.range(5, 0, -1).collect()
+    #         [5, 4, 3, 2, 1]
+    #         >>> sc.range(0, 5, -1).collect()
+    #         []
+    #
+    #         Control the number of partitions
+    #
+    #         >>> sc.range(5, numSlices=1).getNumPartitions()
+    #         1
+    #         >>> sc.range(5, numSlices=10).getNumPartitions()
+    #         10
+    #         """
+    #         if end is None:
+    #             end = start
+    #             start = 0
+    #
+    #         return self.parallelize(range(start, end, step), numSlices)
+    #
     def parallelize(self, c: Iterable[T], numSlices: Optional[int] = None) -> RDD[T]:
         """
         Distribute a local Python collection to form an RDD. Using range
@@ -841,1691 +848,1689 @@ class SparkContext:
         # return RDD(jrdd, self, serializer)
         raise NotImplementedError()
 
-
-
-#     def pickleFile(self, name: str, minPartitions: Optional[int] = None) -> RDD[Any]:
-#         """
-#         Load an RDD previously saved using :meth:`RDD.saveAsPickleFile` method.
-#
-#         .. versionadded:: 1.1.0
-#
-#         Parameters
-#         ----------
-#         name : str
-#             directory to the input data files, the path can be comma separated
-#             paths as a list of inputs
-#         minPartitions : int, optional
-#             suggested minimum number of partitions for the resulting RDD
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD representing unpickled data from the file(s).
-#
-#         See Also
-#         --------
-#         :meth:`RDD.saveAsPickleFile`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     # Write a temporary pickled file
-#         ...     path1 = os.path.join(d, "pickled1")
-#         ...     sc.parallelize(range(10)).saveAsPickleFile(path1, 3)
-#         ...
-#         ...     # Write another temporary pickled file
-#         ...     path2 = os.path.join(d, "pickled2")
-#         ...     sc.parallelize(range(-10, -5)).saveAsPickleFile(path2, 3)
-#         ...
-#         ...     # Load picked file
-#         ...     collected1 = sorted(sc.pickleFile(path1, 3).collect())
-#         ...     collected2 = sorted(sc.pickleFile(path2, 4).collect())
-#         ...
-#         ...     # Load two picked files together
-#         ...     collected3 = sorted(sc.pickleFile('{},{}'.format(path1, path2), 5).collect())
-#
-#         >>> collected1
-#         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-#         >>> collected2
-#         [-10, -9, -8, -7, -6]
-#         >>> collected3
-#         [-10, -9, -8, -7, -6, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-#         """
-#         minPartitions = minPartitions or self.defaultMinPartitions
-#         return RDD(self._jsc.objectFile(name, minPartitions), self)
-#
-#     def textFile(
-#         self, name: str, minPartitions: Optional[int] = None, use_unicode: bool = True
-#     ) -> RDD[str]:
-#         """
-#         Read a text file from HDFS, a local file system (available on all
-#         nodes), or any Hadoop-supported file system URI, and return it as an
-#         RDD of Strings. The text files must be encoded as UTF-8.
-#
-#         .. versionadded:: 0.7.0
-#
-#         Parameters
-#         ----------
-#         name : str
-#             directory to the input data files, the path can be comma separated
-#             paths as a list of inputs
-#         minPartitions : int, optional
-#             suggested minimum number of partitions for the resulting RDD
-#         use_unicode : bool, default True
-#             If `use_unicode` is False, the strings will be kept as `str` (encoding
-#             as `utf-8`), which is faster and smaller than unicode.
-#
-#             .. versionadded:: 1.2.0
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD representing text data from the file(s).
-#
-#         See Also
-#         --------
-#         :meth:`RDD.saveAsTextFile`
-#         :meth:`SparkContext.wholeTextFiles`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     path1 = os.path.join(d, "text1")
-#         ...     path2 = os.path.join(d, "text2")
-#         ...
-#         ...     # Write a temporary text file
-#         ...     sc.parallelize(["x", "y", "z"]).saveAsTextFile(path1)
-#         ...
-#         ...     # Write another temporary text file
-#         ...     sc.parallelize(["aa", "bb", "cc"]).saveAsTextFile(path2)
-#         ...
-#         ...     # Load text file
-#         ...     collected1 = sorted(sc.textFile(path1, 3).collect())
-#         ...     collected2 = sorted(sc.textFile(path2, 4).collect())
-#         ...
-#         ...     # Load two text files together
-#         ...     collected3 = sorted(sc.textFile('{},{}'.format(path1, path2), 5).collect())
-#
-#         >>> collected1
-#         ['x', 'y', 'z']
-#         >>> collected2
-#         ['aa', 'bb', 'cc']
-#         >>> collected3
-#         ['aa', 'bb', 'cc', 'x', 'y', 'z']
-#         """
-#         minPartitions = minPartitions or min(self.defaultParallelism, 2)
-#         return RDD(self._jsc.textFile(name, minPartitions), self, UTF8Deserializer(use_unicode))
-#
-#     def wholeTextFiles(
-#         self, path: str, minPartitions: Optional[int] = None, use_unicode: bool = True
-#     ) -> RDD[Tuple[str, str]]:
-#         """
-#         Read a directory of text files from HDFS, a local file system
-#         (available on all nodes), or any  Hadoop-supported file system
-#         URI. Each file is read as a single record and returned in a
-#         key-value pair, where the key is the path of each file, the
-#         value is the content of each file.
-#         The text files must be encoded as UTF-8.
-#
-#         .. versionadded:: 1.0.0
-#
-#         For example, if you have the following files:
-#
-#         .. code-block:: text
-#
-#             hdfs://a-hdfs-path/part-00000
-#             hdfs://a-hdfs-path/part-00001
-#             ...
-#             hdfs://a-hdfs-path/part-nnnnn
-#
-#         Do ``rdd = sparkContext.wholeTextFiles("hdfs://a-hdfs-path")``,
-#         then ``rdd`` contains:
-#
-#         .. code-block:: text
-#
-#             (a-hdfs-path/part-00000, its content)
-#             (a-hdfs-path/part-00001, its content)
-#             ...
-#             (a-hdfs-path/part-nnnnn, its content)
-#
-#         Parameters
-#         ----------
-#         path : str
-#             directory to the input data files, the path can be comma separated
-#             paths as a list of inputs
-#         minPartitions : int, optional
-#             suggested minimum number of partitions for the resulting RDD
-#         use_unicode : bool, default True
-#             If `use_unicode` is False, the strings will be kept as `str` (encoding
-#             as `utf-8`), which is faster and smaller than unicode.
-#
-#             .. versionadded:: 1.2.0
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD representing path-content pairs from the file(s).
-#
-#         Notes
-#         -----
-#         Small files are preferred, as each file will be loaded fully in memory.
-#
-#         See Also
-#         --------
-#         :meth:`RDD.saveAsTextFile`
-#         :meth:`SparkContext.textFile`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     # Write a temporary text file
-#         ...     with open(os.path.join(d, "1.txt"), "w") as f:
-#         ...         _ = f.write("123")
-#         ...
-#         ...     # Write another temporary text file
-#         ...     with open(os.path.join(d, "2.txt"), "w") as f:
-#         ...         _ = f.write("xyz")
-#         ...
-#         ...     collected = sorted(sc.wholeTextFiles(d).collect())
-#         >>> collected
-#         [('.../1.txt', '123'), ('.../2.txt', 'xyz')]
-#         """
-#         minPartitions = minPartitions or self.defaultMinPartitions
-#         return RDD(
-#             self._jsc.wholeTextFiles(path, minPartitions),
-#             self,
-#             PairDeserializer(UTF8Deserializer(use_unicode), UTF8Deserializer(use_unicode)),
-#         )
-#
-#     def binaryFiles(self, path: str, minPartitions: Optional[int] = None) -> RDD[Tuple[str, bytes]]:
-#         """
-#         Read a directory of binary files from HDFS, a local file system
-#         (available on all nodes), or any Hadoop-supported file system URI
-#         as a byte array. Each file is read as a single record and returned
-#         in a key-value pair, where the key is the path of each file, the
-#         value is the content of each file.
-#
-#         .. versionadded:: 1.3.0
-#
-#         Parameters
-#         ----------
-#         path : str
-#             directory to the input data files, the path can be comma separated
-#             paths as a list of inputs
-#         minPartitions : int, optional
-#             suggested minimum number of partitions for the resulting RDD
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD representing path-content pairs from the file(s).
-#
-#         Notes
-#         -----
-#         Small files are preferred, large file is also allowable, but may cause bad performance.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.binaryRecords`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     # Write a temporary binary file
-#         ...     with open(os.path.join(d, "1.bin"), "wb") as f1:
-#         ...         _ = f1.write(b"binary data I")
-#         ...
-#         ...     # Write another temporary binary file
-#         ...     with open(os.path.join(d, "2.bin"), "wb") as f2:
-#         ...         _ = f2.write(b"binary data II")
-#         ...
-#         ...     collected = sorted(sc.binaryFiles(d).collect())
-#
-#         >>> collected
-#         [('.../1.bin', b'binary data I'), ('.../2.bin', b'binary data II')]
-#         """
-#         minPartitions = minPartitions or self.defaultMinPartitions
-#         return RDD(
-#             self._jsc.binaryFiles(path, minPartitions),
-#             self,
-#             PairDeserializer(UTF8Deserializer(), NoOpSerializer()),
-#         )
-#
-#     def binaryRecords(self, path: str, recordLength: int) -> RDD[bytes]:
-#         """
-#         Load data from a flat binary file, assuming each record is a set of numbers
-#         with the specified numerical format (see ByteBuffer), and the number of
-#         bytes per record is constant.
-#
-#         .. versionadded:: 1.3.0
-#
-#         Parameters
-#         ----------
-#         path : str
-#             Directory to the input data files
-#         recordLength : int
-#             The length at which to split the records
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD of data with values, represented as byte arrays
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.binaryFiles`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     # Write a temporary file
-#         ...     with open(os.path.join(d, "1.bin"), "w") as f:
-#         ...         for i in range(3):
-#         ...             _ = f.write("%04d" % i)
-#         ...
-#         ...     # Write another file
-#         ...     with open(os.path.join(d, "2.bin"), "w") as f:
-#         ...         for i in [-1, -2, -10]:
-#         ...             _ = f.write("%04d" % i)
-#         ...
-#         ...     collected = sorted(sc.binaryRecords(d, 4).collect())
-#
-#         >>> collected
-#         [b'-001', b'-002', b'-010', b'0000', b'0001', b'0002']
-#         """
-#         return RDD(self._jsc.binaryRecords(path, recordLength), self, NoOpSerializer())
-#
-#     def _dictToJavaMap(self, d: Optional[Dict[str, str]]) -> JavaMap:
-#         assert self._jvm is not None
-#         jm = self._jvm.java.util.HashMap()
-#         if not d:
-#             d = {}
-#         for k, v in d.items():
-#             jm[k] = v
-#         return jm
-#
-#     def sequenceFile(
-#         self,
-#         path: str,
-#         keyClass: Optional[str] = None,
-#         valueClass: Optional[str] = None,
-#         keyConverter: Optional[str] = None,
-#         valueConverter: Optional[str] = None,
-#         minSplits: Optional[int] = None,
-#         batchSize: int = 0,
-#     ) -> RDD[Tuple[T, U]]:
-#         """
-#         Read a Hadoop SequenceFile with arbitrary key and value Writable class from HDFS,
-#         a local file system (available on all nodes), or any Hadoop-supported file system URI.
-#         The mechanism is as follows:
-#
-#             1. A Java RDD is created from the SequenceFile or other InputFormat, and the key
-#                and value Writable classes
-#             2. Serialization is attempted via Pickle pickling
-#             3. If this fails, the fallback is to call 'toString' on each key and value
-#             4. :class:`CPickleSerializer` is used to deserialize pickled objects on the Python side
-#
-#         .. versionadded:: 1.3.0
-#
-#         Parameters
-#         ----------
-#         path : str
-#             path to sequencefile
-#         keyClass: str, optional
-#             fully qualified classname of key Writable class (e.g. "org.apache.hadoop.io.Text")
-#         valueClass : str, optional
-#             fully qualified classname of value Writable class
-#             (e.g. "org.apache.hadoop.io.LongWritable")
-#         keyConverter : str, optional
-#             fully qualified name of a function returning key WritableConverter
-#         valueConverter : str, optional
-#             fully qualifiedname of a function returning value WritableConverter
-#         minSplits : int, optional
-#             minimum splits in dataset (default min(2, sc.defaultParallelism))
-#         batchSize : int, optional, default 0
-#             The number of Python objects represented as a single
-#             Java object. (default 0, choose batchSize automatically)
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD of tuples of key and corresponding value
-#
-#         See Also
-#         --------
-#         :meth:`RDD.saveAsSequenceFile`
-#         :meth:`RDD.saveAsNewAPIHadoopFile`
-#         :meth:`RDD.saveAsHadoopFile`
-#         :meth:`SparkContext.newAPIHadoopFile`
-#         :meth:`SparkContext.hadoopFile`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#
-#         Set the class of output format
-#
-#         >>> output_format_class = "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
-#
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     path = os.path.join(d, "hadoop_file")
-#         ...
-#         ...     # Write a temporary Hadoop file
-#         ...     rdd = sc.parallelize([(1, {3.0: "bb"}), (2, {1.0: "aa"}), (3, {2.0: "dd"})])
-#         ...     rdd.saveAsNewAPIHadoopFile(path, output_format_class)
-#         ...
-#         ...     collected = sorted(sc.sequenceFile(path).collect())
-#
-#         >>> collected
-#         [(1, {3.0: 'bb'}), (2, {1.0: 'aa'}), (3, {2.0: 'dd'})]
-#         """
-#         minSplits = minSplits or min(self.defaultParallelism, 2)
-#         assert self._jvm is not None
-#         jrdd = self._jvm.PythonRDD.sequenceFile(
-#             self._jsc,
-#             path,
-#             keyClass,
-#             valueClass,
-#             keyConverter,
-#             valueConverter,
-#             minSplits,
-#             batchSize,
-#         )
-#         return RDD(jrdd, self)
-#
-#     def newAPIHadoopFile(
-#         self,
-#         path: str,
-#         inputFormatClass: str,
-#         keyClass: str,
-#         valueClass: str,
-#         keyConverter: Optional[str] = None,
-#         valueConverter: Optional[str] = None,
-#         conf: Optional[Dict[str, str]] = None,
-#         batchSize: int = 0,
-#     ) -> RDD[Tuple[T, U]]:
-#         """
-#         Read a 'new API' Hadoop InputFormat with arbitrary key and value class from HDFS,
-#         a local file system (available on all nodes), or any Hadoop-supported file system URI.
-#         The mechanism is the same as for meth:`SparkContext.sequenceFile`.
-#
-#         A Hadoop configuration can be passed in as a Python dict. This will be converted into a
-#         Configuration in Java
-#
-#         .. versionadded:: 1.1.0
-#
-#         Parameters
-#         ----------
-#         path : str
-#             path to Hadoop file
-#         inputFormatClass : str
-#             fully qualified classname of Hadoop InputFormat
-#             (e.g. "org.apache.hadoop.mapreduce.lib.input.TextInputFormat")
-#         keyClass : str
-#             fully qualified classname of key Writable class
-#             (e.g. "org.apache.hadoop.io.Text")
-#         valueClass : str
-#             fully qualified classname of value Writable class
-#             (e.g. "org.apache.hadoop.io.LongWritable")
-#         keyConverter : str, optional
-#             fully qualified name of a function returning key WritableConverter
-#             None by default
-#         valueConverter : str, optional
-#             fully qualified name of a function returning value WritableConverter
-#             None by default
-#         conf : dict, optional
-#             Hadoop configuration, passed in as a dict
-#             None by default
-#         batchSize : int, optional, default 0
-#             The number of Python objects represented as a single
-#             Java object. (default 0, choose batchSize automatically)
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD of tuples of key and corresponding value
-#
-#         See Also
-#         --------
-#         :meth:`RDD.saveAsSequenceFile`
-#         :meth:`RDD.saveAsNewAPIHadoopFile`
-#         :meth:`RDD.saveAsHadoopFile`
-#         :meth:`SparkContext.sequenceFile`
-#         :meth:`SparkContext.hadoopFile`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#
-#         Set the related classes
-#
-#         >>> output_format_class = "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
-#         >>> input_format_class = "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
-#         >>> key_class = "org.apache.hadoop.io.IntWritable"
-#         >>> value_class = "org.apache.hadoop.io.Text"
-#
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     path = os.path.join(d, "new_hadoop_file")
-#         ...
-#         ...     # Write a temporary Hadoop file
-#         ...     rdd = sc.parallelize([(1, ""), (1, "a"), (3, "x")])
-#         ...     rdd.saveAsNewAPIHadoopFile(path, output_format_class, key_class, value_class)
-#         ...
-#         ...     loaded = sc.newAPIHadoopFile(path, input_format_class, key_class, value_class)
-#         ...     collected = sorted(loaded.collect())
-#
-#         >>> collected
-#         [(1, ''), (1, 'a'), (3, 'x')]
-#         """
-#         jconf = self._dictToJavaMap(conf)
-#         assert self._jvm is not None
-#         jrdd = self._jvm.PythonRDD.newAPIHadoopFile(
-#             self._jsc,
-#             path,
-#             inputFormatClass,
-#             keyClass,
-#             valueClass,
-#             keyConverter,
-#             valueConverter,
-#             jconf,
-#             batchSize,
-#         )
-#         return RDD(jrdd, self)
-#
-#     def newAPIHadoopRDD(
-#         self,
-#         inputFormatClass: str,
-#         keyClass: str,
-#         valueClass: str,
-#         keyConverter: Optional[str] = None,
-#         valueConverter: Optional[str] = None,
-#         conf: Optional[Dict[str, str]] = None,
-#         batchSize: int = 0,
-#     ) -> RDD[Tuple[T, U]]:
-#         """
-#         Read a 'new API' Hadoop InputFormat with arbitrary key and value class, from an arbitrary
-#         Hadoop configuration, which is passed in as a Python dict.
-#         This will be converted into a Configuration in Java.
-#         The mechanism is the same as for meth:`SparkContext.sequenceFile`.
-#
-#         .. versionadded:: 1.1.0
-#
-#         Parameters
-#         ----------
-#         inputFormatClass : str
-#             fully qualified classname of Hadoop InputFormat
-#             (e.g. "org.apache.hadoop.mapreduce.lib.input.TextInputFormat")
-#         keyClass : str
-#             fully qualified classname of key Writable class (e.g. "org.apache.hadoop.io.Text")
-#         valueClass : str
-#             fully qualified classname of value Writable class
-#             (e.g. "org.apache.hadoop.io.LongWritable")
-#         keyConverter : str, optional
-#             fully qualified name of a function returning key WritableConverter
-#             (None by default)
-#         valueConverter : str, optional
-#             fully qualified name of a function returning value WritableConverter
-#             (None by default)
-#         conf : dict, optional
-#             Hadoop configuration, passed in as a dict (None by default)
-#         batchSize : int, optional, default 0
-#             The number of Python objects represented as a single
-#             Java object. (default 0, choose batchSize automatically)
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD of tuples of key and corresponding value
-#
-#         See Also
-#         --------
-#         :meth:`RDD.saveAsNewAPIHadoopDataset`
-#         :meth:`RDD.saveAsHadoopDataset`
-#         :meth:`SparkContext.hadoopRDD`
-#         :meth:`SparkContext.hadoopFile`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#
-#         Set the related classes
-#
-#         >>> output_format_class = "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
-#         >>> input_format_class = "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
-#         >>> key_class = "org.apache.hadoop.io.IntWritable"
-#         >>> value_class = "org.apache.hadoop.io.Text"
-#
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     path = os.path.join(d, "new_hadoop_file")
-#         ...
-#         ...     # Create the conf for writing
-#         ...     write_conf = {
-#         ...         "mapreduce.job.outputformat.class": (output_format_class),
-#         ...         "mapreduce.job.output.key.class": key_class,
-#         ...         "mapreduce.job.output.value.class": value_class,
-#         ...         "mapreduce.output.fileoutputformat.outputdir": path,
-#         ...     }
-#         ...
-#         ...     # Write a temporary Hadoop file
-#         ...     rdd = sc.parallelize([(1, ""), (1, "a"), (3, "x")])
-#         ...     rdd.saveAsNewAPIHadoopDataset(conf=write_conf)
-#         ...
-#         ...     # Create the conf for reading
-#         ...     read_conf = {"mapreduce.input.fileinputformat.inputdir": path}
-#         ...
-#         ...     loaded = sc.newAPIHadoopRDD(input_format_class,
-#         ...         key_class, value_class, conf=read_conf)
-#         ...     collected = sorted(loaded.collect())
-#
-#         >>> collected
-#         [(1, ''), (1, 'a'), (3, 'x')]
-#         """
-#         jconf = self._dictToJavaMap(conf)
-#         assert self._jvm is not None
-#         jrdd = self._jvm.PythonRDD.newAPIHadoopRDD(
-#             self._jsc,
-#             inputFormatClass,
-#             keyClass,
-#             valueClass,
-#             keyConverter,
-#             valueConverter,
-#             jconf,
-#             batchSize,
-#         )
-#         return RDD(jrdd, self)
-#
-#     def hadoopFile(
-#         self,
-#         path: str,
-#         inputFormatClass: str,
-#         keyClass: str,
-#         valueClass: str,
-#         keyConverter: Optional[str] = None,
-#         valueConverter: Optional[str] = None,
-#         conf: Optional[Dict[str, str]] = None,
-#         batchSize: int = 0,
-#     ) -> RDD[Tuple[T, U]]:
-#         """
-#         Read an 'old' Hadoop InputFormat with arbitrary key and value class from HDFS,
-#         a local file system (available on all nodes), or any Hadoop-supported file system URI.
-#         The mechanism is the same as for meth:`SparkContext.sequenceFile`.
-#
-#         .. versionadded:: 1.1.0
-#
-#         A Hadoop configuration can be passed in as a Python dict. This will be converted into a
-#         Configuration in Java.
-#
-#         Parameters
-#         ----------
-#         path : str
-#             path to Hadoop file
-#         inputFormatClass : str
-#             fully qualified classname of Hadoop InputFormat
-#             (e.g. "org.apache.hadoop.mapreduce.lib.input.TextInputFormat")
-#         keyClass : str
-#             fully qualified classname of key Writable class (e.g. "org.apache.hadoop.io.Text")
-#         valueClass : str
-#             fully qualified classname of value Writable class
-#             (e.g. "org.apache.hadoop.io.LongWritable")
-#         keyConverter : str, optional
-#             fully qualified name of a function returning key WritableConverter
-#         valueConverter : str, optional
-#             fully qualified name of a function returning value WritableConverter
-#         conf : dict, optional
-#             Hadoop configuration, passed in as a dict
-#         batchSize : int, optional, default 0
-#             The number of Python objects represented as a single
-#             Java object. (default 0, choose batchSize automatically)
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD of tuples of key and corresponding value
-#
-#         See Also
-#         --------
-#         :meth:`RDD.saveAsSequenceFile`
-#         :meth:`RDD.saveAsNewAPIHadoopFile`
-#         :meth:`RDD.saveAsHadoopFile`
-#         :meth:`SparkContext.newAPIHadoopFile`
-#         :meth:`SparkContext.hadoopRDD`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#
-#         Set the related classes
-#
-#         >>> output_format_class = "org.apache.hadoop.mapred.TextOutputFormat"
-#         >>> input_format_class = "org.apache.hadoop.mapred.TextInputFormat"
-#         >>> key_class = "org.apache.hadoop.io.IntWritable"
-#         >>> value_class = "org.apache.hadoop.io.Text"
-#
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     path = os.path.join(d, "old_hadoop_file")
-#         ...
-#         ...     # Write a temporary Hadoop file
-#         ...     rdd = sc.parallelize([(1, ""), (1, "a"), (3, "x")])
-#         ...     rdd.saveAsHadoopFile(path, output_format_class, key_class, value_class)
-#         ...
-#         ...     loaded = sc.hadoopFile(path, input_format_class, key_class, value_class)
-#         ...     collected = sorted(loaded.collect())
-#
-#         >>> collected
-#         [(0, '1\\t'), (0, '1\\ta'), (0, '3\\tx')]
-#         """
-#         jconf = self._dictToJavaMap(conf)
-#         assert self._jvm is not None
-#         jrdd = self._jvm.PythonRDD.hadoopFile(
-#             self._jsc,
-#             path,
-#             inputFormatClass,
-#             keyClass,
-#             valueClass,
-#             keyConverter,
-#             valueConverter,
-#             jconf,
-#             batchSize,
-#         )
-#         return RDD(jrdd, self)
-#
-#     def hadoopRDD(
-#         self,
-#         inputFormatClass: str,
-#         keyClass: str,
-#         valueClass: str,
-#         keyConverter: Optional[str] = None,
-#         valueConverter: Optional[str] = None,
-#         conf: Optional[Dict[str, str]] = None,
-#         batchSize: int = 0,
-#     ) -> RDD[Tuple[T, U]]:
-#         """
-#         Read an 'old' Hadoop InputFormat with arbitrary key and value class, from an arbitrary
-#         Hadoop configuration, which is passed in as a Python dict.
-#         This will be converted into a Configuration in Java.
-#         The mechanism is the same as for meth:`SparkContext.sequenceFile`.
-#
-#         .. versionadded:: 1.1.0
-#
-#         Parameters
-#         ----------
-#         inputFormatClass : str
-#             fully qualified classname of Hadoop InputFormat
-#             (e.g. "org.apache.hadoop.mapreduce.lib.input.TextInputFormat")
-#         keyClass : str
-#             fully qualified classname of key Writable class (e.g. "org.apache.hadoop.io.Text")
-#         valueClass : str
-#             fully qualified classname of value Writable class
-#             (e.g. "org.apache.hadoop.io.LongWritable")
-#         keyConverter : str, optional
-#             fully qualified name of a function returning key WritableConverter
-#         valueConverter : str, optional
-#             fully qualified name of a function returning value WritableConverter
-#         conf : dict, optional
-#             Hadoop configuration, passed in as a dict
-#         batchSize : int, optional, default 0
-#             The number of Python objects represented as a single
-#             Java object. (default 0, choose batchSize automatically)
-#
-#         Returns
-#         -------
-#         :class:`RDD`
-#             RDD of tuples of key and corresponding value
-#
-#         See Also
-#         --------
-#         :meth:`RDD.saveAsNewAPIHadoopDataset`
-#         :meth:`RDD.saveAsHadoopDataset`
-#         :meth:`SparkContext.newAPIHadoopRDD`
-#         :meth:`SparkContext.hadoopFile`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#
-#         Set the related classes
-#
-#         >>> output_format_class = "org.apache.hadoop.mapred.TextOutputFormat"
-#         >>> input_format_class = "org.apache.hadoop.mapred.TextInputFormat"
-#         >>> key_class = "org.apache.hadoop.io.IntWritable"
-#         >>> value_class = "org.apache.hadoop.io.Text"
-#
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     path = os.path.join(d, "old_hadoop_file")
-#         ...
-#         ...     # Create the conf for writing
-#         ...     write_conf = {
-#         ...         "mapred.output.format.class": output_format_class,
-#         ...         "mapreduce.job.output.key.class": key_class,
-#         ...         "mapreduce.job.output.value.class": value_class,
-#         ...         "mapreduce.output.fileoutputformat.outputdir": path,
-#         ...     }
-#         ...
-#         ...     # Write a temporary Hadoop file
-#         ...     rdd = sc.parallelize([(1, ""), (1, "a"), (3, "x")])
-#         ...     rdd.saveAsHadoopDataset(conf=write_conf)
-#         ...
-#         ...     # Create the conf for reading
-#         ...     read_conf = {"mapreduce.input.fileinputformat.inputdir": path}
-#         ...
-#         ...     loaded = sc.hadoopRDD(input_format_class, key_class, value_class, conf=read_conf)
-#         ...     collected = sorted(loaded.collect())
-#
-#         >>> collected
-#         [(0, '1\\t'), (0, '1\\ta'), (0, '3\\tx')]
-#         """
-#         jconf = self._dictToJavaMap(conf)
-#         assert self._jvm is not None
-#         jrdd = self._jvm.PythonRDD.hadoopRDD(
-#             self._jsc,
-#             inputFormatClass,
-#             keyClass,
-#             valueClass,
-#             keyConverter,
-#             valueConverter,
-#             jconf,
-#             batchSize,
-#         )
-#         return RDD(jrdd, self)
-#
-#     def _checkpointFile(self, name: str, input_deserializer: PairDeserializer) -> RDD:
-#         jrdd = self._jsc.checkpointFile(name)
-#         return RDD(jrdd, self, input_deserializer)
-#
-#     def union(self, rdds: List[RDD[T]]) -> RDD[T]:
-#         """
-#         Build the union of a list of RDDs.
-#
-#         This supports unions() of RDDs with different serialized formats,
-#         although this forces them to be reserialized using the default
-#         serializer:
-#
-#         .. versionadded:: 0.7.0
-#
-#         See Also
-#         --------
-#         :meth:`RDD.union`
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     # generate a text RDD
-#         ...     with open(os.path.join(d, "union-text.txt"), "w") as f:
-#         ...         _ = f.write("Hello")
-#         ...     text_rdd = sc.textFile(d)
-#         ...
-#         ...     # generate another RDD
-#         ...     parallelized = sc.parallelize(["World!"])
-#         ...
-#         ...     unioned = sorted(sc.union([text_rdd, parallelized]).collect())
-#
-#         >>> unioned
-#         ['Hello', 'World!']
-#         """
-#         first_jrdd_deserializer = rdds[0]._jrdd_deserializer
-#         if any(x._jrdd_deserializer != first_jrdd_deserializer for x in rdds):
-#             rdds = [x._reserialize() for x in rdds]
-#         gw = SparkContext._gateway
-#         assert gw is not None
-#         jvm = SparkContext._jvm
-#         assert jvm is not None
-#         jrdd_cls = jvm.org.apache.spark.api.java.JavaRDD
-#         jpair_rdd_cls = jvm.org.apache.spark.api.java.JavaPairRDD
-#         jdouble_rdd_cls = jvm.org.apache.spark.api.java.JavaDoubleRDD
-#         if is_instance_of(gw, rdds[0]._jrdd, jrdd_cls):
-#             cls = jrdd_cls
-#         elif is_instance_of(gw, rdds[0]._jrdd, jpair_rdd_cls):
-#             cls = jpair_rdd_cls
-#         elif is_instance_of(gw, rdds[0]._jrdd, jdouble_rdd_cls):
-#             cls = jdouble_rdd_cls
-#         else:
-#             cls_name = rdds[0]._jrdd.getClass().getCanonicalName()
-#             raise TypeError("Unsupported Java RDD class %s" % cls_name)
-#         jrdds = gw.new_array(cls, len(rdds))
-#         for i in range(0, len(rdds)):
-#             jrdds[i] = rdds[i]._jrdd
-#         return RDD(self._jsc.union(jrdds), self, rdds[0]._jrdd_deserializer)
-#
-#     def broadcast(self, value: T) -> "Broadcast[T]":
-#         """
-#         Broadcast a read-only variable to the cluster, returning a :class:`Broadcast`
-#         object for reading it in distributed functions. The variable will
-#         be sent to each cluster only once.
-#
-#         .. versionadded:: 0.7.0
-#
-#         Parameters
-#         ----------
-#         value : T
-#             value to broadcast to the Spark nodes
-#
-#         Returns
-#         -------
-#         :class:`Broadcast`
-#             :class:`Broadcast` object, a read-only variable cached on each machine
-#
-#         Examples
-#         --------
-#         >>> mapping = {1: 10001, 2: 10002}
-#         >>> bc = sc.broadcast(mapping)
-#
-#         >>> rdd = sc.range(5)
-#         >>> rdd2 = rdd.map(lambda i: bc.value[i] if i in bc.value else -1)
-#         >>> rdd2.collect()
-#         [-1, 10001, 10002, -1, -1]
-#
-#         >>> bc.destroy()
-#         """
-#         return Broadcast(self, value, self._pickled_broadcast_vars)
-#
-#     def accumulator(
-#         self, value: T, accum_param: Optional["AccumulatorParam[T]"] = None
-#     ) -> "Accumulator[T]":
-#         """
-#         Create an :class:`Accumulator` with the given initial value, using a given
-#         :class:`AccumulatorParam` helper object to define how to add values of the
-#         data type if provided. Default AccumulatorParams are used for integers
-#         and floating-point numbers if you do not provide one. For other types,
-#         a custom AccumulatorParam can be used.
-#
-#         .. versionadded:: 0.7.0
-#
-#         Parameters
-#         ----------
-#         value : T
-#             initialized value
-#         accum_param : :class:`polarspark.AccumulatorParam`, optional
-#             helper object to define how to add values
-#
-#         Returns
-#         -------
-#         :class:`Accumulator`
-#             `Accumulator` object, a shared variable that can be accumulated
-#
-#         Examples
-#         --------
-#         >>> acc = sc.accumulator(9)
-#         >>> acc.value
-#         9
-#         >>> acc += 1
-#         >>> acc.value
-#         10
-#
-#         Accumulator object can be accumulated in RDD operations:
-#
-#         >>> rdd = sc.range(5)
-#         >>> def f(x):
-#         ...     global acc
-#         ...     acc += 1
-#         ...
-#         >>> rdd.foreach(f)
-#         >>> acc.value
-#         15
-#         """
-#         if accum_param is None:
-#             if isinstance(value, int):
-#                 accum_param = cast("AccumulatorParam[T]", accumulators.INT_ACCUMULATOR_PARAM)
-#             elif isinstance(value, float):
-#                 accum_param = cast("AccumulatorParam[T]", accumulators.FLOAT_ACCUMULATOR_PARAM)
-#             elif isinstance(value, complex):
-#                 accum_param = cast("AccumulatorParam[T]", accumulators.COMPLEX_ACCUMULATOR_PARAM)
-#             else:
-#                 raise TypeError("No default accumulator param for type %s" % type(value))
-#         SparkContext._next_accum_id += 1
-#         return Accumulator(SparkContext._next_accum_id - 1, value, accum_param)
-#
-#     def addFile(self, path: str, recursive: bool = False) -> None:
-#         """
-#         Add a file to be downloaded with this Spark job on every node.
-#         The `path` passed can be either a local file, a file in HDFS
-#         (or other Hadoop-supported filesystems), or an HTTP, HTTPS or
-#         FTP URI.
-#
-#         To access the file in Spark jobs, use :meth:`SparkFiles.get` with the
-#         filename to find its download location.
-#
-#         A directory can be given if the recursive option is set to True.
-#         Currently directories are only supported for Hadoop-supported filesystems.
-#
-#         .. versionadded:: 0.7.0
-#
-#         Parameters
-#         ----------
-#         path : str
-#             can be either a local file, a file in HDFS (or other Hadoop-supported
-#             filesystems), or an HTTP, HTTPS or FTP URI. To access the file in Spark jobs,
-#             use :meth:`SparkFiles.get` to find its download location.
-#         recursive : bool, default False
-#             whether to recursively add files in the input directory
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.listFiles`
-#         :meth:`SparkContext.addPyFile`
-#         :meth:`SparkFiles.get`
-#
-#         Notes
-#         -----
-#         A path can be added only once. Subsequent additions of the same path are ignored.
-#
-#         Examples
-#         --------
-#         >>> import os
-#         >>> import tempfile
-#         >>> from polarspark import SparkFiles
-#
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     path1 = os.path.join(d, "test1.txt")
-#         ...     with open(path1, "w") as f:
-#         ...         _ = f.write("100")
-#         ...
-#         ...     path2 = os.path.join(d, "test2.txt")
-#         ...     with open(path2, "w") as f:
-#         ...         _ = f.write("200")
-#         ...
-#         ...     sc.addFile(path1)
-#         ...     file_list1 = sorted(sc.listFiles)
-#         ...
-#         ...     sc.addFile(path2)
-#         ...     file_list2 = sorted(sc.listFiles)
-#         ...
-#         ...     # add path2 twice, this addition will be ignored
-#         ...     sc.addFile(path2)
-#         ...     file_list3 = sorted(sc.listFiles)
-#         ...
-#         ...     def func(iterator):
-#         ...         with open(SparkFiles.get("test1.txt")) as f:
-#         ...             mul = int(f.readline())
-#         ...             return [x * mul for x in iterator]
-#         ...
-#         ...     collected = sc.parallelize([1, 2, 3, 4]).mapPartitions(func).collect()
-#
-#         >>> file_list1
-#         ['file:/.../test1.txt']
-#         >>> file_list2
-#         ['file:/.../test1.txt', 'file:/.../test2.txt']
-#         >>> file_list3
-#         ['file:/.../test1.txt', 'file:/.../test2.txt']
-#         >>> collected
-#         [100, 200, 300, 400]
-#         """
-#         self._jsc.sc().addFile(path, recursive)
-#
-#     @property
-#     def listFiles(self) -> List[str]:
-#         """Returns a list of file paths that are added to resources.
-#
-#         .. versionadded:: 3.4.0
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.addFile`
-#         """
-#         return list(
-#             self._jvm.scala.jdk.javaapi.CollectionConverters.asJava(  # type: ignore[union-attr]
-#                 self._jsc.sc().listFiles()
-#             )
-#         )
-#
-#     def addPyFile(self, path: str) -> None:
-#         """
-#         Add a .py or .zip dependency for all tasks to be executed on this
-#         SparkContext in the future.  The `path` passed can be either a local
-#         file, a file in HDFS (or other Hadoop-supported filesystems), or an
-#         HTTP, HTTPS or FTP URI.
-#
-#         .. versionadded:: 0.7.0
-#
-#         Parameters
-#         ----------
-#         path : str
-#             can be either a .py file or .zip dependency.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.addFile`
-#
-#         Notes
-#         -----
-#         A path can be added only once. Subsequent additions of the same path are ignored.
-#         """
-#         self.addFile(path)
-#         (dirname, filename) = os.path.split(path)  # dirname may be directory or HDFS/S3 prefix
-#         if filename[-4:].lower() in self.PACKAGE_EXTENSIONS:
-#             assert self._python_includes is not None
-#             self._python_includes.append(filename)
-#             # for tests in local mode
-#             sys.path.insert(1, os.path.join(SparkFiles.getRootDirectory(), filename))
-#
-#         importlib.invalidate_caches()
-#
-#     def addArchive(self, path: str) -> None:
-#         """
-#         Add an archive to be downloaded with this Spark job on every node.
-#         The `path` passed can be either a local file, a file in HDFS
-#         (or other Hadoop-supported filesystems), or an HTTP, HTTPS or
-#         FTP URI.
-#
-#         To access the file in Spark jobs, use :meth:`SparkFiles.get` with the
-#         filename to find its download/unpacked location. The given path should
-#         be one of .zip, .tar, .tar.gz, .tgz and .jar.
-#
-#         .. versionadded:: 3.3.0
-#
-#         Parameters
-#         ----------
-#         path : str
-#             can be either a local file, a file in HDFS (or other Hadoop-supported
-#             filesystems), or an HTTP, HTTPS or FTP URI. To access the file in Spark jobs,
-#             use :meth:`SparkFiles.get` to find its download location.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.listArchives`
-#         :meth:`SparkFiles.get`
-#
-#         Notes
-#         -----
-#         A path can be added only once. Subsequent additions of the same path are ignored.
-#         This API is experimental.
-#
-#         Examples
-#         --------
-#         Creates a zipped file that contains a text file written '100'.
-#
-#         >>> import os
-#         >>> import tempfile
-#         >>> import zipfile
-#         >>> from polarspark import SparkFiles
-#
-#         >>> with tempfile.TemporaryDirectory() as d:
-#         ...     path = os.path.join(d, "test.txt")
-#         ...     with open(path, "w") as f:
-#         ...         _ = f.write("100")
-#         ...
-#         ...     zip_path1 = os.path.join(d, "test1.zip")
-#         ...     with zipfile.ZipFile(zip_path1, "w", zipfile.ZIP_DEFLATED) as z:
-#         ...         z.write(path, os.path.basename(path))
-#         ...
-#         ...     zip_path2 = os.path.join(d, "test2.zip")
-#         ...     with zipfile.ZipFile(zip_path2, "w", zipfile.ZIP_DEFLATED) as z:
-#         ...         z.write(path, os.path.basename(path))
-#         ...
-#         ...     sc.addArchive(zip_path1)
-#         ...     arch_list1 = sorted(sc.listArchives)
-#         ...
-#         ...     sc.addArchive(zip_path2)
-#         ...     arch_list2 = sorted(sc.listArchives)
-#         ...
-#         ...     # add zip_path2 twice, this addition will be ignored
-#         ...     sc.addArchive(zip_path2)
-#         ...     arch_list3 = sorted(sc.listArchives)
-#         ...
-#         ...     def func(iterator):
-#         ...         with open("%s/test.txt" % SparkFiles.get("test1.zip")) as f:
-#         ...             mul = int(f.readline())
-#         ...             return [x * mul for x in iterator]
-#         ...
-#         ...     collected = sc.parallelize([1, 2, 3, 4]).mapPartitions(func).collect()
-#
-#         >>> arch_list1
-#         ['file:/.../test1.zip']
-#         >>> arch_list2
-#         ['file:/.../test1.zip', 'file:/.../test2.zip']
-#         >>> arch_list3
-#         ['file:/.../test1.zip', 'file:/.../test2.zip']
-#         >>> collected
-#         [100, 200, 300, 400]
-#         """
-#         self._jsc.sc().addArchive(path)
-#
-#     @property
-#     def listArchives(self) -> List[str]:
-#         """Returns a list of archive paths that are added to resources.
-#
-#         .. versionadded:: 3.4.0
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.addArchive`
-#         """
-#         return list(
-#             self._jvm.scala.jdk.javaapi.CollectionConverters.asJava(  # type: ignore[union-attr]
-#                 self._jsc.sc().listArchives()
-#             )
-#         )
-#
-#     def setCheckpointDir(self, dirName: str) -> None:
-#         """
-#         Set the directory under which RDDs are going to be checkpointed. The
-#         directory must be an HDFS path if running on a cluster.
-#
-#         .. versionadded:: 0.7.0
-#
-#         Parameters
-#         ----------
-#         dirName : str
-#             path to the directory where checkpoint files will be stored
-#             (must be HDFS path if running in cluster)
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.getCheckpointDir`
-#         :meth:`RDD.checkpoint`
-#         :meth:`RDD.getCheckpointFile`
-#         """
-#         self._jsc.sc().setCheckpointDir(dirName)
-#
-#     def getCheckpointDir(self) -> Optional[str]:
-#         """
-#         Return the directory where RDDs are checkpointed. Returns None if no
-#         checkpoint directory has been set.
-#
-#         .. versionadded:: 3.1.0
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.setCheckpointDir`
-#         :meth:`RDD.checkpoint`
-#         :meth:`RDD.getCheckpointFile`
-#         """
-#         if not self._jsc.sc().getCheckpointDir().isEmpty():
-#             return self._jsc.sc().getCheckpointDir().get()
-#         return None
-#
-#     def _getJavaStorageLevel(self, storageLevel: StorageLevel) -> JavaObject:
-#         """
-#         Returns a Java StorageLevel based on a polarspark.StorageLevel.
-#         """
-#         if not isinstance(storageLevel, StorageLevel):
-#             raise TypeError("storageLevel must be of type polarspark.StorageLevel")
-#         assert self._jvm is not None
-#         newStorageLevel = self._jvm.org.apache.spark.storage.StorageLevel
-#         return newStorageLevel(
-#             storageLevel.useDisk,
-#             storageLevel.useMemory,
-#             storageLevel.useOffHeap,
-#             storageLevel.deserialized,
-#             storageLevel.replication,
-#         )
-#
-#     def setJobGroup(self, groupId: str, description: str, interruptOnCancel: bool = False) -> None:
-#         """
-#         Assigns a group ID to all the jobs started by this thread until the group ID is set to a
-#         different value or cleared.
-#
-#         Often, a unit of execution in an application consists of multiple Spark actions or jobs.
-#         Application programmers can use this method to group all those jobs together and give a
-#         group description. Once set, the Spark web UI will associate such jobs with this group.
-#
-#         The application can use :meth:`SparkContext.cancelJobGroup` to cancel all
-#         running jobs in this group.
-#
-#         .. versionadded:: 1.0.0
-#
-#         Parameters
-#         ----------
-#         groupId : str
-#             The group ID to assign.
-#         description : str
-#             The description to set for the job group.
-#         interruptOnCancel : bool, optional, default False
-#             whether to interrupt jobs on job cancellation.
-#
-#         Notes
-#         -----
-#         If interruptOnCancel is set to true for the job group, then job cancellation will result
-#         in Thread.interrupt() being called on the job's executor threads. This is useful to help
-#         ensure that the tasks are actually stopped in a timely manner, but is off by default due
-#         to HDFS-1208, where HDFS may respond to Thread.interrupt() by marking nodes as dead.
-#
-#         If you run jobs in parallel, use :class:`polarspark.InheritableThread` for thread
-#         local inheritance.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.cancelJobGroup`
-#
-#         Examples
-#         --------
-#         >>> import threading
-#         >>> from time import sleep
-#         >>> from polarspark import InheritableThread
-#         >>> result = "Not Set"
-#         >>> lock = threading.Lock()
-#         >>> def map_func(x):
-#         ...     sleep(100)
-#         ...     raise RuntimeError("Task should have been cancelled")
-#         ...
-#         >>> def start_job(x):
-#         ...     global result
-#         ...     try:
-#         ...         sc.setJobGroup("job_to_cancel", "some description")
-#         ...         result = sc.parallelize(range(x)).map(map_func).collect()
-#         ...     except Exception as e:
-#         ...         result = "Cancelled"
-#         ...     lock.release()
-#         ...
-#         >>> def stop_job():
-#         ...     sleep(5)
-#         ...     sc.cancelJobGroup("job_to_cancel")
-#         ...
-#         >>> suppress = lock.acquire()
-#         >>> suppress = InheritableThread(target=start_job, args=(10,)).start()
-#         >>> suppress = InheritableThread(target=stop_job).start()
-#         >>> suppress = lock.acquire()
-#         >>> print(result)
-#         Cancelled
-#         """
-#         self._jsc.setJobGroup(groupId, description, interruptOnCancel)
-#
-#     def setInterruptOnCancel(self, interruptOnCancel: bool) -> None:
-#         """
-#         Set the behavior of job cancellation from jobs started in this thread.
-#
-#         .. versionadded:: 3.5.0
-#
-#         Parameters
-#         ----------
-#         interruptOnCancel : bool
-#             If true, then job cancellation will result in ``Thread.interrupt()``
-#             being called on the job's executor threads. This is useful to help ensure that
-#             the tasks are actually stopped in a timely manner, but is off by default due to
-#             HDFS-1208, where HDFS may respond to ``Thread.interrupt()`` by marking nodes as dead.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.addJobTag`
-#         :meth:`SparkContext.removeJobTag`
-#         :meth:`SparkContext.cancelAllJobs`
-#         :meth:`SparkContext.cancelJobGroup`
-#         :meth:`SparkContext.cancelJobsWithTag`
-#         """
-#         self._jsc.setInterruptOnCancel(interruptOnCancel)
-#
-#     def addJobTag(self, tag: str) -> None:
-#         """
-#         Add a tag to be assigned to all the jobs started by this thread.
-#
-#         Often, a unit of execution in an application consists of multiple Spark actions or jobs.
-#         Application programmers can use this method to group all those jobs together and give a
-#         group tag. The application can use :meth:`SparkContext.cancelJobsWithTag` to cancel all
-#         running executions with this tag.
-#
-#         There may be multiple tags present at the same time, so different parts of application may
-#         use different tags to perform cancellation at different levels of granularity.
-#
-#         .. versionadded:: 3.5.0
-#
-#         Parameters
-#         ----------
-#         tag : str
-#             The tag to be added. Cannot contain ',' (comma) character.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.removeJobTag`
-#         :meth:`SparkContext.getJobTags`
-#         :meth:`SparkContext.clearJobTags`
-#         :meth:`SparkContext.cancelJobsWithTag`
-#         :meth:`SparkContext.setInterruptOnCancel`
-#
-#         Examples
-#         --------
-#         >>> import threading
-#         >>> from time import sleep
-#         >>> from polarspark import InheritableThread
-#         >>> sc.setInterruptOnCancel(interruptOnCancel=True)
-#         >>> result = "Not Set"
-#         >>> lock = threading.Lock()
-#         >>> def map_func(x):
-#         ...     sleep(100)
-#         ...     raise RuntimeError("Task should have been cancelled")
-#         ...
-#         >>> def start_job(x):
-#         ...     global result
-#         ...     try:
-#         ...         sc.addJobTag("job_to_cancel")
-#         ...         result = sc.parallelize(range(x)).map(map_func).collect()
-#         ...     except Exception as e:
-#         ...         result = "Cancelled"
-#         ...     lock.release()
-#         ...
-#         >>> def stop_job():
-#         ...     sleep(5)
-#         ...     sc.cancelJobsWithTag("job_to_cancel")
-#         ...
-#         >>> suppress = lock.acquire()
-#         >>> suppress = InheritableThread(target=start_job, args=(10,)).start()
-#         >>> suppress = InheritableThread(target=stop_job).start()
-#         >>> suppress = lock.acquire()
-#         >>> print(result)
-#         Cancelled
-#         >>> sc.clearJobTags()
-#         """
-#         self._jsc.addJobTag(tag)
-#
-#     def removeJobTag(self, tag: str) -> None:
-#         """
-#         Remove a tag previously added to be assigned to all the jobs started by this thread.
-#         Noop if such a tag was not added earlier.
-#
-#         .. versionadded:: 3.5.0
-#
-#         Parameters
-#         ----------
-#         tag : str
-#             The tag to be removed. Cannot contain ',' (comma) character.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.addJobTag`
-#         :meth:`SparkContext.getJobTags`
-#         :meth:`SparkContext.clearJobTags`
-#         :meth:`SparkContext.cancelJobsWithTag`
-#         :meth:`SparkContext.setInterruptOnCancel`
-#
-#         Examples
-#         --------
-#         >>> sc.addJobTag("job_to_cancel1")
-#         >>> sc.addJobTag("job_to_cancel2")
-#         >>> sc.getJobTags()
-#         {'job_to_cancel1', 'job_to_cancel2'}
-#         >>> sc.removeJobTag("job_to_cancel1")
-#         >>> sc.getJobTags()
-#         {'job_to_cancel2'}
-#         >>> sc.clearJobTags()
-#         """
-#         self._jsc.removeJobTag(tag)
-#
-#     def getJobTags(self) -> Set[str]:
-#         """
-#         Get the tags that are currently set to be assigned to all the jobs started by this thread.
-#
-#         .. versionadded:: 3.5.0
-#
-#         Returns
-#         -------
-#         set of str
-#             the tags that are currently set to be assigned to all the jobs started by this thread.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.addJobTag`
-#         :meth:`SparkContext.removeJobTag`
-#         :meth:`SparkContext.clearJobTags`
-#         :meth:`SparkContext.cancelJobsWithTag`
-#         :meth:`SparkContext.setInterruptOnCancel`
-#
-#         Examples
-#         --------
-#         >>> sc.addJobTag("job_to_cancel")
-#         >>> sc.getJobTags()
-#         {'job_to_cancel'}
-#         >>> sc.clearJobTags()
-#         """
-#         return self._jsc.getJobTags()
-#
-#     def clearJobTags(self) -> None:
-#         """
-#         Clear the current thread's job tags.
-#
-#         .. versionadded:: 3.5.0
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.addJobTag`
-#         :meth:`SparkContext.removeJobTag`
-#         :meth:`SparkContext.getJobTags`
-#         :meth:`SparkContext.cancelJobsWithTag`
-#         :meth:`SparkContext.setInterruptOnCancel`
-#
-#         Examples
-#         --------
-#         >>> sc.addJobTag("job_to_cancel")
-#         >>> sc.clearJobTags()
-#         >>> sc.getJobTags()
-#         set()
-#         """
-#         self._jsc.clearJobTags()
-#
-#     def setLocalProperty(self, key: str, value: str) -> None:
-#         """
-#         Set a local property that affects jobs submitted from this thread, such as the
-#         Spark fair scheduler pool.
-#
-#         To remove/unset property simply set `value` to None e.g. sc.setLocalProperty("key", None)
-#
-#         .. versionadded:: 1.0.0
-#
-#         Parameters
-#         ----------
-#         key : str
-#             The key of the local property to set.
-#         value : str
-#             The value of the local property to set. If set to `None` then the
-#             property will be removed
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.getLocalProperty`
-#
-#         Notes
-#         -----
-#         If you run jobs in parallel, use :class:`polarspark.InheritableThread` for thread
-#         local inheritance.
-#         """
-#         self._jsc.setLocalProperty(key, value)
-#
-#     def getLocalProperty(self, key: str) -> Optional[str]:
-#         """
-#         Get a local property set in this thread, or null if it is missing. See
-#         :meth:`setLocalProperty`.
-#
-#         .. versionadded:: 1.0.0
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.setLocalProperty`
-#         """
-#         return self._jsc.getLocalProperty(key)
-#
-#     def setJobDescription(self, value: str) -> None:
-#         """
-#         Set a human readable description of the current job.
-#
-#         .. versionadded:: 2.3.0
-#
-#         Parameters
-#         ----------
-#         value : str
-#             The job description to set.
-#
-#         Notes
-#         -----
-#         If you run jobs in parallel, use :class:`polarspark.InheritableThread` for thread
-#         local inheritance.
-#         """
-#         self._jsc.setJobDescription(value)
-#
-#     def sparkUser(self) -> str:
-#         """
-#         Get SPARK_USER for user who is running SparkContext.
-#
-#         .. versionadded:: 1.0.0
-#         """
-#         return self._jsc.sc().sparkUser()
-#
-#     def cancelJobGroup(self, groupId: str) -> None:
-#         """
-#         Cancel active jobs for the specified group. See :meth:`SparkContext.setJobGroup`.
-#         for more information.
-#
-#         .. versionadded:: 1.1.0
-#
-#         Parameters
-#         ----------
-#         groupId : str
-#             The group ID to cancel the job.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.setJobGroup`
-#         """
-#         self._jsc.sc().cancelJobGroup(groupId)
-#
-#     def cancelJobsWithTag(self, tag: str) -> None:
-#         """
-#         Cancel active jobs that have the specified tag. See
-#         :meth:`SparkContext.addJobTag`.
-#
-#         .. versionadded:: 3.5.0
-#
-#         Parameters
-#         ----------
-#         tag : str
-#             The tag to be cancelled. Cannot contain ',' (comma) character.
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.addJobTag`
-#         :meth:`SparkContext.removeJobTag`
-#         :meth:`SparkContext.getJobTags`
-#         :meth:`SparkContext.clearJobTags`
-#         :meth:`SparkContext.setInterruptOnCancel`
-#         """
-#         return self._jsc.cancelJobsWithTag(tag)
-#
-#     def cancelAllJobs(self) -> None:
-#         """
-#         Cancel all jobs that have been scheduled or are running.
-#
-#         .. versionadded:: 1.1.0
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.cancelJobGroup`
-#         :meth:`SparkContext.cancelJobsWithTag`
-#         :meth:`SparkContext.runJob`
-#         """
-#         self._jsc.sc().cancelAllJobs()
-#
-#     def statusTracker(self) -> StatusTracker:
-#         """
-#         Return :class:`StatusTracker` object
-#
-#         .. versionadded:: 1.4.0
-#         """
-#         return StatusTracker(self._jsc.statusTracker())
-#
-#     def runJob(
-#         self,
-#         rdd: RDD[T],
-#         partitionFunc: Callable[[Iterable[T]], Iterable[U]],
-#         partitions: Optional[Sequence[int]] = None,
-#         allowLocal: bool = False,
-#     ) -> List[U]:
-#         """
-#         Executes the given partitionFunc on the specified set of partitions,
-#         returning the result as an array of elements.
-#
-#         If 'partitions' is not specified, this will run over all partitions.
-#
-#         .. versionadded:: 1.1.0
-#
-#         Parameters
-#         ----------
-#         rdd : :class:`RDD`
-#             target RDD to run tasks on
-#         partitionFunc : function
-#             a function to run on each partition of the RDD
-#         partitions : list, optional
-#             set of partitions to run on; some jobs may not want to compute on all
-#             partitions of the target RDD, e.g. for operations like `first`
-#         allowLocal : bool, default False
-#             this parameter takes no effect
-#
-#         Returns
-#         -------
-#         list
-#             results of specified partitions
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.cancelAllJobs`
-#
-#         Examples
-#         --------
-#         >>> myRDD = sc.parallelize(range(6), 3)
-#         >>> sc.runJob(myRDD, lambda part: [x * x for x in part])
-#         [0, 1, 4, 9, 16, 25]
-#
-#         >>> myRDD = sc.parallelize(range(6), 3)
-#         >>> sc.runJob(myRDD, lambda part: [x * x for x in part], [0, 2], True)
-#         [0, 1, 16, 25]
-#         """
-#         if partitions is None:
-#             partitions = list(range(rdd._jrdd.partitions().size()))
-#
-#         # Implementation note: This is implemented as a mapPartitions followed
-#         # by runJob() in order to avoid having to pass a Python lambda into
-#         # SparkContext#runJob.
-#         mappedRDD = rdd.mapPartitions(partitionFunc)
-#         assert self._jvm is not None
-#         sock_info = self._jvm.PythonRDD.runJob(self._jsc.sc(), mappedRDD._jrdd, partitions)
-#         return list(_load_from_socket(sock_info, mappedRDD._jrdd_deserializer))
-#
-#     def show_profiles(self) -> None:
-#         """Print the profile stats to stdout
-#
-#         .. versionadded:: 1.2.0
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.dump_profiles`
-#         """
-#         if self.profiler_collector is not None:
-#             self.profiler_collector.show_profiles()
-#         else:
-#             raise PySparkRuntimeError(
-#                 error_class="INCORRECT_CONF_FOR_PROFILE",
-#                 message_parameters={},
-#             )
-#
-#     def dump_profiles(self, path: str) -> None:
-#         """Dump the profile stats into directory `path`
-#
-#         .. versionadded:: 1.2.0
-#
-#         See Also
-#         --------
-#         :meth:`SparkContext.show_profiles`
-#         """
-#         if self.profiler_collector is not None:
-#             self.profiler_collector.dump_profiles(path)
-#         else:
-#             raise PySparkRuntimeError(
-#                 error_class="INCORRECT_CONF_FOR_PROFILE",
-#                 message_parameters={},
-#             )
-#
+    #     def pickleFile(self, name: str, minPartitions: Optional[int] = None) -> RDD[Any]:
+    #         """
+    #         Load an RDD previously saved using :meth:`RDD.saveAsPickleFile` method.
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         Parameters
+    #         ----------
+    #         name : str
+    #             directory to the input data files, the path can be comma separated
+    #             paths as a list of inputs
+    #         minPartitions : int, optional
+    #             suggested minimum number of partitions for the resulting RDD
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD representing unpickled data from the file(s).
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.saveAsPickleFile`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     # Write a temporary pickled file
+    #         ...     path1 = os.path.join(d, "pickled1")
+    #         ...     sc.parallelize(range(10)).saveAsPickleFile(path1, 3)
+    #         ...
+    #         ...     # Write another temporary pickled file
+    #         ...     path2 = os.path.join(d, "pickled2")
+    #         ...     sc.parallelize(range(-10, -5)).saveAsPickleFile(path2, 3)
+    #         ...
+    #         ...     # Load picked file
+    #         ...     collected1 = sorted(sc.pickleFile(path1, 3).collect())
+    #         ...     collected2 = sorted(sc.pickleFile(path2, 4).collect())
+    #         ...
+    #         ...     # Load two picked files together
+    #         ...     collected3 = sorted(sc.pickleFile('{},{}'.format(path1, path2), 5).collect())
+    #
+    #         >>> collected1
+    #         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    #         >>> collected2
+    #         [-10, -9, -8, -7, -6]
+    #         >>> collected3
+    #         [-10, -9, -8, -7, -6, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    #         """
+    #         minPartitions = minPartitions or self.defaultMinPartitions
+    #         return RDD(self._jsc.objectFile(name, minPartitions), self)
+    #
+    #     def textFile(
+    #         self, name: str, minPartitions: Optional[int] = None, use_unicode: bool = True
+    #     ) -> RDD[str]:
+    #         """
+    #         Read a text file from HDFS, a local file system (available on all
+    #         nodes), or any Hadoop-supported file system URI, and return it as an
+    #         RDD of Strings. The text files must be encoded as UTF-8.
+    #
+    #         .. versionadded:: 0.7.0
+    #
+    #         Parameters
+    #         ----------
+    #         name : str
+    #             directory to the input data files, the path can be comma separated
+    #             paths as a list of inputs
+    #         minPartitions : int, optional
+    #             suggested minimum number of partitions for the resulting RDD
+    #         use_unicode : bool, default True
+    #             If `use_unicode` is False, the strings will be kept as `str` (encoding
+    #             as `utf-8`), which is faster and smaller than unicode.
+    #
+    #             .. versionadded:: 1.2.0
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD representing text data from the file(s).
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.saveAsTextFile`
+    #         :meth:`SparkContext.wholeTextFiles`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     path1 = os.path.join(d, "text1")
+    #         ...     path2 = os.path.join(d, "text2")
+    #         ...
+    #         ...     # Write a temporary text file
+    #         ...     sc.parallelize(["x", "y", "z"]).saveAsTextFile(path1)
+    #         ...
+    #         ...     # Write another temporary text file
+    #         ...     sc.parallelize(["aa", "bb", "cc"]).saveAsTextFile(path2)
+    #         ...
+    #         ...     # Load text file
+    #         ...     collected1 = sorted(sc.textFile(path1, 3).collect())
+    #         ...     collected2 = sorted(sc.textFile(path2, 4).collect())
+    #         ...
+    #         ...     # Load two text files together
+    #         ...     collected3 = sorted(sc.textFile('{},{}'.format(path1, path2), 5).collect())
+    #
+    #         >>> collected1
+    #         ['x', 'y', 'z']
+    #         >>> collected2
+    #         ['aa', 'bb', 'cc']
+    #         >>> collected3
+    #         ['aa', 'bb', 'cc', 'x', 'y', 'z']
+    #         """
+    #         minPartitions = minPartitions or min(self.defaultParallelism, 2)
+    #         return RDD(self._jsc.textFile(name, minPartitions), self, UTF8Deserializer(use_unicode))
+    #
+    #     def wholeTextFiles(
+    #         self, path: str, minPartitions: Optional[int] = None, use_unicode: bool = True
+    #     ) -> RDD[Tuple[str, str]]:
+    #         """
+    #         Read a directory of text files from HDFS, a local file system
+    #         (available on all nodes), or any  Hadoop-supported file system
+    #         URI. Each file is read as a single record and returned in a
+    #         key-value pair, where the key is the path of each file, the
+    #         value is the content of each file.
+    #         The text files must be encoded as UTF-8.
+    #
+    #         .. versionadded:: 1.0.0
+    #
+    #         For example, if you have the following files:
+    #
+    #         .. code-block:: text
+    #
+    #             hdfs://a-hdfs-path/part-00000
+    #             hdfs://a-hdfs-path/part-00001
+    #             ...
+    #             hdfs://a-hdfs-path/part-nnnnn
+    #
+    #         Do ``rdd = sparkContext.wholeTextFiles("hdfs://a-hdfs-path")``,
+    #         then ``rdd`` contains:
+    #
+    #         .. code-block:: text
+    #
+    #             (a-hdfs-path/part-00000, its content)
+    #             (a-hdfs-path/part-00001, its content)
+    #             ...
+    #             (a-hdfs-path/part-nnnnn, its content)
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             directory to the input data files, the path can be comma separated
+    #             paths as a list of inputs
+    #         minPartitions : int, optional
+    #             suggested minimum number of partitions for the resulting RDD
+    #         use_unicode : bool, default True
+    #             If `use_unicode` is False, the strings will be kept as `str` (encoding
+    #             as `utf-8`), which is faster and smaller than unicode.
+    #
+    #             .. versionadded:: 1.2.0
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD representing path-content pairs from the file(s).
+    #
+    #         Notes
+    #         -----
+    #         Small files are preferred, as each file will be loaded fully in memory.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.saveAsTextFile`
+    #         :meth:`SparkContext.textFile`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     # Write a temporary text file
+    #         ...     with open(os.path.join(d, "1.txt"), "w") as f:
+    #         ...         _ = f.write("123")
+    #         ...
+    #         ...     # Write another temporary text file
+    #         ...     with open(os.path.join(d, "2.txt"), "w") as f:
+    #         ...         _ = f.write("xyz")
+    #         ...
+    #         ...     collected = sorted(sc.wholeTextFiles(d).collect())
+    #         >>> collected
+    #         [('.../1.txt', '123'), ('.../2.txt', 'xyz')]
+    #         """
+    #         minPartitions = minPartitions or self.defaultMinPartitions
+    #         return RDD(
+    #             self._jsc.wholeTextFiles(path, minPartitions),
+    #             self,
+    #             PairDeserializer(UTF8Deserializer(use_unicode), UTF8Deserializer(use_unicode)),
+    #         )
+    #
+    #     def binaryFiles(self, path: str, minPartitions: Optional[int] = None) -> RDD[Tuple[str, bytes]]:
+    #         """
+    #         Read a directory of binary files from HDFS, a local file system
+    #         (available on all nodes), or any Hadoop-supported file system URI
+    #         as a byte array. Each file is read as a single record and returned
+    #         in a key-value pair, where the key is the path of each file, the
+    #         value is the content of each file.
+    #
+    #         .. versionadded:: 1.3.0
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             directory to the input data files, the path can be comma separated
+    #             paths as a list of inputs
+    #         minPartitions : int, optional
+    #             suggested minimum number of partitions for the resulting RDD
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD representing path-content pairs from the file(s).
+    #
+    #         Notes
+    #         -----
+    #         Small files are preferred, large file is also allowable, but may cause bad performance.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.binaryRecords`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     # Write a temporary binary file
+    #         ...     with open(os.path.join(d, "1.bin"), "wb") as f1:
+    #         ...         _ = f1.write(b"binary data I")
+    #         ...
+    #         ...     # Write another temporary binary file
+    #         ...     with open(os.path.join(d, "2.bin"), "wb") as f2:
+    #         ...         _ = f2.write(b"binary data II")
+    #         ...
+    #         ...     collected = sorted(sc.binaryFiles(d).collect())
+    #
+    #         >>> collected
+    #         [('.../1.bin', b'binary data I'), ('.../2.bin', b'binary data II')]
+    #         """
+    #         minPartitions = minPartitions or self.defaultMinPartitions
+    #         return RDD(
+    #             self._jsc.binaryFiles(path, minPartitions),
+    #             self,
+    #             PairDeserializer(UTF8Deserializer(), NoOpSerializer()),
+    #         )
+    #
+    #     def binaryRecords(self, path: str, recordLength: int) -> RDD[bytes]:
+    #         """
+    #         Load data from a flat binary file, assuming each record is a set of numbers
+    #         with the specified numerical format (see ByteBuffer), and the number of
+    #         bytes per record is constant.
+    #
+    #         .. versionadded:: 1.3.0
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             Directory to the input data files
+    #         recordLength : int
+    #             The length at which to split the records
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD of data with values, represented as byte arrays
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.binaryFiles`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     # Write a temporary file
+    #         ...     with open(os.path.join(d, "1.bin"), "w") as f:
+    #         ...         for i in range(3):
+    #         ...             _ = f.write("%04d" % i)
+    #         ...
+    #         ...     # Write another file
+    #         ...     with open(os.path.join(d, "2.bin"), "w") as f:
+    #         ...         for i in [-1, -2, -10]:
+    #         ...             _ = f.write("%04d" % i)
+    #         ...
+    #         ...     collected = sorted(sc.binaryRecords(d, 4).collect())
+    #
+    #         >>> collected
+    #         [b'-001', b'-002', b'-010', b'0000', b'0001', b'0002']
+    #         """
+    #         return RDD(self._jsc.binaryRecords(path, recordLength), self, NoOpSerializer())
+    #
+    #     def _dictToJavaMap(self, d: Optional[Dict[str, str]]) -> JavaMap:
+    #         assert self._jvm is not None
+    #         jm = self._jvm.java.util.HashMap()
+    #         if not d:
+    #             d = {}
+    #         for k, v in d.items():
+    #             jm[k] = v
+    #         return jm
+    #
+    #     def sequenceFile(
+    #         self,
+    #         path: str,
+    #         keyClass: Optional[str] = None,
+    #         valueClass: Optional[str] = None,
+    #         keyConverter: Optional[str] = None,
+    #         valueConverter: Optional[str] = None,
+    #         minSplits: Optional[int] = None,
+    #         batchSize: int = 0,
+    #     ) -> RDD[Tuple[T, U]]:
+    #         """
+    #         Read a Hadoop SequenceFile with arbitrary key and value Writable class from HDFS,
+    #         a local file system (available on all nodes), or any Hadoop-supported file system URI.
+    #         The mechanism is as follows:
+    #
+    #             1. A Java RDD is created from the SequenceFile or other InputFormat, and the key
+    #                and value Writable classes
+    #             2. Serialization is attempted via Pickle pickling
+    #             3. If this fails, the fallback is to call 'toString' on each key and value
+    #             4. :class:`CPickleSerializer` is used to deserialize pickled objects on the Python side
+    #
+    #         .. versionadded:: 1.3.0
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             path to sequencefile
+    #         keyClass: str, optional
+    #             fully qualified classname of key Writable class (e.g. "org.apache.hadoop.io.Text")
+    #         valueClass : str, optional
+    #             fully qualified classname of value Writable class
+    #             (e.g. "org.apache.hadoop.io.LongWritable")
+    #         keyConverter : str, optional
+    #             fully qualified name of a function returning key WritableConverter
+    #         valueConverter : str, optional
+    #             fully qualifiedname of a function returning value WritableConverter
+    #         minSplits : int, optional
+    #             minimum splits in dataset (default min(2, sc.defaultParallelism))
+    #         batchSize : int, optional, default 0
+    #             The number of Python objects represented as a single
+    #             Java object. (default 0, choose batchSize automatically)
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD of tuples of key and corresponding value
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.saveAsSequenceFile`
+    #         :meth:`RDD.saveAsNewAPIHadoopFile`
+    #         :meth:`RDD.saveAsHadoopFile`
+    #         :meth:`SparkContext.newAPIHadoopFile`
+    #         :meth:`SparkContext.hadoopFile`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #
+    #         Set the class of output format
+    #
+    #         >>> output_format_class = "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
+    #
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     path = os.path.join(d, "hadoop_file")
+    #         ...
+    #         ...     # Write a temporary Hadoop file
+    #         ...     rdd = sc.parallelize([(1, {3.0: "bb"}), (2, {1.0: "aa"}), (3, {2.0: "dd"})])
+    #         ...     rdd.saveAsNewAPIHadoopFile(path, output_format_class)
+    #         ...
+    #         ...     collected = sorted(sc.sequenceFile(path).collect())
+    #
+    #         >>> collected
+    #         [(1, {3.0: 'bb'}), (2, {1.0: 'aa'}), (3, {2.0: 'dd'})]
+    #         """
+    #         minSplits = minSplits or min(self.defaultParallelism, 2)
+    #         assert self._jvm is not None
+    #         jrdd = self._jvm.PythonRDD.sequenceFile(
+    #             self._jsc,
+    #             path,
+    #             keyClass,
+    #             valueClass,
+    #             keyConverter,
+    #             valueConverter,
+    #             minSplits,
+    #             batchSize,
+    #         )
+    #         return RDD(jrdd, self)
+    #
+    #     def newAPIHadoopFile(
+    #         self,
+    #         path: str,
+    #         inputFormatClass: str,
+    #         keyClass: str,
+    #         valueClass: str,
+    #         keyConverter: Optional[str] = None,
+    #         valueConverter: Optional[str] = None,
+    #         conf: Optional[Dict[str, str]] = None,
+    #         batchSize: int = 0,
+    #     ) -> RDD[Tuple[T, U]]:
+    #         """
+    #         Read a 'new API' Hadoop InputFormat with arbitrary key and value class from HDFS,
+    #         a local file system (available on all nodes), or any Hadoop-supported file system URI.
+    #         The mechanism is the same as for meth:`SparkContext.sequenceFile`.
+    #
+    #         A Hadoop configuration can be passed in as a Python dict. This will be converted into a
+    #         Configuration in Java
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             path to Hadoop file
+    #         inputFormatClass : str
+    #             fully qualified classname of Hadoop InputFormat
+    #             (e.g. "org.apache.hadoop.mapreduce.lib.input.TextInputFormat")
+    #         keyClass : str
+    #             fully qualified classname of key Writable class
+    #             (e.g. "org.apache.hadoop.io.Text")
+    #         valueClass : str
+    #             fully qualified classname of value Writable class
+    #             (e.g. "org.apache.hadoop.io.LongWritable")
+    #         keyConverter : str, optional
+    #             fully qualified name of a function returning key WritableConverter
+    #             None by default
+    #         valueConverter : str, optional
+    #             fully qualified name of a function returning value WritableConverter
+    #             None by default
+    #         conf : dict, optional
+    #             Hadoop configuration, passed in as a dict
+    #             None by default
+    #         batchSize : int, optional, default 0
+    #             The number of Python objects represented as a single
+    #             Java object. (default 0, choose batchSize automatically)
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD of tuples of key and corresponding value
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.saveAsSequenceFile`
+    #         :meth:`RDD.saveAsNewAPIHadoopFile`
+    #         :meth:`RDD.saveAsHadoopFile`
+    #         :meth:`SparkContext.sequenceFile`
+    #         :meth:`SparkContext.hadoopFile`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #
+    #         Set the related classes
+    #
+    #         >>> output_format_class = "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
+    #         >>> input_format_class = "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
+    #         >>> key_class = "org.apache.hadoop.io.IntWritable"
+    #         >>> value_class = "org.apache.hadoop.io.Text"
+    #
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     path = os.path.join(d, "new_hadoop_file")
+    #         ...
+    #         ...     # Write a temporary Hadoop file
+    #         ...     rdd = sc.parallelize([(1, ""), (1, "a"), (3, "x")])
+    #         ...     rdd.saveAsNewAPIHadoopFile(path, output_format_class, key_class, value_class)
+    #         ...
+    #         ...     loaded = sc.newAPIHadoopFile(path, input_format_class, key_class, value_class)
+    #         ...     collected = sorted(loaded.collect())
+    #
+    #         >>> collected
+    #         [(1, ''), (1, 'a'), (3, 'x')]
+    #         """
+    #         jconf = self._dictToJavaMap(conf)
+    #         assert self._jvm is not None
+    #         jrdd = self._jvm.PythonRDD.newAPIHadoopFile(
+    #             self._jsc,
+    #             path,
+    #             inputFormatClass,
+    #             keyClass,
+    #             valueClass,
+    #             keyConverter,
+    #             valueConverter,
+    #             jconf,
+    #             batchSize,
+    #         )
+    #         return RDD(jrdd, self)
+    #
+    #     def newAPIHadoopRDD(
+    #         self,
+    #         inputFormatClass: str,
+    #         keyClass: str,
+    #         valueClass: str,
+    #         keyConverter: Optional[str] = None,
+    #         valueConverter: Optional[str] = None,
+    #         conf: Optional[Dict[str, str]] = None,
+    #         batchSize: int = 0,
+    #     ) -> RDD[Tuple[T, U]]:
+    #         """
+    #         Read a 'new API' Hadoop InputFormat with arbitrary key and value class, from an arbitrary
+    #         Hadoop configuration, which is passed in as a Python dict.
+    #         This will be converted into a Configuration in Java.
+    #         The mechanism is the same as for meth:`SparkContext.sequenceFile`.
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         Parameters
+    #         ----------
+    #         inputFormatClass : str
+    #             fully qualified classname of Hadoop InputFormat
+    #             (e.g. "org.apache.hadoop.mapreduce.lib.input.TextInputFormat")
+    #         keyClass : str
+    #             fully qualified classname of key Writable class (e.g. "org.apache.hadoop.io.Text")
+    #         valueClass : str
+    #             fully qualified classname of value Writable class
+    #             (e.g. "org.apache.hadoop.io.LongWritable")
+    #         keyConverter : str, optional
+    #             fully qualified name of a function returning key WritableConverter
+    #             (None by default)
+    #         valueConverter : str, optional
+    #             fully qualified name of a function returning value WritableConverter
+    #             (None by default)
+    #         conf : dict, optional
+    #             Hadoop configuration, passed in as a dict (None by default)
+    #         batchSize : int, optional, default 0
+    #             The number of Python objects represented as a single
+    #             Java object. (default 0, choose batchSize automatically)
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD of tuples of key and corresponding value
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.saveAsNewAPIHadoopDataset`
+    #         :meth:`RDD.saveAsHadoopDataset`
+    #         :meth:`SparkContext.hadoopRDD`
+    #         :meth:`SparkContext.hadoopFile`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #
+    #         Set the related classes
+    #
+    #         >>> output_format_class = "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
+    #         >>> input_format_class = "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
+    #         >>> key_class = "org.apache.hadoop.io.IntWritable"
+    #         >>> value_class = "org.apache.hadoop.io.Text"
+    #
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     path = os.path.join(d, "new_hadoop_file")
+    #         ...
+    #         ...     # Create the conf for writing
+    #         ...     write_conf = {
+    #         ...         "mapreduce.job.outputformat.class": (output_format_class),
+    #         ...         "mapreduce.job.output.key.class": key_class,
+    #         ...         "mapreduce.job.output.value.class": value_class,
+    #         ...         "mapreduce.output.fileoutputformat.outputdir": path,
+    #         ...     }
+    #         ...
+    #         ...     # Write a temporary Hadoop file
+    #         ...     rdd = sc.parallelize([(1, ""), (1, "a"), (3, "x")])
+    #         ...     rdd.saveAsNewAPIHadoopDataset(conf=write_conf)
+    #         ...
+    #         ...     # Create the conf for reading
+    #         ...     read_conf = {"mapreduce.input.fileinputformat.inputdir": path}
+    #         ...
+    #         ...     loaded = sc.newAPIHadoopRDD(input_format_class,
+    #         ...         key_class, value_class, conf=read_conf)
+    #         ...     collected = sorted(loaded.collect())
+    #
+    #         >>> collected
+    #         [(1, ''), (1, 'a'), (3, 'x')]
+    #         """
+    #         jconf = self._dictToJavaMap(conf)
+    #         assert self._jvm is not None
+    #         jrdd = self._jvm.PythonRDD.newAPIHadoopRDD(
+    #             self._jsc,
+    #             inputFormatClass,
+    #             keyClass,
+    #             valueClass,
+    #             keyConverter,
+    #             valueConverter,
+    #             jconf,
+    #             batchSize,
+    #         )
+    #         return RDD(jrdd, self)
+    #
+    #     def hadoopFile(
+    #         self,
+    #         path: str,
+    #         inputFormatClass: str,
+    #         keyClass: str,
+    #         valueClass: str,
+    #         keyConverter: Optional[str] = None,
+    #         valueConverter: Optional[str] = None,
+    #         conf: Optional[Dict[str, str]] = None,
+    #         batchSize: int = 0,
+    #     ) -> RDD[Tuple[T, U]]:
+    #         """
+    #         Read an 'old' Hadoop InputFormat with arbitrary key and value class from HDFS,
+    #         a local file system (available on all nodes), or any Hadoop-supported file system URI.
+    #         The mechanism is the same as for meth:`SparkContext.sequenceFile`.
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         A Hadoop configuration can be passed in as a Python dict. This will be converted into a
+    #         Configuration in Java.
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             path to Hadoop file
+    #         inputFormatClass : str
+    #             fully qualified classname of Hadoop InputFormat
+    #             (e.g. "org.apache.hadoop.mapreduce.lib.input.TextInputFormat")
+    #         keyClass : str
+    #             fully qualified classname of key Writable class (e.g. "org.apache.hadoop.io.Text")
+    #         valueClass : str
+    #             fully qualified classname of value Writable class
+    #             (e.g. "org.apache.hadoop.io.LongWritable")
+    #         keyConverter : str, optional
+    #             fully qualified name of a function returning key WritableConverter
+    #         valueConverter : str, optional
+    #             fully qualified name of a function returning value WritableConverter
+    #         conf : dict, optional
+    #             Hadoop configuration, passed in as a dict
+    #         batchSize : int, optional, default 0
+    #             The number of Python objects represented as a single
+    #             Java object. (default 0, choose batchSize automatically)
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD of tuples of key and corresponding value
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.saveAsSequenceFile`
+    #         :meth:`RDD.saveAsNewAPIHadoopFile`
+    #         :meth:`RDD.saveAsHadoopFile`
+    #         :meth:`SparkContext.newAPIHadoopFile`
+    #         :meth:`SparkContext.hadoopRDD`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #
+    #         Set the related classes
+    #
+    #         >>> output_format_class = "org.apache.hadoop.mapred.TextOutputFormat"
+    #         >>> input_format_class = "org.apache.hadoop.mapred.TextInputFormat"
+    #         >>> key_class = "org.apache.hadoop.io.IntWritable"
+    #         >>> value_class = "org.apache.hadoop.io.Text"
+    #
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     path = os.path.join(d, "old_hadoop_file")
+    #         ...
+    #         ...     # Write a temporary Hadoop file
+    #         ...     rdd = sc.parallelize([(1, ""), (1, "a"), (3, "x")])
+    #         ...     rdd.saveAsHadoopFile(path, output_format_class, key_class, value_class)
+    #         ...
+    #         ...     loaded = sc.hadoopFile(path, input_format_class, key_class, value_class)
+    #         ...     collected = sorted(loaded.collect())
+    #
+    #         >>> collected
+    #         [(0, '1\\t'), (0, '1\\ta'), (0, '3\\tx')]
+    #         """
+    #         jconf = self._dictToJavaMap(conf)
+    #         assert self._jvm is not None
+    #         jrdd = self._jvm.PythonRDD.hadoopFile(
+    #             self._jsc,
+    #             path,
+    #             inputFormatClass,
+    #             keyClass,
+    #             valueClass,
+    #             keyConverter,
+    #             valueConverter,
+    #             jconf,
+    #             batchSize,
+    #         )
+    #         return RDD(jrdd, self)
+    #
+    #     def hadoopRDD(
+    #         self,
+    #         inputFormatClass: str,
+    #         keyClass: str,
+    #         valueClass: str,
+    #         keyConverter: Optional[str] = None,
+    #         valueConverter: Optional[str] = None,
+    #         conf: Optional[Dict[str, str]] = None,
+    #         batchSize: int = 0,
+    #     ) -> RDD[Tuple[T, U]]:
+    #         """
+    #         Read an 'old' Hadoop InputFormat with arbitrary key and value class, from an arbitrary
+    #         Hadoop configuration, which is passed in as a Python dict.
+    #         This will be converted into a Configuration in Java.
+    #         The mechanism is the same as for meth:`SparkContext.sequenceFile`.
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         Parameters
+    #         ----------
+    #         inputFormatClass : str
+    #             fully qualified classname of Hadoop InputFormat
+    #             (e.g. "org.apache.hadoop.mapreduce.lib.input.TextInputFormat")
+    #         keyClass : str
+    #             fully qualified classname of key Writable class (e.g. "org.apache.hadoop.io.Text")
+    #         valueClass : str
+    #             fully qualified classname of value Writable class
+    #             (e.g. "org.apache.hadoop.io.LongWritable")
+    #         keyConverter : str, optional
+    #             fully qualified name of a function returning key WritableConverter
+    #         valueConverter : str, optional
+    #             fully qualified name of a function returning value WritableConverter
+    #         conf : dict, optional
+    #             Hadoop configuration, passed in as a dict
+    #         batchSize : int, optional, default 0
+    #             The number of Python objects represented as a single
+    #             Java object. (default 0, choose batchSize automatically)
+    #
+    #         Returns
+    #         -------
+    #         :class:`RDD`
+    #             RDD of tuples of key and corresponding value
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.saveAsNewAPIHadoopDataset`
+    #         :meth:`RDD.saveAsHadoopDataset`
+    #         :meth:`SparkContext.newAPIHadoopRDD`
+    #         :meth:`SparkContext.hadoopFile`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #
+    #         Set the related classes
+    #
+    #         >>> output_format_class = "org.apache.hadoop.mapred.TextOutputFormat"
+    #         >>> input_format_class = "org.apache.hadoop.mapred.TextInputFormat"
+    #         >>> key_class = "org.apache.hadoop.io.IntWritable"
+    #         >>> value_class = "org.apache.hadoop.io.Text"
+    #
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     path = os.path.join(d, "old_hadoop_file")
+    #         ...
+    #         ...     # Create the conf for writing
+    #         ...     write_conf = {
+    #         ...         "mapred.output.format.class": output_format_class,
+    #         ...         "mapreduce.job.output.key.class": key_class,
+    #         ...         "mapreduce.job.output.value.class": value_class,
+    #         ...         "mapreduce.output.fileoutputformat.outputdir": path,
+    #         ...     }
+    #         ...
+    #         ...     # Write a temporary Hadoop file
+    #         ...     rdd = sc.parallelize([(1, ""), (1, "a"), (3, "x")])
+    #         ...     rdd.saveAsHadoopDataset(conf=write_conf)
+    #         ...
+    #         ...     # Create the conf for reading
+    #         ...     read_conf = {"mapreduce.input.fileinputformat.inputdir": path}
+    #         ...
+    #         ...     loaded = sc.hadoopRDD(input_format_class, key_class, value_class, conf=read_conf)
+    #         ...     collected = sorted(loaded.collect())
+    #
+    #         >>> collected
+    #         [(0, '1\\t'), (0, '1\\ta'), (0, '3\\tx')]
+    #         """
+    #         jconf = self._dictToJavaMap(conf)
+    #         assert self._jvm is not None
+    #         jrdd = self._jvm.PythonRDD.hadoopRDD(
+    #             self._jsc,
+    #             inputFormatClass,
+    #             keyClass,
+    #             valueClass,
+    #             keyConverter,
+    #             valueConverter,
+    #             jconf,
+    #             batchSize,
+    #         )
+    #         return RDD(jrdd, self)
+    #
+    #     def _checkpointFile(self, name: str, input_deserializer: PairDeserializer) -> RDD:
+    #         jrdd = self._jsc.checkpointFile(name)
+    #         return RDD(jrdd, self, input_deserializer)
+    #
+    #     def union(self, rdds: List[RDD[T]]) -> RDD[T]:
+    #         """
+    #         Build the union of a list of RDDs.
+    #
+    #         This supports unions() of RDDs with different serialized formats,
+    #         although this forces them to be reserialized using the default
+    #         serializer:
+    #
+    #         .. versionadded:: 0.7.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`RDD.union`
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     # generate a text RDD
+    #         ...     with open(os.path.join(d, "union-text.txt"), "w") as f:
+    #         ...         _ = f.write("Hello")
+    #         ...     text_rdd = sc.textFile(d)
+    #         ...
+    #         ...     # generate another RDD
+    #         ...     parallelized = sc.parallelize(["World!"])
+    #         ...
+    #         ...     unioned = sorted(sc.union([text_rdd, parallelized]).collect())
+    #
+    #         >>> unioned
+    #         ['Hello', 'World!']
+    #         """
+    #         first_jrdd_deserializer = rdds[0]._jrdd_deserializer
+    #         if any(x._jrdd_deserializer != first_jrdd_deserializer for x in rdds):
+    #             rdds = [x._reserialize() for x in rdds]
+    #         gw = SparkContext._gateway
+    #         assert gw is not None
+    #         jvm = SparkContext._jvm
+    #         assert jvm is not None
+    #         jrdd_cls = jvm.org.apache.spark.api.java.JavaRDD
+    #         jpair_rdd_cls = jvm.org.apache.spark.api.java.JavaPairRDD
+    #         jdouble_rdd_cls = jvm.org.apache.spark.api.java.JavaDoubleRDD
+    #         if is_instance_of(gw, rdds[0]._jrdd, jrdd_cls):
+    #             cls = jrdd_cls
+    #         elif is_instance_of(gw, rdds[0]._jrdd, jpair_rdd_cls):
+    #             cls = jpair_rdd_cls
+    #         elif is_instance_of(gw, rdds[0]._jrdd, jdouble_rdd_cls):
+    #             cls = jdouble_rdd_cls
+    #         else:
+    #             cls_name = rdds[0]._jrdd.getClass().getCanonicalName()
+    #             raise TypeError("Unsupported Java RDD class %s" % cls_name)
+    #         jrdds = gw.new_array(cls, len(rdds))
+    #         for i in range(0, len(rdds)):
+    #             jrdds[i] = rdds[i]._jrdd
+    #         return RDD(self._jsc.union(jrdds), self, rdds[0]._jrdd_deserializer)
+    #
+    #     def broadcast(self, value: T) -> "Broadcast[T]":
+    #         """
+    #         Broadcast a read-only variable to the cluster, returning a :class:`Broadcast`
+    #         object for reading it in distributed functions. The variable will
+    #         be sent to each cluster only once.
+    #
+    #         .. versionadded:: 0.7.0
+    #
+    #         Parameters
+    #         ----------
+    #         value : T
+    #             value to broadcast to the Spark nodes
+    #
+    #         Returns
+    #         -------
+    #         :class:`Broadcast`
+    #             :class:`Broadcast` object, a read-only variable cached on each machine
+    #
+    #         Examples
+    #         --------
+    #         >>> mapping = {1: 10001, 2: 10002}
+    #         >>> bc = sc.broadcast(mapping)
+    #
+    #         >>> rdd = sc.range(5)
+    #         >>> rdd2 = rdd.map(lambda i: bc.value[i] if i in bc.value else -1)
+    #         >>> rdd2.collect()
+    #         [-1, 10001, 10002, -1, -1]
+    #
+    #         >>> bc.destroy()
+    #         """
+    #         return Broadcast(self, value, self._pickled_broadcast_vars)
+    #
+    #     def accumulator(
+    #         self, value: T, accum_param: Optional["AccumulatorParam[T]"] = None
+    #     ) -> "Accumulator[T]":
+    #         """
+    #         Create an :class:`Accumulator` with the given initial value, using a given
+    #         :class:`AccumulatorParam` helper object to define how to add values of the
+    #         data type if provided. Default AccumulatorParams are used for integers
+    #         and floating-point numbers if you do not provide one. For other types,
+    #         a custom AccumulatorParam can be used.
+    #
+    #         .. versionadded:: 0.7.0
+    #
+    #         Parameters
+    #         ----------
+    #         value : T
+    #             initialized value
+    #         accum_param : :class:`polarspark.AccumulatorParam`, optional
+    #             helper object to define how to add values
+    #
+    #         Returns
+    #         -------
+    #         :class:`Accumulator`
+    #             `Accumulator` object, a shared variable that can be accumulated
+    #
+    #         Examples
+    #         --------
+    #         >>> acc = sc.accumulator(9)
+    #         >>> acc.value
+    #         9
+    #         >>> acc += 1
+    #         >>> acc.value
+    #         10
+    #
+    #         Accumulator object can be accumulated in RDD operations:
+    #
+    #         >>> rdd = sc.range(5)
+    #         >>> def f(x):
+    #         ...     global acc
+    #         ...     acc += 1
+    #         ...
+    #         >>> rdd.foreach(f)
+    #         >>> acc.value
+    #         15
+    #         """
+    #         if accum_param is None:
+    #             if isinstance(value, int):
+    #                 accum_param = cast("AccumulatorParam[T]", accumulators.INT_ACCUMULATOR_PARAM)
+    #             elif isinstance(value, float):
+    #                 accum_param = cast("AccumulatorParam[T]", accumulators.FLOAT_ACCUMULATOR_PARAM)
+    #             elif isinstance(value, complex):
+    #                 accum_param = cast("AccumulatorParam[T]", accumulators.COMPLEX_ACCUMULATOR_PARAM)
+    #             else:
+    #                 raise TypeError("No default accumulator param for type %s" % type(value))
+    #         SparkContext._next_accum_id += 1
+    #         return Accumulator(SparkContext._next_accum_id - 1, value, accum_param)
+    #
+    #     def addFile(self, path: str, recursive: bool = False) -> None:
+    #         """
+    #         Add a file to be downloaded with this Spark job on every node.
+    #         The `path` passed can be either a local file, a file in HDFS
+    #         (or other Hadoop-supported filesystems), or an HTTP, HTTPS or
+    #         FTP URI.
+    #
+    #         To access the file in Spark jobs, use :meth:`SparkFiles.get` with the
+    #         filename to find its download location.
+    #
+    #         A directory can be given if the recursive option is set to True.
+    #         Currently directories are only supported for Hadoop-supported filesystems.
+    #
+    #         .. versionadded:: 0.7.0
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             can be either a local file, a file in HDFS (or other Hadoop-supported
+    #             filesystems), or an HTTP, HTTPS or FTP URI. To access the file in Spark jobs,
+    #             use :meth:`SparkFiles.get` to find its download location.
+    #         recursive : bool, default False
+    #             whether to recursively add files in the input directory
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.listFiles`
+    #         :meth:`SparkContext.addPyFile`
+    #         :meth:`SparkFiles.get`
+    #
+    #         Notes
+    #         -----
+    #         A path can be added only once. Subsequent additions of the same path are ignored.
+    #
+    #         Examples
+    #         --------
+    #         >>> import os
+    #         >>> import tempfile
+    #         >>> from polarspark import SparkFiles
+    #
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     path1 = os.path.join(d, "test1.txt")
+    #         ...     with open(path1, "w") as f:
+    #         ...         _ = f.write("100")
+    #         ...
+    #         ...     path2 = os.path.join(d, "test2.txt")
+    #         ...     with open(path2, "w") as f:
+    #         ...         _ = f.write("200")
+    #         ...
+    #         ...     sc.addFile(path1)
+    #         ...     file_list1 = sorted(sc.listFiles)
+    #         ...
+    #         ...     sc.addFile(path2)
+    #         ...     file_list2 = sorted(sc.listFiles)
+    #         ...
+    #         ...     # add path2 twice, this addition will be ignored
+    #         ...     sc.addFile(path2)
+    #         ...     file_list3 = sorted(sc.listFiles)
+    #         ...
+    #         ...     def func(iterator):
+    #         ...         with open(SparkFiles.get("test1.txt")) as f:
+    #         ...             mul = int(f.readline())
+    #         ...             return [x * mul for x in iterator]
+    #         ...
+    #         ...     collected = sc.parallelize([1, 2, 3, 4]).mapPartitions(func).collect()
+    #
+    #         >>> file_list1
+    #         ['file:/.../test1.txt']
+    #         >>> file_list2
+    #         ['file:/.../test1.txt', 'file:/.../test2.txt']
+    #         >>> file_list3
+    #         ['file:/.../test1.txt', 'file:/.../test2.txt']
+    #         >>> collected
+    #         [100, 200, 300, 400]
+    #         """
+    #         self._jsc.sc().addFile(path, recursive)
+    #
+    #     @property
+    #     def listFiles(self) -> List[str]:
+    #         """Returns a list of file paths that are added to resources.
+    #
+    #         .. versionadded:: 3.4.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.addFile`
+    #         """
+    #         return list(
+    #             self._jvm.scala.jdk.javaapi.CollectionConverters.asJava(  # type: ignore[union-attr]
+    #                 self._jsc.sc().listFiles()
+    #             )
+    #         )
+    #
+    #     def addPyFile(self, path: str) -> None:
+    #         """
+    #         Add a .py or .zip dependency for all tasks to be executed on this
+    #         SparkContext in the future.  The `path` passed can be either a local
+    #         file, a file in HDFS (or other Hadoop-supported filesystems), or an
+    #         HTTP, HTTPS or FTP URI.
+    #
+    #         .. versionadded:: 0.7.0
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             can be either a .py file or .zip dependency.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.addFile`
+    #
+    #         Notes
+    #         -----
+    #         A path can be added only once. Subsequent additions of the same path are ignored.
+    #         """
+    #         self.addFile(path)
+    #         (dirname, filename) = os.path.split(path)  # dirname may be directory or HDFS/S3 prefix
+    #         if filename[-4:].lower() in self.PACKAGE_EXTENSIONS:
+    #             assert self._python_includes is not None
+    #             self._python_includes.append(filename)
+    #             # for tests in local mode
+    #             sys.path.insert(1, os.path.join(SparkFiles.getRootDirectory(), filename))
+    #
+    #         importlib.invalidate_caches()
+    #
+    #     def addArchive(self, path: str) -> None:
+    #         """
+    #         Add an archive to be downloaded with this Spark job on every node.
+    #         The `path` passed can be either a local file, a file in HDFS
+    #         (or other Hadoop-supported filesystems), or an HTTP, HTTPS or
+    #         FTP URI.
+    #
+    #         To access the file in Spark jobs, use :meth:`SparkFiles.get` with the
+    #         filename to find its download/unpacked location. The given path should
+    #         be one of .zip, .tar, .tar.gz, .tgz and .jar.
+    #
+    #         .. versionadded:: 3.3.0
+    #
+    #         Parameters
+    #         ----------
+    #         path : str
+    #             can be either a local file, a file in HDFS (or other Hadoop-supported
+    #             filesystems), or an HTTP, HTTPS or FTP URI. To access the file in Spark jobs,
+    #             use :meth:`SparkFiles.get` to find its download location.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.listArchives`
+    #         :meth:`SparkFiles.get`
+    #
+    #         Notes
+    #         -----
+    #         A path can be added only once. Subsequent additions of the same path are ignored.
+    #         This API is experimental.
+    #
+    #         Examples
+    #         --------
+    #         Creates a zipped file that contains a text file written '100'.
+    #
+    #         >>> import os
+    #         >>> import tempfile
+    #         >>> import zipfile
+    #         >>> from polarspark import SparkFiles
+    #
+    #         >>> with tempfile.TemporaryDirectory() as d:
+    #         ...     path = os.path.join(d, "test.txt")
+    #         ...     with open(path, "w") as f:
+    #         ...         _ = f.write("100")
+    #         ...
+    #         ...     zip_path1 = os.path.join(d, "test1.zip")
+    #         ...     with zipfile.ZipFile(zip_path1, "w", zipfile.ZIP_DEFLATED) as z:
+    #         ...         z.write(path, os.path.basename(path))
+    #         ...
+    #         ...     zip_path2 = os.path.join(d, "test2.zip")
+    #         ...     with zipfile.ZipFile(zip_path2, "w", zipfile.ZIP_DEFLATED) as z:
+    #         ...         z.write(path, os.path.basename(path))
+    #         ...
+    #         ...     sc.addArchive(zip_path1)
+    #         ...     arch_list1 = sorted(sc.listArchives)
+    #         ...
+    #         ...     sc.addArchive(zip_path2)
+    #         ...     arch_list2 = sorted(sc.listArchives)
+    #         ...
+    #         ...     # add zip_path2 twice, this addition will be ignored
+    #         ...     sc.addArchive(zip_path2)
+    #         ...     arch_list3 = sorted(sc.listArchives)
+    #         ...
+    #         ...     def func(iterator):
+    #         ...         with open("%s/test.txt" % SparkFiles.get("test1.zip")) as f:
+    #         ...             mul = int(f.readline())
+    #         ...             return [x * mul for x in iterator]
+    #         ...
+    #         ...     collected = sc.parallelize([1, 2, 3, 4]).mapPartitions(func).collect()
+    #
+    #         >>> arch_list1
+    #         ['file:/.../test1.zip']
+    #         >>> arch_list2
+    #         ['file:/.../test1.zip', 'file:/.../test2.zip']
+    #         >>> arch_list3
+    #         ['file:/.../test1.zip', 'file:/.../test2.zip']
+    #         >>> collected
+    #         [100, 200, 300, 400]
+    #         """
+    #         self._jsc.sc().addArchive(path)
+    #
+    #     @property
+    #     def listArchives(self) -> List[str]:
+    #         """Returns a list of archive paths that are added to resources.
+    #
+    #         .. versionadded:: 3.4.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.addArchive`
+    #         """
+    #         return list(
+    #             self._jvm.scala.jdk.javaapi.CollectionConverters.asJava(  # type: ignore[union-attr]
+    #                 self._jsc.sc().listArchives()
+    #             )
+    #         )
+    #
+    #     def setCheckpointDir(self, dirName: str) -> None:
+    #         """
+    #         Set the directory under which RDDs are going to be checkpointed. The
+    #         directory must be an HDFS path if running on a cluster.
+    #
+    #         .. versionadded:: 0.7.0
+    #
+    #         Parameters
+    #         ----------
+    #         dirName : str
+    #             path to the directory where checkpoint files will be stored
+    #             (must be HDFS path if running in cluster)
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.getCheckpointDir`
+    #         :meth:`RDD.checkpoint`
+    #         :meth:`RDD.getCheckpointFile`
+    #         """
+    #         self._jsc.sc().setCheckpointDir(dirName)
+    #
+    #     def getCheckpointDir(self) -> Optional[str]:
+    #         """
+    #         Return the directory where RDDs are checkpointed. Returns None if no
+    #         checkpoint directory has been set.
+    #
+    #         .. versionadded:: 3.1.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.setCheckpointDir`
+    #         :meth:`RDD.checkpoint`
+    #         :meth:`RDD.getCheckpointFile`
+    #         """
+    #         if not self._jsc.sc().getCheckpointDir().isEmpty():
+    #             return self._jsc.sc().getCheckpointDir().get()
+    #         return None
+    #
+    #     def _getJavaStorageLevel(self, storageLevel: StorageLevel) -> JavaObject:
+    #         """
+    #         Returns a Java StorageLevel based on a polarspark.StorageLevel.
+    #         """
+    #         if not isinstance(storageLevel, StorageLevel):
+    #             raise TypeError("storageLevel must be of type polarspark.StorageLevel")
+    #         assert self._jvm is not None
+    #         newStorageLevel = self._jvm.org.apache.spark.storage.StorageLevel
+    #         return newStorageLevel(
+    #             storageLevel.useDisk,
+    #             storageLevel.useMemory,
+    #             storageLevel.useOffHeap,
+    #             storageLevel.deserialized,
+    #             storageLevel.replication,
+    #         )
+    #
+    #     def setJobGroup(self, groupId: str, description: str, interruptOnCancel: bool = False) -> None:
+    #         """
+    #         Assigns a group ID to all the jobs started by this thread until the group ID is set to a
+    #         different value or cleared.
+    #
+    #         Often, a unit of execution in an application consists of multiple Spark actions or jobs.
+    #         Application programmers can use this method to group all those jobs together and give a
+    #         group description. Once set, the Spark web UI will associate such jobs with this group.
+    #
+    #         The application can use :meth:`SparkContext.cancelJobGroup` to cancel all
+    #         running jobs in this group.
+    #
+    #         .. versionadded:: 1.0.0
+    #
+    #         Parameters
+    #         ----------
+    #         groupId : str
+    #             The group ID to assign.
+    #         description : str
+    #             The description to set for the job group.
+    #         interruptOnCancel : bool, optional, default False
+    #             whether to interrupt jobs on job cancellation.
+    #
+    #         Notes
+    #         -----
+    #         If interruptOnCancel is set to true for the job group, then job cancellation will result
+    #         in Thread.interrupt() being called on the job's executor threads. This is useful to help
+    #         ensure that the tasks are actually stopped in a timely manner, but is off by default due
+    #         to HDFS-1208, where HDFS may respond to Thread.interrupt() by marking nodes as dead.
+    #
+    #         If you run jobs in parallel, use :class:`polarspark.InheritableThread` for thread
+    #         local inheritance.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.cancelJobGroup`
+    #
+    #         Examples
+    #         --------
+    #         >>> import threading
+    #         >>> from time import sleep
+    #         >>> from polarspark import InheritableThread
+    #         >>> result = "Not Set"
+    #         >>> lock = threading.Lock()
+    #         >>> def map_func(x):
+    #         ...     sleep(100)
+    #         ...     raise RuntimeError("Task should have been cancelled")
+    #         ...
+    #         >>> def start_job(x):
+    #         ...     global result
+    #         ...     try:
+    #         ...         sc.setJobGroup("job_to_cancel", "some description")
+    #         ...         result = sc.parallelize(range(x)).map(map_func).collect()
+    #         ...     except Exception as e:
+    #         ...         result = "Cancelled"
+    #         ...     lock.release()
+    #         ...
+    #         >>> def stop_job():
+    #         ...     sleep(5)
+    #         ...     sc.cancelJobGroup("job_to_cancel")
+    #         ...
+    #         >>> suppress = lock.acquire()
+    #         >>> suppress = InheritableThread(target=start_job, args=(10,)).start()
+    #         >>> suppress = InheritableThread(target=stop_job).start()
+    #         >>> suppress = lock.acquire()
+    #         >>> print(result)
+    #         Cancelled
+    #         """
+    #         self._jsc.setJobGroup(groupId, description, interruptOnCancel)
+    #
+    #     def setInterruptOnCancel(self, interruptOnCancel: bool) -> None:
+    #         """
+    #         Set the behavior of job cancellation from jobs started in this thread.
+    #
+    #         .. versionadded:: 3.5.0
+    #
+    #         Parameters
+    #         ----------
+    #         interruptOnCancel : bool
+    #             If true, then job cancellation will result in ``Thread.interrupt()``
+    #             being called on the job's executor threads. This is useful to help ensure that
+    #             the tasks are actually stopped in a timely manner, but is off by default due to
+    #             HDFS-1208, where HDFS may respond to ``Thread.interrupt()`` by marking nodes as dead.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.addJobTag`
+    #         :meth:`SparkContext.removeJobTag`
+    #         :meth:`SparkContext.cancelAllJobs`
+    #         :meth:`SparkContext.cancelJobGroup`
+    #         :meth:`SparkContext.cancelJobsWithTag`
+    #         """
+    #         self._jsc.setInterruptOnCancel(interruptOnCancel)
+    #
+    #     def addJobTag(self, tag: str) -> None:
+    #         """
+    #         Add a tag to be assigned to all the jobs started by this thread.
+    #
+    #         Often, a unit of execution in an application consists of multiple Spark actions or jobs.
+    #         Application programmers can use this method to group all those jobs together and give a
+    #         group tag. The application can use :meth:`SparkContext.cancelJobsWithTag` to cancel all
+    #         running executions with this tag.
+    #
+    #         There may be multiple tags present at the same time, so different parts of application may
+    #         use different tags to perform cancellation at different levels of granularity.
+    #
+    #         .. versionadded:: 3.5.0
+    #
+    #         Parameters
+    #         ----------
+    #         tag : str
+    #             The tag to be added. Cannot contain ',' (comma) character.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.removeJobTag`
+    #         :meth:`SparkContext.getJobTags`
+    #         :meth:`SparkContext.clearJobTags`
+    #         :meth:`SparkContext.cancelJobsWithTag`
+    #         :meth:`SparkContext.setInterruptOnCancel`
+    #
+    #         Examples
+    #         --------
+    #         >>> import threading
+    #         >>> from time import sleep
+    #         >>> from polarspark import InheritableThread
+    #         >>> sc.setInterruptOnCancel(interruptOnCancel=True)
+    #         >>> result = "Not Set"
+    #         >>> lock = threading.Lock()
+    #         >>> def map_func(x):
+    #         ...     sleep(100)
+    #         ...     raise RuntimeError("Task should have been cancelled")
+    #         ...
+    #         >>> def start_job(x):
+    #         ...     global result
+    #         ...     try:
+    #         ...         sc.addJobTag("job_to_cancel")
+    #         ...         result = sc.parallelize(range(x)).map(map_func).collect()
+    #         ...     except Exception as e:
+    #         ...         result = "Cancelled"
+    #         ...     lock.release()
+    #         ...
+    #         >>> def stop_job():
+    #         ...     sleep(5)
+    #         ...     sc.cancelJobsWithTag("job_to_cancel")
+    #         ...
+    #         >>> suppress = lock.acquire()
+    #         >>> suppress = InheritableThread(target=start_job, args=(10,)).start()
+    #         >>> suppress = InheritableThread(target=stop_job).start()
+    #         >>> suppress = lock.acquire()
+    #         >>> print(result)
+    #         Cancelled
+    #         >>> sc.clearJobTags()
+    #         """
+    #         self._jsc.addJobTag(tag)
+    #
+    #     def removeJobTag(self, tag: str) -> None:
+    #         """
+    #         Remove a tag previously added to be assigned to all the jobs started by this thread.
+    #         Noop if such a tag was not added earlier.
+    #
+    #         .. versionadded:: 3.5.0
+    #
+    #         Parameters
+    #         ----------
+    #         tag : str
+    #             The tag to be removed. Cannot contain ',' (comma) character.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.addJobTag`
+    #         :meth:`SparkContext.getJobTags`
+    #         :meth:`SparkContext.clearJobTags`
+    #         :meth:`SparkContext.cancelJobsWithTag`
+    #         :meth:`SparkContext.setInterruptOnCancel`
+    #
+    #         Examples
+    #         --------
+    #         >>> sc.addJobTag("job_to_cancel1")
+    #         >>> sc.addJobTag("job_to_cancel2")
+    #         >>> sc.getJobTags()
+    #         {'job_to_cancel1', 'job_to_cancel2'}
+    #         >>> sc.removeJobTag("job_to_cancel1")
+    #         >>> sc.getJobTags()
+    #         {'job_to_cancel2'}
+    #         >>> sc.clearJobTags()
+    #         """
+    #         self._jsc.removeJobTag(tag)
+    #
+    #     def getJobTags(self) -> Set[str]:
+    #         """
+    #         Get the tags that are currently set to be assigned to all the jobs started by this thread.
+    #
+    #         .. versionadded:: 3.5.0
+    #
+    #         Returns
+    #         -------
+    #         set of str
+    #             the tags that are currently set to be assigned to all the jobs started by this thread.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.addJobTag`
+    #         :meth:`SparkContext.removeJobTag`
+    #         :meth:`SparkContext.clearJobTags`
+    #         :meth:`SparkContext.cancelJobsWithTag`
+    #         :meth:`SparkContext.setInterruptOnCancel`
+    #
+    #         Examples
+    #         --------
+    #         >>> sc.addJobTag("job_to_cancel")
+    #         >>> sc.getJobTags()
+    #         {'job_to_cancel'}
+    #         >>> sc.clearJobTags()
+    #         """
+    #         return self._jsc.getJobTags()
+    #
+    #     def clearJobTags(self) -> None:
+    #         """
+    #         Clear the current thread's job tags.
+    #
+    #         .. versionadded:: 3.5.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.addJobTag`
+    #         :meth:`SparkContext.removeJobTag`
+    #         :meth:`SparkContext.getJobTags`
+    #         :meth:`SparkContext.cancelJobsWithTag`
+    #         :meth:`SparkContext.setInterruptOnCancel`
+    #
+    #         Examples
+    #         --------
+    #         >>> sc.addJobTag("job_to_cancel")
+    #         >>> sc.clearJobTags()
+    #         >>> sc.getJobTags()
+    #         set()
+    #         """
+    #         self._jsc.clearJobTags()
+    #
+    #     def setLocalProperty(self, key: str, value: str) -> None:
+    #         """
+    #         Set a local property that affects jobs submitted from this thread, such as the
+    #         Spark fair scheduler pool.
+    #
+    #         To remove/unset property simply set `value` to None e.g. sc.setLocalProperty("key", None)
+    #
+    #         .. versionadded:: 1.0.0
+    #
+    #         Parameters
+    #         ----------
+    #         key : str
+    #             The key of the local property to set.
+    #         value : str
+    #             The value of the local property to set. If set to `None` then the
+    #             property will be removed
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.getLocalProperty`
+    #
+    #         Notes
+    #         -----
+    #         If you run jobs in parallel, use :class:`polarspark.InheritableThread` for thread
+    #         local inheritance.
+    #         """
+    #         self._jsc.setLocalProperty(key, value)
+    #
+    #     def getLocalProperty(self, key: str) -> Optional[str]:
+    #         """
+    #         Get a local property set in this thread, or null if it is missing. See
+    #         :meth:`setLocalProperty`.
+    #
+    #         .. versionadded:: 1.0.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.setLocalProperty`
+    #         """
+    #         return self._jsc.getLocalProperty(key)
+    #
+    #     def setJobDescription(self, value: str) -> None:
+    #         """
+    #         Set a human readable description of the current job.
+    #
+    #         .. versionadded:: 2.3.0
+    #
+    #         Parameters
+    #         ----------
+    #         value : str
+    #             The job description to set.
+    #
+    #         Notes
+    #         -----
+    #         If you run jobs in parallel, use :class:`polarspark.InheritableThread` for thread
+    #         local inheritance.
+    #         """
+    #         self._jsc.setJobDescription(value)
+    #
+    #     def sparkUser(self) -> str:
+    #         """
+    #         Get SPARK_USER for user who is running SparkContext.
+    #
+    #         .. versionadded:: 1.0.0
+    #         """
+    #         return self._jsc.sc().sparkUser()
+    #
+    #     def cancelJobGroup(self, groupId: str) -> None:
+    #         """
+    #         Cancel active jobs for the specified group. See :meth:`SparkContext.setJobGroup`.
+    #         for more information.
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         Parameters
+    #         ----------
+    #         groupId : str
+    #             The group ID to cancel the job.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.setJobGroup`
+    #         """
+    #         self._jsc.sc().cancelJobGroup(groupId)
+    #
+    #     def cancelJobsWithTag(self, tag: str) -> None:
+    #         """
+    #         Cancel active jobs that have the specified tag. See
+    #         :meth:`SparkContext.addJobTag`.
+    #
+    #         .. versionadded:: 3.5.0
+    #
+    #         Parameters
+    #         ----------
+    #         tag : str
+    #             The tag to be cancelled. Cannot contain ',' (comma) character.
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.addJobTag`
+    #         :meth:`SparkContext.removeJobTag`
+    #         :meth:`SparkContext.getJobTags`
+    #         :meth:`SparkContext.clearJobTags`
+    #         :meth:`SparkContext.setInterruptOnCancel`
+    #         """
+    #         return self._jsc.cancelJobsWithTag(tag)
+    #
+    #     def cancelAllJobs(self) -> None:
+    #         """
+    #         Cancel all jobs that have been scheduled or are running.
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.cancelJobGroup`
+    #         :meth:`SparkContext.cancelJobsWithTag`
+    #         :meth:`SparkContext.runJob`
+    #         """
+    #         self._jsc.sc().cancelAllJobs()
+    #
+    #     def statusTracker(self) -> StatusTracker:
+    #         """
+    #         Return :class:`StatusTracker` object
+    #
+    #         .. versionadded:: 1.4.0
+    #         """
+    #         return StatusTracker(self._jsc.statusTracker())
+    #
+    #     def runJob(
+    #         self,
+    #         rdd: RDD[T],
+    #         partitionFunc: Callable[[Iterable[T]], Iterable[U]],
+    #         partitions: Optional[Sequence[int]] = None,
+    #         allowLocal: bool = False,
+    #     ) -> List[U]:
+    #         """
+    #         Executes the given partitionFunc on the specified set of partitions,
+    #         returning the result as an array of elements.
+    #
+    #         If 'partitions' is not specified, this will run over all partitions.
+    #
+    #         .. versionadded:: 1.1.0
+    #
+    #         Parameters
+    #         ----------
+    #         rdd : :class:`RDD`
+    #             target RDD to run tasks on
+    #         partitionFunc : function
+    #             a function to run on each partition of the RDD
+    #         partitions : list, optional
+    #             set of partitions to run on; some jobs may not want to compute on all
+    #             partitions of the target RDD, e.g. for operations like `first`
+    #         allowLocal : bool, default False
+    #             this parameter takes no effect
+    #
+    #         Returns
+    #         -------
+    #         list
+    #             results of specified partitions
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.cancelAllJobs`
+    #
+    #         Examples
+    #         --------
+    #         >>> myRDD = sc.parallelize(range(6), 3)
+    #         >>> sc.runJob(myRDD, lambda part: [x * x for x in part])
+    #         [0, 1, 4, 9, 16, 25]
+    #
+    #         >>> myRDD = sc.parallelize(range(6), 3)
+    #         >>> sc.runJob(myRDD, lambda part: [x * x for x in part], [0, 2], True)
+    #         [0, 1, 16, 25]
+    #         """
+    #         if partitions is None:
+    #             partitions = list(range(rdd._jrdd.partitions().size()))
+    #
+    #         # Implementation note: This is implemented as a mapPartitions followed
+    #         # by runJob() in order to avoid having to pass a Python lambda into
+    #         # SparkContext#runJob.
+    #         mappedRDD = rdd.mapPartitions(partitionFunc)
+    #         assert self._jvm is not None
+    #         sock_info = self._jvm.PythonRDD.runJob(self._jsc.sc(), mappedRDD._jrdd, partitions)
+    #         return list(_load_from_socket(sock_info, mappedRDD._jrdd_deserializer))
+    #
+    #     def show_profiles(self) -> None:
+    #         """Print the profile stats to stdout
+    #
+    #         .. versionadded:: 1.2.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.dump_profiles`
+    #         """
+    #         if self.profiler_collector is not None:
+    #             self.profiler_collector.show_profiles()
+    #         else:
+    #             raise PySparkRuntimeError(
+    #                 error_class="INCORRECT_CONF_FOR_PROFILE",
+    #                 message_parameters={},
+    #             )
+    #
+    #     def dump_profiles(self, path: str) -> None:
+    #         """Dump the profile stats into directory `path`
+    #
+    #         .. versionadded:: 1.2.0
+    #
+    #         See Also
+    #         --------
+    #         :meth:`SparkContext.show_profiles`
+    #         """
+    #         if self.profiler_collector is not None:
+    #             self.profiler_collector.dump_profiles(path)
+    #         else:
+    #             raise PySparkRuntimeError(
+    #                 error_class="INCORRECT_CONF_FOR_PROFILE",
+    #                 message_parameters={},
+    #             )
+    #
     def getConf(self) -> SparkConf:
         """Return a copy of this SparkContext's configuration :class:`SparkConf`.
 
@@ -2534,24 +2539,25 @@ class SparkContext:
         conf = SparkConf()
         conf.setAll(self._conf.getAll())
         return conf
-#
-#     @property
-#     def resources(self) -> Dict[str, ResourceInformation]:
-#         """
-#         Return the resource information of this :class:`SparkContext`.
-#         A resource could be a GPU, FPGA, etc.
-#
-#         .. versionadded:: 3.0.0
-#         """
-#         resources = {}
-#         jresources = self._jsc.resources()
-#         for x in jresources:
-#             name = jresources[x].name()
-#             jaddresses = jresources[x].addresses()
-#             addrs = [addr for addr in jaddresses]
-#             resources[name] = ResourceInformation(name, addrs)
-#         return resources
-#
+
+    #
+    #     @property
+    #     def resources(self) -> Dict[str, ResourceInformation]:
+    #         """
+    #         Return the resource information of this :class:`SparkContext`.
+    #         A resource could be a GPU, FPGA, etc.
+    #
+    #         .. versionadded:: 3.0.0
+    #         """
+    #         resources = {}
+    #         jresources = self._jsc.resources()
+    #         for x in jresources:
+    #             name = jresources[x].name()
+    #             jaddresses = jresources[x].addresses()
+    #             addrs = [addr for addr in jaddresses]
+    #             resources[name] = ResourceInformation(name, addrs)
+    #         return resources
+    #
     @staticmethod
     def _assert_on_driver() -> None:
         """

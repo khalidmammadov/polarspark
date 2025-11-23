@@ -146,6 +146,7 @@ class StreamingTestsMixin:
             self.fail("Should have thrown an exception")
         except TypeError:
             pass
+
     #
     def test_stream_read_options(self):
         schema = StructType([StructField("data", StringType(), False)])
@@ -502,6 +503,7 @@ class StreamingTestsMixin:
     #     result = self.spark.sql("SELECT * FROM test_streaming_drop_duplicates_within_wm").collect()
     #     self.assertTrue(len(result) >= 6 and len(result) <= 9)
     #
+
 
 class StreamingTests(StreamingTestsMixin, ReusedSQLTestCase):
     def _assert_exception_tree_contains_msg(self, exception, msg):

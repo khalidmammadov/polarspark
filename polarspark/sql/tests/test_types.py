@@ -777,7 +777,11 @@ class TypesTestsMixin:
 
     @pytest.mark.skip(reason="no udt")
     def test_udt(self):
-        from polarspark.sql.types import _parse_datatype_json_string, _infer_type, _make_type_verifier
+        from polarspark.sql.types import (
+            _parse_datatype_json_string,
+            _infer_type,
+            _make_type_verifier,
+        )
 
         def check_datatype(datatype):
             pickled = pickle.loads(pickle.dumps(datatype))
@@ -1462,9 +1466,7 @@ class TypesTestsMixin:
                 " |-- short: short (nullable = true)",
                 " |-- byte: byte (nullable = true)",
                 "",
-
                 # " |-- ts_ntz: timestamp_ntz (nullable = true)",
-
                 # " |-- ym_interval_1: interval year to month (nullable = true)",
                 # " |-- ym_interval_2: interval year (nullable = true)",
                 # " |-- ym_interval_3: interval year to month (nullable = true)",

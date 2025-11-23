@@ -71,9 +71,11 @@ from polarspark.join import (
     python_full_outer_join,
     python_cogroup,
 )
+
 # from polarspark.statcounter import StatCounter
 # from polarspark.rddsampler import RDDSampler, RDDRangeSampler, RDDStratifiedSampler
 from polarspark.storagelevel import StorageLevel
+
 # from polarspark.resource.requests import ExecutorResourceRequests, TaskResourceRequests
 # from polarspark.resource.profile import ResourceProfile
 # from polarspark.resultiterable import ResultIterable
@@ -96,6 +98,7 @@ if TYPE_CHECKING:
     from polarspark._typing import NonUDFType
     from polarspark._typing import S, NumberOrArray
     from polarspark.context import SparkContext
+
     # from polarspark.sql.pandas._typing import (
     #     PandasScalarUDFType,
     #     PandasGroupedMapUDFType,
@@ -336,12 +339,7 @@ class RDD(Generic[T_co]):
     operated on in parallel.
     """
 
-    def __init__(
-        self,
-        ctx: "SparkContext",
-        part_count=1,
-        part_by=None
-    ):
+    def __init__(self, ctx: "SparkContext", part_count=1, part_by=None):
         self.is_cached = False
         self.is_checkpointed = False
         self.has_resource_profile = False

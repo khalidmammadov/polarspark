@@ -124,7 +124,7 @@ class SparkConf:
         Create a new Spark configuration.
         """
         self._conf = {}
-        #REMOVE
+        # REMOVE
         # if _jconf:
         #     self._jconf = _jconf
         # else:

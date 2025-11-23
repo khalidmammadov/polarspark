@@ -55,6 +55,7 @@ except ImportError:
 
 from polarspark import SparkContext, SparkConf
 from polarspark.errors import PySparkAssertionError, PySparkException
+
 # from polarspark.find_spark_home import _find_spark_home
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql import Row

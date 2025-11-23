@@ -43,16 +43,22 @@ from typing import (
 from polarspark import copy_func, _NoValue
 from polarspark._globals import _NoValueType
 from polarspark.context import SparkContext
-from polarspark.errors import PySparkTypeError, PySparkValueError, AnalysisException, IllegalArgumentException
+from polarspark.errors import (
+    PySparkTypeError,
+    PySparkValueError,
+    AnalysisException,
+    IllegalArgumentException,
+)
 from polarspark.rdd import (
     RDD,
     _load_from_socket,
     _local_iterator_from_socket,
 )
+
 # from polarspark.serializers import BatchedSerializer, CPickleSerializer, UTF8Deserializer
 from polarspark.storagelevel import StorageLevel
 from polarspark.traceback_utils import SCCallSiteSync
-from polarspark.sql.column import Column#, _to_seq, _to_list, _to_java_column
+from polarspark.sql.column import Column  # , _to_seq, _to_list, _to_java_column
 from polarspark.sql.readwriter import DataFrameWriter, DataFrameWriterV2
 from polarspark.sql.streaming import DataStreamWriter
 from polarspark.sql.types import (
@@ -61,7 +67,7 @@ from polarspark.sql.types import (
     _to_polars_type,
     _parse_datatype_json_string,
 )
-from polarspark.sql.utils import get_active_spark_context#, toJArray
+from polarspark.sql.utils import get_active_spark_context  # , toJArray
 from polarspark.sql.pandas.conversion import PandasConversionMixin, schema_from_polars
 from polarspark.sql.pandas.map_ops import PandasMapOpsMixin
 from polarspark.sql.pandas.types import to_polars_selector
@@ -71,6 +77,7 @@ from polars.lazyframe import LazyFrame
 
 if TYPE_CHECKING:
     from polarspark._typing import PrimitiveType
+
     # from polarspark.pandas.frame import DataFrame as PandasOnSparkDataFrame
     from polarspark.sql._typing import (
         ColumnOrName,
@@ -81,6 +88,7 @@ if TYPE_CHECKING:
     from polarspark.sql.context import SQLContext
     from polarspark.sql.session import SparkSession
     from polarspark.sql.group import GroupedData
+
     # from polarspark.sql.observation import Observation
 
 
@@ -142,11 +150,13 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     def __init__(
         self,
         parent: Optional["DataFrame"],
-        transformer: Union[Callable[[LazyFrame], LazyFrame], Callable[[], Generator[LazyFrame, None, None]]],
+        transformer: Union[
+            Callable[[LazyFrame], LazyFrame], Callable[[], Generator[LazyFrame, None, None]]
+        ],
         sql_ctx: Union["SQLContext", "SparkSession"],
         rdds: RDD = None,
         alias: Optional[str] = None,
-        is_streaming = False
+        is_streaming=False,
     ):
         from polarspark.sql.context import SQLContext
 
@@ -1368,8 +1378,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         +---+----+
         +---+----+
         """
+
         def transformer(ldf):
             return ldf.slice(0, num)
+
         return self._to_df(transformer)
 
     def offset(self, num: int) -> "DataFrame":
@@ -1407,8 +1419,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         +---+----+
         +---+----+
         """
+
         def transformer(ldf):
             return ldf.slice(num)
+
         return self._to_df(transformer)
 
     def take(self, num: int) -> List[Row]:
@@ -1473,8 +1487,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.tail(2)
         [Row(age=23, name='Alice'), Row(age=16, name='Bob')]
         """
+
         def transformer(ldf):
             return ldf.tail(num)
+
         return self._to_df(transformer).collect()
 
     def foreach(self, f: Callable[[Row], None]) -> None:
@@ -1531,8 +1547,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ...
         >>> df.foreachPartition(func)
         """
+
         def top_iter():
             yield self.toLocalIterator()
+
         for item in top_iter():
             f(item)
 
@@ -1614,8 +1632,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         self.is_cached = True
         self._storage_level = storageLevel
+
         def transformer(ldf):
             return ldf.cache()
+
         return self._to_df(transformer)
 
     @property
@@ -1859,12 +1879,12 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         # There is always one copy/partition in the memory
         if not isinstance(numPartitions, (int, Column, str)):
             raise PySparkTypeError(
-                    error_class="NOT_COLUMN_OR_STR",
-                    message_parameters={
-                        "arg_name": "numPartitions",
-                        "arg_type": type(numPartitions).__name__,
-                    },
-                )
+                error_class="NOT_COLUMN_OR_STR",
+                message_parameters={
+                    "arg_name": "numPartitions",
+                    "arg_type": type(numPartitions).__name__,
+                },
+            )
         self.rdds = RDD(self._sc, numPartitions)
         return self
 
@@ -2057,8 +2077,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 23|Alice|     F|
         +---+-----+------+
         """
+
         def transformer(ldf):
-            return ldf.unique(subset=None, maintain_order=False,  keep="any")
+            return ldf.unique(subset=None, maintain_order=False, keep="any")
+
         return self._to_df(transformer)
 
     @overload
@@ -2162,10 +2184,12 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         # This is not optimum but at least makes use of Polars sample method
         if not fraction:
             fraction = 0.1
+
         def transformer(ldf):
             pdf: pl.DataFrame = ldf.collect()
             n = len(pdf) * fraction
             return pdf.sample(n, seed=seed).lazy()
+
         return self._to_df(transformer)
 
     def sampleBy(
@@ -2711,10 +2735,24 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
 
         supported = {
-            "inner", "cross", "outer",
-            "full", "fullouter", "full_outer", "left", "leftouter", "left_outer",
-            "right", "rightouter", "right_outer", "semi", "leftsemi", "left_semi",
-            "anti", "leftanti", "left_anti"
+            "inner",
+            "cross",
+            "outer",
+            "full",
+            "fullouter",
+            "full_outer",
+            "left",
+            "leftouter",
+            "left_outer",
+            "right",
+            "rightouter",
+            "right_outer",
+            "semi",
+            "leftsemi",
+            "left_semi",
+            "anti",
+            "leftanti",
+            "left_anti",
         }
         how_map = {
             "outer": "full",
@@ -2727,7 +2765,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             "leftsemi": "semi",
             "left_semi": "semi",
             "leftanti": "anti",
-            "left_anti": "anti"
+            "left_anti": "anti",
         }
         how = how_map.get(how, how)
 
@@ -2769,6 +2807,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         if how is None:
             how = "inner"
         assert isinstance(how, str), "how should be a string"
+
         def transformer(ldf):
             if left_on and right_on:
                 _ldf = ldf.join(other._gather_first(), how=how, left_on=left_on, right_on=right_on)
@@ -3152,13 +3191,14 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 else:
                     raise IndexError("Column ordinal must not be zero!")
             else:
-                raise ValueError("NOT_COLUMN_STR_INT. Grouping column must be"
-                                 "either Column, str or int")
+                raise ValueError(
+                    "NOT_COLUMN_STR_INT. Grouping column must be" "either Column, str or int"
+                )
 
         ascending = kwargs.get("ascending", True)
         if isinstance(ascending, (bool, int)):
             if not ascending:
-                desc = [True]*len(by)
+                desc = [True] * len(by)
         elif isinstance(ascending, list):
             desc = [not a for a in ascending]
         else:
@@ -3459,6 +3499,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         +---+----+
         """
         from polarspark.sql.functions import col
+
         if isinstance(item, str):
             if item not in self._gather_first().collect_schema().names():
                 raise AnalysisException(f"Column {item} does not exists")
@@ -3612,6 +3653,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         def transformer(ldf):
             return ldf.select(*pl_cols)
+
         return self._to_df(transformer)
 
     @overload
@@ -3813,6 +3855,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="NOT_COLUMN_OR_STR",
                 message_parameters={"arg_name": "condition", "arg_type": type(condition).__name__},
             )
+
         def transformer(ldf):
             if isinstance(condition, str):
                 if condition.lower() == "false":
@@ -3822,6 +3865,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 else:
                     return ldf.filter(condition)
             return ldf.filter(condition._expr)
+
         return self._to_df(transformer)
 
     @overload
@@ -3940,8 +3984,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             elif isinstance(c, int):
                 by.append(self[c]._expr)
             else:
-                raise ValueError("NOT_COLUMN_STR_INT. Grouping column must be"
-                                 "either Column, str or int")
+                raise ValueError(
+                    "NOT_COLUMN_STR_INT. Grouping column must be" "either Column, str or int"
+                )
         from polarspark.sql.group import GroupedData
 
         return GroupedData(self._gather_first().group_by(by), self)
@@ -4503,6 +4548,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |  4|    D|
         +---+-----+
         """
+
         def transformer(ldf):
             _other = other
             self_cols = ldf.collect_schema().names()
@@ -4626,6 +4672,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |NULL|NULL|NULL|   3|   4|   5|
         +----+----+----+----+----+----+
         """
+
         def transformer(ldf):
             if not allowMissingColumns:
                 self_cols = set(ldf.collect_schema().names())
@@ -4820,7 +4867,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             return self.distinct()
 
         def transformer(ldf):
-            return ldf.unique(subset=subset, maintain_order=False,  keep="any")
+            return ldf.unique(subset=subset, maintain_order=False, keep="any")
 
         return self._to_df(transformer)
 
@@ -4947,10 +4994,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             return self.filter(Column(pl.sql_expr(_filter)))
 
         if subset and not isinstance(subset, (str, list, tuple)):
-                raise PySparkTypeError(
-                    error_class="NOT_LIST_OR_STR_OR_TUPLE",
-                    message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
-                )
+            raise PySparkTypeError(
+                error_class="NOT_LIST_OR_STR_OR_TUPLE",
+                message_parameters={"arg_name": "subset", "arg_type": type(subset).__name__},
+            )
+
         def transformer(ldf):
             if subset:
                 return ldf.drop_nulls(subset)
@@ -5060,6 +5108,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         # Warning: Eager execution
         if isinstance(value, dict):
+
             def transformer(ldf):
                 _df: pl.DataFrame = ldf.collect()
                 sers: Dict[str, pl.Series] = {}
@@ -5069,6 +5118,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                     else:
                         sers[c] = _df[c]
                 return pl.DataFrame(sers).lazy()
+
             return self._to_df(transformer)
 
         def _fill(ldf, sub, val):
@@ -5098,7 +5148,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 return _fill(ldf, ff(subs(str(type(value).__name__))), value)
 
         return self._to_df(transformer)
-
 
     @overload
     def replace(
@@ -5847,8 +5896,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="NOT_COLUMN",
                 message_parameters={"arg_name": "col", "arg_type": type(col).__name__},
             )
+
         def transformer(ldf):
-            return ldf.with_columns(col._expr.alias(colName)) # noqa
+            return ldf.with_columns(col._expr.alias(colName))  # noqa
+
         return self._to_df(transformer)
 
     def withColumnRenamed(self, existing: str, new: str) -> "DataFrame":
@@ -5911,6 +5962,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |   5|  Bob|
         +----+-----+
         """
+
         def transformer(ldf):
             return ldf.rename({existing: new})
 
@@ -5988,9 +6040,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="NOT_DICT",
                 message_parameters={"arg_name": "colsMap", "arg_type": type(colsMap).__name__},
             )
-        _cols_map = {k:v for k, v in colsMap.items() if k in self.columns}
+        _cols_map = {k: v for k, v in colsMap.items() if k in self.columns}
+
         def transformer(ldf):
             return ldf.rename(_cols_map)
+
         return self._to_df(transformer)
 
     # def withMetadata(self, columnName: str, metadata: Dict[str, Any]) -> "DataFrame":
@@ -6184,8 +6238,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                     error_class="NOT_COLUMN_OR_STR",
                     message_parameters={"arg_name": "col", "arg_type": type(c).__name__},
                 )
+
         def transformer(ldf):
             return ldf.drop(*columns)
+
         return self._to_df(transformer)
 
     def toDF(self, *cols: str) -> "DataFrame":
@@ -6231,6 +6287,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         def transformer(ldf):
             return ldf.rename(mapping)
+
         return self._to_df(transformer)
 
     def transform(self, func: Callable[..., "DataFrame"], *args: Any, **kwargs: Any) -> "DataFrame":
@@ -6507,7 +6564,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         return self.pandas_api(index_col)
 
     def _to_df(self, transformer: Callable[[LazyFrame], LazyFrame], alias=None) -> "DataFrame":
-        return DataFrame(self, transformer, self.sparkSession, rdds=self.rdds, alias=alias or self._alias)
+        return DataFrame(
+            self, transformer, self.sparkSession, rdds=self.rdds, alias=alias or self._alias
+        )
 
     def _gather(self) -> Generator[pl.LazyFrame, None, None]:
         trans = [t for t in self._trans_gen()]
@@ -6522,6 +6581,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         if self._parent:
             yield from self._parent._trans_gen()
         yield self._transformer
+
 
 class PandasFrameWrapper:
     def __init__(self, pdf, spark):
@@ -6686,7 +6746,7 @@ class DataFrameStatFunctions:
 
 def _pdf_to_row_iter(pdf: pl.DataFrame) -> Iterator[Row]:
     cols = pdf.columns
-    for row in  pdf.iter_rows():
+    for row in pdf.iter_rows():
         yield Row(**dict(list(zip(cols, row))))
 
 
