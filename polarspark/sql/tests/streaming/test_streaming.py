@@ -20,6 +20,8 @@ import shutil
 import tempfile
 import time
 
+import pytest
+
 from polarspark.sql import Row
 from polarspark.sql.functions import lit
 from polarspark.sql.types import StructType, StructField, IntegerType, StringType, TimestampType
@@ -147,7 +149,6 @@ class StreamingTestsMixin:
         except TypeError:
             pass
 
-
     def test_stream_read_options(self):
         schema = StructType([StructField("data", StringType(), False)])
         df = (
@@ -208,123 +209,125 @@ class StreamingTestsMixin:
         finally:
             q.stop()
             shutil.rmtree(tmpPath)
-    #
-    # def test_stream_save_options_overwrite(self):
-    #     df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
-    #     for q in self.spark.streams.active:
-    #         q.stop()
-    #     tmpPath = tempfile.mkdtemp()
-    #     shutil.rmtree(tmpPath)
-    #     self.assertTrue(df.isStreaming)
-    #     out = os.path.join(tmpPath, "out")
-    #     chk = os.path.join(tmpPath, "chk")
-    #     fake1 = os.path.join(tmpPath, "fake1")
-    #     fake2 = os.path.join(tmpPath, "fake2")
-    #     # SPARK-32516 disables the overwrite behavior by default.
-    #     with self.sql_conf({"spark.sql.legacy.pathOptionBehavior.enabled": True}):
-    #         q = (
-    #             df.writeStream.option("checkpointLocation", fake1)
-    #             .format("memory")
-    #             .option("path", fake2)
-    #             .queryName("fake_query")
-    #             .outputMode("append")
-    #             .start(path=out, format="parquet", queryName="this_query", checkpointLocation=chk)
-    #         )
-    #
-    #     try:
-    #         self.assertEqual(q.name, "this_query")
-    #         self.assertTrue(q.isActive)
-    #         q.processAllAvailable()
-    #         output_files = []
-    #         for _, _, files in os.walk(out):
-    #             output_files.extend([f for f in files if not f.startswith(".")])
-    #         self.assertTrue(len(output_files) > 0)
-    #         self.assertTrue(len(os.listdir(chk)) > 0)
-    #         self.assertFalse(os.path.isdir(fake1))  # should not have been created
-    #         self.assertFalse(os.path.isdir(fake2))  # should not have been created
-    #     finally:
-    #         q.stop()
-    #         shutil.rmtree(tmpPath)
-    #
-    # def test_stream_status_and_progress(self):
-    #     df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
-    #     for q in self.spark.streams.active:
-    #         q.stop()
-    #     tmpPath = tempfile.mkdtemp()
-    #     shutil.rmtree(tmpPath)
-    #     self.assertTrue(df.isStreaming)
-    #     out = os.path.join(tmpPath, "out")
-    #     chk = os.path.join(tmpPath, "chk")
-    #
-    #     def func(x):
-    #         time.sleep(1)
-    #         return x
-    #
-    #     from polarspark.sql.functions import col, udf
-    #
-    #     sleep_udf = udf(func)
-    #
-    #     # Use "sleep_udf" to delay the progress update so that we can test `lastProgress` when there
-    #     # were no updates.
-    #     q = df.select(sleep_udf(col("value")).alias("value")).writeStream.start(
-    #         path=out, format="parquet", queryName="this_query", checkpointLocation=chk
-    #     )
-    #     try:
-    #         # "lastProgress" will return None in most cases. However, as it may be flaky when
-    #         # Jenkins is very slow, we don't assert it. If there is something wrong, "lastProgress"
-    #         # may throw error with a high chance and make this test flaky, so we should still be
-    #         # able to detect broken codes.
-    #         q.lastProgress
-    #
-    #         q.processAllAvailable()
-    #         lastProgress = q.lastProgress
-    #         recentProgress = q.recentProgress
-    #         status = q.status
-    #         self.assertEqual(lastProgress["name"], q.name)
-    #         self.assertEqual(lastProgress["id"], q.id)
-    #         self.assertTrue(any(p == lastProgress for p in recentProgress))
-    #         self.assertTrue(
-    #             "message" in status and "isDataAvailable" in status and "isTriggerActive" in status
-    #         )
-    #     finally:
-    #         q.stop()
-    #         shutil.rmtree(tmpPath)
-    #
-    # def test_stream_await_termination(self):
-    #     df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
-    #     for q in self.spark.streams.active:
-    #         q.stop()
-    #     tmpPath = tempfile.mkdtemp()
-    #     shutil.rmtree(tmpPath)
-    #     self.assertTrue(df.isStreaming)
-    #     out = os.path.join(tmpPath, "out")
-    #     chk = os.path.join(tmpPath, "chk")
-    #     q = df.writeStream.start(
-    #         path=out, format="parquet", queryName="this_query", checkpointLocation=chk
-    #     )
-    #     try:
-    #         self.assertTrue(q.isActive)
-    #         try:
-    #             q.awaitTermination("hello")
-    #             self.fail("Expected a value exception")
-    #         except ValueError:
-    #             pass
-    #         now = time.time()
-    #         # test should take at least 2 seconds
-    #         res = q.awaitTermination(2.6)
-    #         duration = time.time() - now
-    #         self.assertTrue(duration >= 2)
-    #         self.assertFalse(res)
-    #
-    #         q.processAllAvailable()
-    #         q.stop()
-    #         # Sanity check when no parameter is set
-    #         q.awaitTermination()
-    #         self.assertFalse(q.isActive)
-    #     finally:
-    #         q.stop()
-    #         shutil.rmtree(tmpPath)
-    #
+
+    def test_stream_save_options_overwrite(self):
+        df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
+        for q in self.spark.streams.active:
+            q.stop()
+        tmpPath = tempfile.mkdtemp()
+        shutil.rmtree(tmpPath)
+        self.assertTrue(df.isStreaming)
+        out = os.path.join(tmpPath, "out")
+        chk = os.path.join(tmpPath, "chk")
+        fake1 = os.path.join(tmpPath, "fake1")
+        fake2 = os.path.join(tmpPath, "fake2")
+        # SPARK-32516 disables the overwrite behavior by default.
+        with self.sql_conf({"spark.sql.legacy.pathOptionBehavior.enabled": True}):
+            q = (
+                df.writeStream.option("checkpointLocation", fake1)
+                .format("memory")
+                .option("path", fake2)
+                .queryName("fake_query")
+                .outputMode("append")
+                .start(path=out, format="parquet", queryName="this_query", checkpointLocation=chk)
+            )
+
+        try:
+            self.assertEqual(q.name, "this_query")
+            self.assertTrue(q.isActive)
+            q.processAllAvailable()
+            output_files = []
+            for _, _, files in os.walk(out):
+                output_files.extend([f for f in files if not f.startswith(".")])
+            self.assertTrue(len(output_files) > 0)
+            # TODO: Re-enable when checkpointing added
+            # self.assertTrue(len(os.listdir(chk)) > 0)
+            self.assertFalse(os.path.isdir(fake1))  # should not have been created
+            self.assertFalse(os.path.isdir(fake2))  # should not have been created
+        finally:
+            q.stop()
+            shutil.rmtree(tmpPath)
+
+    @pytest.mark.skip(reason="UDF not supported")
+    def test_stream_status_and_progress(self):
+        df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
+        for q in self.spark.streams.active:
+            q.stop()
+        tmpPath = tempfile.mkdtemp()
+        shutil.rmtree(tmpPath)
+        self.assertTrue(df.isStreaming)
+        out = os.path.join(tmpPath, "out")
+        chk = os.path.join(tmpPath, "chk")
+
+        def func(x):
+            time.sleep(1)
+            return x
+
+        from polarspark.sql.functions import col, udf
+
+        sleep_udf = udf(func)
+
+        # Use "sleep_udf" to delay the progress update so that we can test `lastProgress` when there
+        # were no updates.
+        q = df.select(sleep_udf(col("value")).alias("value")).writeStream.start(
+            path=out, format="parquet", queryName="this_query", checkpointLocation=chk
+        )
+        try:
+            # "lastProgress" will return None in most cases. However, as it may be flaky when
+            # Jenkins is very slow, we don't assert it. If there is something wrong, "lastProgress"
+            # may throw error with a high chance and make this test flaky, so we should still be
+            # able to detect broken codes.
+            q.lastProgress
+
+            q.processAllAvailable()
+            lastProgress = q.lastProgress
+            recentProgress = q.recentProgress
+            status = q.status
+            self.assertEqual(lastProgress["name"], q.name)
+            self.assertEqual(lastProgress["id"], q.id)
+            self.assertTrue(any(p == lastProgress for p in recentProgress))
+            self.assertTrue(
+                "message" in status and "isDataAvailable" in status and "isTriggerActive" in status
+            )
+        finally:
+            q.stop()
+            shutil.rmtree(tmpPath)
+
+    def test_stream_await_termination(self):
+        df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
+        for q in self.spark.streams.active:
+            q.stop()
+        tmpPath = tempfile.mkdtemp()
+        shutil.rmtree(tmpPath)
+        self.assertTrue(df.isStreaming)
+        out = os.path.join(tmpPath, "out")
+        chk = os.path.join(tmpPath, "chk")
+        q = df.writeStream.start(
+            path=out, format="parquet", queryName="this_query", checkpointLocation=chk
+        )
+        try:
+            self.assertTrue(q.isActive)
+            try:
+                q.awaitTermination("hello")
+                self.fail("Expected a value exception")
+            except ValueError:
+                pass
+            now = time.time()
+            # test should take at least 2 seconds
+            res = q.awaitTermination(2.6)
+            duration = time.time() - now
+            self.assertTrue(duration >= 2)
+            self.assertFalse(res)
+
+            q.processAllAvailable()
+            q.stop()
+            # Sanity check when no parameter is set
+            q.awaitTermination()
+            self.assertFalse(q.isActive)
+        finally:
+            q.stop()
+            shutil.rmtree(tmpPath)
+
     # def test_stream_exception(self):
     #     with self.sql_conf({"spark.sql.execution.pyspark.udf.simplifiedTraceback.enabled": True}):
     #         sdf = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")

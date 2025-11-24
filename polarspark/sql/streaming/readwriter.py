@@ -27,9 +27,11 @@ from dataclasses import dataclass
 
 # from py4j.java_gateway import java_import, JavaObject
 
+from file_watcher import watch_files
+
 # from polarspark.sql.column import _to_seq
 import polars as pl
-from polarspark.sql.readwriter import OptionUtils, to_str
+from polarspark.sql.readwriter import OptionUtils, to_str, _save
 from polarspark.sql.streaming.query import StreamingQuery
 from polarspark.sql.types import Row, StructType, DataType
 from polarspark.sql.utils import ForeachBatchFunction
@@ -37,7 +39,8 @@ from polarspark.errors import (
     PySparkTypeError,
     PySparkValueError,
     PySparkAttributeError,
-    PySparkRuntimeError, AnalysisException,
+    PySparkRuntimeError,
+    AnalysisException,
 )
 
 if TYPE_CHECKING:
@@ -308,14 +311,20 @@ class DataStreamReader(OptionUtils):
                     message_parameters={"arg_name": "path", "arg_value": str(_path)},
                 )
 
-            df_reader = self._spark.read.options(**self._options).format(self._format)  # noqa
-            if self._schema:
-                df_reader = df_reader.schema(self._schema)
+            def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
+                df_reader = self._spark.read.options(**self._options).format(self._format)  # noqa
+                if self._schema:
+                    df_reader = df_reader.schema(self._schema)
 
-            df = df_reader.load(_path)
+                if self._format == "text":
+                    for file in watch_files(_path):
+                        df = df_reader.load(file)
+                        yield df._gather_first()  # noqa
+                else:
+                    df = df_reader.load(_path)
+                    yield df._gather_first()  # noqa
 
-            setattr(df, "_is_streaming", True)
-            return df
+            return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
 
         elif self._format == "rate":
 
@@ -1683,37 +1692,43 @@ class DataStreamWriter:
         if self._format not in ["memory", "noop"] and not self._foreach_func:
             chk = self._options.get("checkpointLocation")
             if not chk:
-                raise AnalysisException("""
+                raise AnalysisException(
+                    """
                 checkpointLocation must be specified either through option("checkpointLocation", ...) 
                 or SparkSession.conf.set("spark.sql.streaming.checkpointLocation", ...)
-                """)
+                """
+                )
             Path(chk).mkdir(parents=True, exist_ok=True)
 
         def starter():
             if self._foreach_func:
                 self._foreach_func(self._df, 0)
             else:
-                if self._format in ["memory", "noop"]:
-                    for i, ldf in enumerate(self._df._gather()):  # noqa
-                        t = time.process_time()
+                for i, ldf in enumerate(self._df._gather()):  # noqa
+                    t = time.process_time()
+                    if self._format in ["memory", "noop"]:
                         rows = ldf.collect()
                         print(rows)
-                        duration = time.process_time() - t
-                        progress.append(
-                            {
-                                "name": self._query_name,
-                                "id": self._query_id,
-                                "timestamp": str(datetime.now()),
-                                "batchId": i,
-                                "batchDuration": duration,
-                                "runId": run_id,
-                                "stateOperators": [self._get_state(len(rows))],
-                                "sources": [self._get_source()],
-                                "sink": self._get_sink(len(rows)),
-                            }
-                        )
-                else:
-                    self._df.write.options(**self._options).format(self._format).save(path)
+                    else:
+                        _save(ldf=ldf,
+                              path=path,
+                              format=self._format,
+                              **self._options)
+                    duration = time.process_time() - t
+                    progress.append(
+                        {
+                            "name": self._query_name,
+                            "id": self._query_id,
+                            "timestamp": str(datetime.now()),
+                            "batchId": i,
+                            "batchDuration": duration,
+                            "runId": run_id,
+                            "stateOperators": [self._get_state(len(rows))],
+                            "sources": [self._get_source()],
+                            "sink": self._get_sink(len(rows)),
+                        }
+                    )
+
             self._active = False
 
         self._future = self._executor.submit(starter)

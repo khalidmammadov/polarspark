@@ -18,7 +18,9 @@ dependencies = [
     'polars==1.33.1',
     'pyarrow>=4.0.0',
     'tzlocal==5.2',
-    'deltalake>=1.0.0'
+    'deltalake>=1.0.0',
+    # For streaming from paths
+    'watchdog'
 ]
 
 [build-system]
