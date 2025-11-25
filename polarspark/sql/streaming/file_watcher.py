@@ -1,9 +1,11 @@
 from pathlib import Path
+from typing import Generator
+
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 
-def watch_files(path, recursive=False):
+def watch_files(path: str, recursive: bool=False) -> Generator[Path, None, None]:
     path = Path(path)
 
     # 1. Yield pre-existing files

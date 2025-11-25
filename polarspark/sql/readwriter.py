@@ -2287,7 +2287,7 @@ def _save(
         write = writers.get(format)
         if write is None:
             raise PySparkRuntimeError(f"Format {format} not supported")
-        write(path, **options)
+        write(path) #, **options)
 
 
 class DataFrameWriterV2:

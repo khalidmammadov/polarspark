@@ -20,16 +20,14 @@ import time
 import uuid
 from pathlib import Path
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
+from threading import Event
 from collections.abc import Iterator
 from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING, Union, Generator
 from dataclasses import dataclass
 
-# from py4j.java_gateway import java_import, JavaObject
+from polarspark.sql.streaming.file_watcher import watch_files
 
-from file_watcher import watch_files
-
-# from polarspark.sql.column import _to_seq
 import polars as pl
 from polarspark.sql.readwriter import OptionUtils, to_str, _save
 from polarspark.sql.streaming.query import StreamingQuery
@@ -318,7 +316,10 @@ class DataStreamReader(OptionUtils):
 
                 if self._format == "text":
                     for file in watch_files(_path):
-                        df = df_reader.load(file)
+                        # TODO: Fix this so you get LDF directly rather than
+                        # evaluating using DF load which does eager schema
+                        # resolution
+                        df = df_reader.load(str(file))
                         yield df._gather_first()  # noqa
                 else:
                     df = df_reader.load(_path)
@@ -955,9 +956,9 @@ class DataStreamWriter:
         self._partition_by_cols = None
 
         self._executor = ThreadPoolExecutor(max_workers=1)
-        self._future = None
+        self._future: Optional[Future] = None
 
-        self._active = False  # Thread safe due to GIL
+        self._active = Event()  # Thread safe due to GIL
 
     def outputMode(self, outputMode: str) -> "DataStreamWriter":
         """Specifies how data of a streaming DataFrame/Dataset is written to a streaming sink.
@@ -1685,7 +1686,7 @@ class DataStreamWriter:
         if queryName is not None:
             self.queryName(queryName)
 
-        self._active = True
+        self._active.set()
         run_id = str(uuid.uuid4())
         progress = []
 
@@ -1705,31 +1706,33 @@ class DataStreamWriter:
                 self._foreach_func(self._df, 0)
             else:
                 for i, ldf in enumerate(self._df._gather()):  # noqa
-                    t = time.process_time()
-                    if self._format in ["memory", "noop"]:
-                        rows = ldf.collect()
-                        print(rows)
-                    else:
-                        _save(ldf=ldf,
-                              path=path,
-                              format=self._format,
-                              **self._options)
-                    duration = time.process_time() - t
-                    progress.append(
-                        {
-                            "name": self._query_name,
-                            "id": self._query_id,
-                            "timestamp": str(datetime.now()),
-                            "batchId": i,
-                            "batchDuration": duration,
-                            "runId": run_id,
-                            "stateOperators": [self._get_state(len(rows))],
-                            "sources": [self._get_source()],
-                            "sink": self._get_sink(len(rows)),
-                        }
-                    )
+                    if self._active.isSet():
+                        t = time.process_time()
+                        rows = []
+                        if self._format in ["memory", "noop"]:
+                            rows = ldf.collect()
+                            print(rows)
+                        else:
+                            _save(ldf=ldf,
+                                  path=path,
+                                  format=self._format,
+                                  **self._options)
+                        duration = time.process_time() - t
+                        progress.append(
+                            {
+                                "name": self._query_name,
+                                "id": self._query_id,
+                                "timestamp": str(datetime.now()),
+                                "batchId": i,
+                                "batchDuration": duration,
+                                "runId": run_id,
+                                "stateOperators": [self._get_state(len(rows))],
+                                "sources": [self._get_source()],
+                                "sink": self._get_sink(len(rows)),
+                            }
+                        )
 
-            self._active = False
+            self._active.clear()
 
         self._future = self._executor.submit(starter)
         query = StreamingQuery(self, progress)
