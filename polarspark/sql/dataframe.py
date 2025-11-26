@@ -6579,7 +6579,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         for origin_ldf in trans[0]():
             if not isinstance(origin_ldf, pl.LazyFrame) and origin_ldf == NOTHING:
                 yield NOTHING
-                yield None
+                continue
             yield reduce(lambda ldf, y: y(ldf), trans[1:], origin_ldf)
 
     def _gather_first(self):

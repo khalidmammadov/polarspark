@@ -316,12 +316,14 @@ class DataStreamReader(OptionUtils):
 
                 if self._format == "text":
                     for file in watch_files(_path):
-                        print(f"Reading file {file}")
+                        print(f"Reading file {file} {NOTHING}")
                         if file and not isinstance(file, Path):
                             yield NOTHING
+                            continue
                         # TODO: Fix this so you get LDF directly rather than
                         # evaluating using DF load which does eager schema
                         # resolution
+                        print(f"Loading file {file}")
                         df = df_reader.load(str(file))
                         yield df._gather_first()  # noqa
                 else:
