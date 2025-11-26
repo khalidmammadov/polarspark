@@ -1633,7 +1633,7 @@ class DataFrameWriter(OptionUtils):
         if format is not None:
             self.format(format)
         for ldf in self._df._gather(): # noqa
-            _save(ldf, path, self._format, self._mode, self._part_cols, **self._options)
+            _save(ldf, path, self._format, self._mode, self._part_cols, self._options)
 
     def insertInto(self, tableName: str, overwrite: Optional[bool] = None) -> None:
         """Inserts the content of the :class:`DataFrame` to the specified table.
@@ -2250,7 +2250,7 @@ def _save(
       mode: Optional[str] = None,
       # TODO: Add partitioning
       partitionBy: Optional[Union[str, List[str]]] = None,
-      **options: "OptionalPrimitiveType",
+      options: Optional[dict] = None,
   ):
     assert format is not None, "Format must be specified"
 

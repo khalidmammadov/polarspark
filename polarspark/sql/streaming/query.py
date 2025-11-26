@@ -173,7 +173,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._stream_writer._active  # noqa
+        return self._stream_writer._active.is_set()  # noqa
 
     def awaitTermination(self, timeout: Optional[int] = None) -> Optional[bool]:
         """
@@ -399,7 +399,7 @@ class StreamingQuery:
         >>> sq.isActive
         False
         """
-        self._stream_writer._active = False
+        self._stream_writer._active.clear() # noqa
         self._stream_writer._future.cancel()  # noqa
 
     def explain(self, extended: bool = False) -> None:

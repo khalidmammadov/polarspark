@@ -199,6 +199,7 @@ class StreamingTestsMixin:
         try:
             self.assertEqual(q.name, "this_query")
             self.assertTrue(q.isActive)
+            print("STOP")
             q.processAllAvailable()
             output_files = []
             for _, _, files in os.walk(out):
