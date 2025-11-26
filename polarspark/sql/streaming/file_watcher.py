@@ -4,6 +4,8 @@ from typing import Generator
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+from polarspark.sql.utils import NOTHING
+
 
 def watch_files(path: str, recursive: bool=False) -> Generator[Path, None, None]:
     path = Path(path)
@@ -29,9 +31,11 @@ def watch_files(path: str, recursive: bool=False) -> Generator[Path, None, None]
 
     try:
         while True:
+            print("Looping")
             # Yield files as they appear
             while handler.queue:
                 yield handler.queue.pop(0)
+            yield NOTHING
     finally:
         observer.stop()
         observer.join()

@@ -32,7 +32,7 @@ import polars as pl
 from polarspark.sql.readwriter import OptionUtils, to_str, _save
 from polarspark.sql.streaming.query import StreamingQuery
 from polarspark.sql.types import Row, StructType, DataType
-from polarspark.sql.utils import ForeachBatchFunction
+from polarspark.sql.utils import NOTHING, ForeachBatchFunction
 from polarspark.errors import (
     PySparkTypeError,
     PySparkValueError,
@@ -316,6 +316,9 @@ class DataStreamReader(OptionUtils):
 
                 if self._format == "text":
                     for file in watch_files(_path):
+                        print(f"Reading file {file}")
+                        if file and not isinstance(file, Path):
+                            yield NOTHING
                         # TODO: Fix this so you get LDF directly rather than
                         # evaluating using DF load which does eager schema
                         # resolution
@@ -1709,28 +1712,32 @@ class DataStreamWriter:
                     if self._active.isSet():
                         t = time.process_time()
                         rows = []
-                        if self._format in ["memory", "noop"]:
-                            rows = ldf.collect()
-                            print(rows)
-                        else:
-                            _save(ldf=ldf,
-                                  path=path,
-                                  format=self._format,
-                                  **self._options)
-                        duration = time.process_time() - t
-                        progress.append(
-                            {
-                                "name": self._query_name,
-                                "id": self._query_id,
-                                "timestamp": str(datetime.now()),
-                                "batchId": i,
-                                "batchDuration": duration,
-                                "runId": run_id,
-                                "stateOperators": [self._get_state(len(rows))],
-                                "sources": [self._get_source()],
-                                "sink": self._get_sink(len(rows)),
-                            }
-                        )
+                        if isinstance(ldf, pl.LazyFrame):
+                            if self._format in ["memory", "noop"]:
+                                rows = ldf.collect()
+                                print(rows)
+                            else:
+                                print(f"Flag2 {self._active.is_set()}")
+                                _save(ldf=ldf,
+                                      path=path,
+                                      format=self._format,
+                                      **self._options)
+                            duration = time.process_time() - t
+                            progress.append(
+                                {
+                                    "name": self._query_name,
+                                    "id": self._query_id,
+                                    "timestamp": str(datetime.now()),
+                                    "batchId": i,
+                                    "batchDuration": duration,
+                                    "runId": run_id,
+                                    "stateOperators": [self._get_state(len(rows))],
+                                    "sources": [self._get_source()],
+                                    "sink": self._get_sink(len(rows)),
+                                }
+                            )
+                    else:
+                        break
 
             self._active.clear()
 
