@@ -20,24 +20,25 @@ import time
 import uuid
 from pathlib import Path
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
+from threading import Event
 from collections.abc import Iterator
 from typing import cast, overload, Any, Callable, List, Optional, TYPE_CHECKING, Union, Generator
 from dataclasses import dataclass
 
-# from py4j.java_gateway import java_import, JavaObject
+from polarspark.sql.streaming.file_watcher import watch_files
 
-# from polarspark.sql.column import _to_seq
 import polars as pl
-from polarspark.sql.readwriter import OptionUtils, to_str
+from polarspark.sql.readwriter import OptionUtils, to_str, _save
 from polarspark.sql.streaming.query import StreamingQuery
 from polarspark.sql.types import Row, StructType, DataType
-from polarspark.sql.utils import ForeachBatchFunction
+from polarspark.sql.utils import NOTHING, ForeachBatchFunction
 from polarspark.errors import (
     PySparkTypeError,
     PySparkValueError,
     PySparkAttributeError,
-    PySparkRuntimeError, AnalysisException,
+    PySparkRuntimeError,
+    AnalysisException,
 )
 
 if TYPE_CHECKING:
@@ -293,39 +294,60 @@ class DataStreamReader(OptionUtils):
         ...     time.sleep(3)
         ...     q.stop()
         """
-        from polarspark.sql.dataframe import DataFrame
-
         if format is not None:
             self.format(format)
         if schema is not None:
             self.schema(schema)
         self.options(**options)
+
         _path = path or self._options.get("path")
         if _path is not None:
-            if type(_path) != str or len(_path.strip()) == 0:
-                raise PySparkValueError(
-                    error_class="VALUE_NOT_NON_EMPTY_STR",
-                    message_parameters={"arg_name": "path", "arg_value": str(_path)},
-                )
+            return self._streaming_df_from_path(_path)
+        elif self._format == "rate":
+            return self._streaming_df_from_rate()
+        else:
+            raise NotImplementedError("This stream config not supported")
 
+    def _streaming_df_from_rate(self) -> "DataFrame":
+        from polarspark.sql.dataframe import DataFrame
+
+        def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
+            for i in itertools.count():
+                yield pl.LazyFrame({"value", i})
+
+        return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
+
+    def _streaming_df_from_path(self, path) -> "DataFrame":
+        from polarspark.sql.dataframe import DataFrame
+
+        if type(path) != str or len(path.strip()) == 0:
+            raise PySparkValueError(
+                error_class="VALUE_NOT_NON_EMPTY_STR",
+                message_parameters={"arg_name": "path", "arg_value": str(path)},
+            )
+
+        def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
             df_reader = self._spark.read.options(**self._options).format(self._format)  # noqa
             if self._schema:
                 df_reader = df_reader.schema(self._schema)
 
-            df = df_reader.load(_path)
+            if self._format in ["text", "csv", "json", "parquet", "excel"]:
+                for file in watch_files(path):
+                    if file and not isinstance(file, Path):
+                        yield NOTHING
+                        continue
+                    # TODO: Fix this so you get LDF directly rather than
+                    # evaluating using DF load which does eager schema
+                    # resolution
+                    df = df_reader.load(str(file))
+                    yield df._gather_first()  # noqa
+            elif self._format == "delta":  # TODO: use history
+                df = df_reader.load(path)
+                yield df._gather_first()  # noqa
+            else:
+                raise NotImplementedError(f"Source {self._format} is not supported.")
 
-            setattr(df, "_is_streaming", True)
-            return df
-
-        elif self._format == "rate":
-
-            def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
-                for i in itertools.count():
-                    yield pl.LazyFrame({"value", i})
-
-            return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
-        else:
-            raise NotImplementedError()
+        return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
 
     def json(
         self,
@@ -946,9 +968,9 @@ class DataStreamWriter:
         self._partition_by_cols = None
 
         self._executor = ThreadPoolExecutor(max_workers=1)
-        self._future = None
+        self._future: Optional[Future] = None
 
-        self._active = False  # Thread safe due to GIL
+        self._active = Event()  # Thread safe due to GIL
 
     def outputMode(self, outputMode: str) -> "DataStreamWriter":
         """Specifies how data of a streaming DataFrame/Dataset is written to a streaming sink.
@@ -1676,45 +1698,55 @@ class DataStreamWriter:
         if queryName is not None:
             self.queryName(queryName)
 
-        self._active = True
+        self._active.set()
         run_id = str(uuid.uuid4())
         progress = []
 
         if self._format not in ["memory", "noop"] and not self._foreach_func:
             chk = self._options.get("checkpointLocation")
             if not chk:
-                raise AnalysisException("""
+                raise AnalysisException(
+                    """
                 checkpointLocation must be specified either through option("checkpointLocation", ...) 
                 or SparkSession.conf.set("spark.sql.streaming.checkpointLocation", ...)
-                """)
+                """
+                )
             Path(chk).mkdir(parents=True, exist_ok=True)
 
         def starter():
             if self._foreach_func:
                 self._foreach_func(self._df, 0)
             else:
-                if self._format in ["memory", "noop"]:
-                    for i, ldf in enumerate(self._df._gather()):  # noqa
+                for i, ldf in enumerate(self._df._gather()):  # noqa
+                    if self._active.isSet() or isinstance(ldf, pl.LazyFrame):
                         t = time.process_time()
-                        rows = ldf.collect()
-                        print(rows)
-                        duration = time.process_time() - t
-                        progress.append(
-                            {
-                                "name": self._query_name,
-                                "id": self._query_id,
-                                "timestamp": str(datetime.now()),
-                                "batchId": i,
-                                "batchDuration": duration,
-                                "runId": run_id,
-                                "stateOperators": [self._get_state(len(rows))],
-                                "sources": [self._get_source()],
-                                "sink": self._get_sink(len(rows)),
-                            }
-                        )
-                else:
-                    self._df.write.options(**self._options).format(self._format).save(path)
-            self._active = False
+                        rows = []
+                        if isinstance(ldf, pl.LazyFrame):
+                            if self._format in ["memory", "noop"]:
+                                rows = ldf.collect()
+                                print(rows)
+                            else:
+                                _save(
+                                    ldf=ldf, path=path, format=self._format, options=self._options
+                                )
+                            duration = time.process_time() - t
+                            progress.append(
+                                {
+                                    "name": self._query_name,
+                                    "id": self._query_id,
+                                    "timestamp": str(datetime.now()),
+                                    "batchId": i,
+                                    "batchDuration": duration,
+                                    "runId": run_id,
+                                    "stateOperators": [self._get_state(len(rows))],
+                                    "sources": [self._get_source()],
+                                    "sink": self._get_sink(len(rows)),
+                                }
+                            )
+                    else:
+                        break
+
+            self._active.clear()
 
         self._future = self._executor.submit(starter)
         query = StreamingQuery(self, progress)

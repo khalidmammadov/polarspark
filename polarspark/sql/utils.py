@@ -63,6 +63,7 @@ except ImportError:
 
 FuncT = TypeVar("FuncT", bound=Callable[..., Any])
 
+NOTHING = object()
 
 # def toJArray(gateway: JavaGateway, jtype: JavaClass, arr: Sequence[Any]) -> JavaArray:
 #     """

@@ -389,7 +389,8 @@ class SparkContext:
 
         # create a signal handler which would be invoked on receiving SIGINT
         def signal_handler(signal: Any, frame: Any) -> NoReturn:
-            self.cancelAllJobs()
+            # TODO: Cancel Jobs
+            # self.cancelAllJobs()
             raise KeyboardInterrupt()
 
         # see http://stackoverflow.com/questions/23206787/

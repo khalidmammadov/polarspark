@@ -67,7 +67,7 @@ from polarspark.sql.types import (
     _to_polars_type,
     _parse_datatype_json_string,
 )
-from polarspark.sql.utils import get_active_spark_context  # , toJArray
+from polarspark.sql.utils import NOTHING, get_active_spark_context
 from polarspark.sql.pandas.conversion import PandasConversionMixin, schema_from_polars
 from polarspark.sql.pandas.map_ops import PandasMapOpsMixin
 from polarspark.sql.pandas.types import to_polars_selector
@@ -6565,13 +6565,21 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
     def _to_df(self, transformer: Callable[[LazyFrame], LazyFrame], alias=None) -> "DataFrame":
         return DataFrame(
-            self, transformer, self.sparkSession, rdds=self.rdds, alias=alias or self._alias, is_streaming=self._is_streaming
+            self,
+            transformer,
+            self.sparkSession,
+            rdds=self.rdds,
+            alias=alias or self._alias,
+            is_streaming=self._is_streaming,
         )
 
-    def _gather(self) -> Generator[pl.LazyFrame, None, None]:
+    def _gather(self) -> Generator[Optional[pl.LazyFrame], None, None]:
         trans = [t for t in self._trans_gen()]
         assert trans
         for origin_ldf in trans[0]():
+            if not isinstance(origin_ldf, pl.LazyFrame) and origin_ldf == NOTHING:
+                yield NOTHING
+                continue
             yield reduce(lambda ldf, y: y(ldf), trans[1:], origin_ldf)
 
     def _gather_first(self):

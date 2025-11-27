@@ -85,7 +85,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._stream_writer._query_id # noqa
+        return self._stream_writer._query_id  # noqa
 
     @property
     def runId(self) -> str:
@@ -115,7 +115,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._stream_writer._query_id # noqa
+        return self._stream_writer._query_id  # noqa
 
     @property
     def name(self) -> str:
@@ -173,7 +173,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        return self._stream_writer._active  # noqa
+        return self._stream_writer._active.is_set()  # noqa
 
     def awaitTermination(self, timeout: Optional[int] = None) -> Optional[bool]:
         """
@@ -240,7 +240,7 @@ class StreamingQuery:
                 ex = e
 
         if ex:
-            if self._stream_writer._foreach_func: # noqa
+            if self._stream_writer._foreach_func:  # noqa
                 raise CapturedStreamingQueryException(
                     "FOREACH_BATCH_USER_FUNCTION_ERROR: {}".format(str(ex)), traceback.format_exc()
                 )
@@ -372,6 +372,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
+        self._stream_writer._active.clear()  # noqa
         return self.awaitTermination()
 
     def stop(self) -> None:
@@ -397,6 +398,7 @@ class StreamingQuery:
         >>> sq.isActive
         False
         """
+        self._stream_writer._active.clear()  # noqa
         self._stream_writer._future.cancel()  # noqa
 
     def explain(self, extended: bool = False) -> None:
@@ -440,7 +442,7 @@ class StreamingQuery:
         ...
         >>> sq.stop()
         """
-        self._stream_writer._df.explain(extended) # noqa
+        self._stream_writer._df.explain(extended)  # noqa
 
     def exception(self) -> Optional[StreamingQueryException]:
         """
@@ -455,7 +457,7 @@ class StreamingQuery:
             the StreamingQueryException if the query was terminated by an exception, or None.
         """
         try:
-            ex = self._stream_writer._future.exception(0.1) # noqa
+            ex = self._stream_writer._future.exception(0.1)  # noqa
         except TimeoutError as _:
             return None
         except Exception as e:

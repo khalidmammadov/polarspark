@@ -1632,37 +1632,8 @@ class DataFrameWriter(OptionUtils):
             self.partitionBy(partitionBy)
         if format is not None:
             self.format(format)
-        # Create dir with target file name
-        p = Path(path or self._options.get("path"))
-        if self._format != "delta":
-            path = p / f"part-00000-{uuid.uuid4()}-c000{p.suffix}"
-        else:
-            path = p
-        if p.exists() and self._mode == "overwrite":
-            shutil.rmtree(p)
-        elif p.exists() and self._mode == "error":
-            raise PySparkRuntimeError(
-                error_class="PATH_ALREADY_EXISTS",
-                message_parameters={"path": str(p)},
-            )
-        if not p.exists():
-            p.mkdir(parents=True)
-
-        if path is None:
-            pass
-            # FIX check what is default path or table?
-            # self._jwrite.save()
-        else:
-            for ldf in self._df._gather():  # noqa
-                writers = {
-                    "csv": ldf.sink_csv,
-                    "json": ldf.sink_ndjson,
-                    "parquet": ldf.sink_parquet,
-                    "delta": ldf.collect().write_delta,
-                    "excel": ldf.collect().write_excel,
-                }
-                write = writers[self._format]
-                write(path, **options)
+        for ldf in self._df._gather():  # noqa
+            _save(ldf, path, self._format, self._mode, self._part_cols, self._options)
 
     def insertInto(self, tableName: str, overwrite: Optional[bool] = None) -> None:
         """Inserts the content of the :class:`DataFrame` to the specified table.
@@ -2269,6 +2240,54 @@ class DataFrameWriter(OptionUtils):
             jprop.setProperty(k, properties[k])
         self.mode(mode)
         raise NotImplementedError()
+
+
+def _save(
+    # self,
+    ldf: pl.LazyFrame,
+    path: Optional[str] = None,
+    format: Optional[str] = None,  # noqa
+    mode: Optional[str] = None,
+    # TODO: Add partitioning
+    partitionBy: Optional[Union[str, List[str]]] = None,
+    options: Optional[dict] = None,
+):
+    assert format is not None, "Format must be specified"
+
+    # Create dir with target file name
+    p = Path(path or options.get("path"))
+    if format != "delta":
+        path = p / f"part-00000-{uuid.uuid4()}-c000{p.suffix}"
+    else:
+        path = p
+
+    if mode:
+        if p.exists() and mode == "overwrite":
+            shutil.rmtree(p)
+        elif p.exists() and mode == "error":
+            raise PySparkRuntimeError(
+                error_class="PATH_ALREADY_EXISTS",
+                message_parameters={"path": str(p)},
+            )
+    if not p.exists():
+        p.mkdir(parents=True)
+
+    if path is None:
+        pass
+        # FIX check what is default path or table?
+        # self._jwrite.save()
+    else:
+        writers = {
+            "csv": ldf.sink_csv,
+            "json": ldf.sink_ndjson,
+            "parquet": ldf.sink_parquet,
+            "delta": ldf.collect().write_delta,
+            "excel": ldf.collect().write_excel,
+        }
+        write = writers.get(format)
+        if write is None:
+            raise PySparkRuntimeError(f"Format {format} not supported")
+        write(path)  # , **options)
 
 
 class DataFrameWriterV2:
