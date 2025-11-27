@@ -373,7 +373,6 @@ class StreamingQuery:
         >>> sq.stop()
         """
         self._stream_writer._active.clear()  # noqa
-        print(f"Flag {self._stream_writer._active.is_set()}")
         return self.awaitTermination()
 
     def stop(self) -> None:

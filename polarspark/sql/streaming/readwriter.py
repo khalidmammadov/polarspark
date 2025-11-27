@@ -1717,9 +1717,7 @@ class DataStreamWriter:
             if self._foreach_func:
                 self._foreach_func(self._df, 0)
             else:
-                print(f"Flag -1 {self._active.is_set()}")
                 for i, ldf in enumerate(self._df._gather()):  # noqa
-                    print(f"Flag0 {self._active.is_set()} {i} {ldf}")
                     if self._active.isSet() or isinstance(ldf, pl.LazyFrame):
                         t = time.process_time()
                         rows = []
