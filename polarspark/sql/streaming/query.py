@@ -372,7 +372,7 @@ class StreamingQuery:
 
         >>> sq.stop()
         """
-        self._stream_writer._active.clear() # noqa
+        self._stream_writer._active.clear()  # noqa
         print(f"Flag {self._stream_writer._active.is_set()}")
         return self.awaitTermination()
 
@@ -399,7 +399,7 @@ class StreamingQuery:
         >>> sq.isActive
         False
         """
-        self._stream_writer._active.clear() # noqa
+        self._stream_writer._active.clear()  # noqa
         self._stream_writer._future.cancel()  # noqa
 
     def explain(self, extended: bool = False) -> None:

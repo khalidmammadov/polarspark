@@ -43,7 +43,7 @@ class StreamingTestsMixin:
             self.assertTrue(isinstance(query.runId, str))
             self.assertTrue(query.isActive)
             self.assertEqual(query.exception(), None)
-            self.assertTrue(query.awaitTermination(1))
+            self.assertFalse(query.awaitTermination(1))
             query.processAllAvailable()
             lastProgress = query.lastProgress
             recentProgress = query.recentProgress

@@ -7,7 +7,7 @@ from watchdog.events import FileSystemEventHandler
 from polarspark.sql.utils import NOTHING
 
 
-def watch_files(path: str, recursive: bool=False) -> Generator[Path, None, None]:
+def watch_files(path: str, recursive: bool = False) -> Generator[Path, None, None]:
     path = Path(path)
 
     # 1. Yield pre-existing files

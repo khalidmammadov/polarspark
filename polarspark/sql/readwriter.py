@@ -1632,7 +1632,7 @@ class DataFrameWriter(OptionUtils):
             self.partitionBy(partitionBy)
         if format is not None:
             self.format(format)
-        for ldf in self._df._gather(): # noqa
+        for ldf in self._df._gather():  # noqa
             _save(ldf, path, self._format, self._mode, self._part_cols, self._options)
 
     def insertInto(self, tableName: str, overwrite: Optional[bool] = None) -> None:
@@ -2243,15 +2243,15 @@ class DataFrameWriter(OptionUtils):
 
 
 def _save(
-      # self,
-      ldf: pl.LazyFrame,
-      path: Optional[str] = None,
-      format: Optional[str] = None, # noqa
-      mode: Optional[str] = None,
-      # TODO: Add partitioning
-      partitionBy: Optional[Union[str, List[str]]] = None,
-      options: Optional[dict] = None,
-  ):
+    # self,
+    ldf: pl.LazyFrame,
+    path: Optional[str] = None,
+    format: Optional[str] = None,  # noqa
+    mode: Optional[str] = None,
+    # TODO: Add partitioning
+    partitionBy: Optional[Union[str, List[str]]] = None,
+    options: Optional[dict] = None,
+):
     assert format is not None, "Format must be specified"
 
     # Create dir with target file name
@@ -2287,7 +2287,7 @@ def _save(
         write = writers.get(format)
         if write is None:
             raise PySparkRuntimeError(f"Format {format} not supported")
-        write(path) #, **options)
+        write(path)  # , **options)
 
 
 class DataFrameWriterV2:

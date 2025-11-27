@@ -294,53 +294,60 @@ class DataStreamReader(OptionUtils):
         ...     time.sleep(3)
         ...     q.stop()
         """
-        from polarspark.sql.dataframe import DataFrame
-
         if format is not None:
             self.format(format)
         if schema is not None:
             self.schema(schema)
         self.options(**options)
+
         _path = path or self._options.get("path")
         if _path is not None:
-            if type(_path) != str or len(_path.strip()) == 0:
-                raise PySparkValueError(
-                    error_class="VALUE_NOT_NON_EMPTY_STR",
-                    message_parameters={"arg_name": "path", "arg_value": str(_path)},
-                )
-
-            def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
-                df_reader = self._spark.read.options(**self._options).format(self._format)  # noqa
-                if self._schema:
-                    df_reader = df_reader.schema(self._schema)
-
-                if self._format == "text":
-                    for file in watch_files(_path):
-                        print(f"Reading file {file} {NOTHING}")
-                        if file and not isinstance(file, Path):
-                            yield NOTHING
-                            continue
-                        # TODO: Fix this so you get LDF directly rather than
-                        # evaluating using DF load which does eager schema
-                        # resolution
-                        print(f"Loading file {file}")
-                        df = df_reader.load(str(file))
-                        yield df._gather_first()  # noqa
-                else:
-                    df = df_reader.load(_path)
-                    yield df._gather_first()  # noqa
-
-            return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
-
+            return self._streaming_df_from_path(_path)
         elif self._format == "rate":
-
-            def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
-                for i in itertools.count():
-                    yield pl.LazyFrame({"value", i})
-
-            return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
+            return self._streaming_df_from_rate()
         else:
-            raise NotImplementedError()
+            raise NotImplementedError("This stream config not supported")
+
+    def _streaming_df_from_rate(self) -> "DataFrame":
+        from polarspark.sql.dataframe import DataFrame
+
+        def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
+            for i in itertools.count():
+                yield pl.LazyFrame({"value", i})
+
+        return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
+
+    def _streaming_df_from_path(self, path) -> "DataFrame":
+        from polarspark.sql.dataframe import DataFrame
+
+        if type(path) != str or len(path.strip()) == 0:
+            raise PySparkValueError(
+                error_class="VALUE_NOT_NON_EMPTY_STR",
+                message_parameters={"arg_name": "path", "arg_value": str(path)},
+            )
+
+        def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
+            df_reader = self._spark.read.options(**self._options).format(self._format)  # noqa
+            if self._schema:
+                df_reader = df_reader.schema(self._schema)
+
+            if self._format in ["text", "csv", "json", "parquet", "excel"]:
+                for file in watch_files(path):
+                    if file and not isinstance(file, Path):
+                        yield NOTHING
+                        continue
+                    # TODO: Fix this so you get LDF directly rather than
+                    # evaluating using DF load which does eager schema
+                    # resolution
+                    df = df_reader.load(str(file))
+                    yield df._gather_first()  # noqa
+            elif self._format == "delta":  # TODO: use history
+                df = df_reader.load(path)
+                yield df._gather_first()  # noqa
+            else:
+                raise NotImplementedError(f"Source {self._format} is not supported.")
+
+        return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
 
     def json(
         self,
@@ -1721,11 +1728,9 @@ class DataStreamWriter:
                                 rows = ldf.collect()
                                 print(rows)
                             else:
-                                print(f"Flag2 {self._active.is_set()}")
-                                _save(ldf=ldf,
-                                      path=path,
-                                      format=self._format,
-                                      options=self._options)
+                                _save(
+                                    ldf=ldf, path=path, format=self._format, options=self._options
+                                )
                             duration = time.process_time() - t
                             progress.append(
                                 {
