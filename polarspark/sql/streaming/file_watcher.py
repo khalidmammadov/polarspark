@@ -31,7 +31,6 @@ def watch_files(path: str, recursive: bool = False) -> Generator[Path, None, Non
 
     try:
         while True:
-            print("Looping")
             # Yield files as they appear
             while handler.queue:
                 yield handler.queue.pop(0)

@@ -400,6 +400,7 @@ class StreamingQuery:
         """
         self._stream_writer._active.clear()  # noqa
         self._stream_writer._future.cancel()  # noqa
+        self._stream_writer._spark.streams._remove(self.id)  # noqa
 
     def explain(self, extended: bool = False) -> None:
         """
@@ -522,6 +523,9 @@ class StreamingQueryManager:
 
     def _add(self, q: StreamingQuery):
         self._queries[q.id] = q
+
+    def _remove(self, _id: str):
+        self._queries.pop(_id, None)
 
     def get(self, id: str) -> Optional[StreamingQuery]:
         """
