@@ -328,57 +328,59 @@ class StreamingTestsMixin:
             q.stop()
             shutil.rmtree(tmpPath)
 
-    # def test_stream_exception(self):
-    #     with self.sql_conf({"spark.sql.execution.pyspark.udf.simplifiedTraceback.enabled": True}):
-    #         sdf = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
-    #         sq = sdf.writeStream.format("memory").queryName("query_explain").start()
-    #         try:
-    #             sq.processAllAvailable()
-    #             self.assertEqual(sq.exception(), None)
-    #         finally:
-    #             sq.stop()
-    #
-    #         from polarspark.sql.functions import col, udf
-    #         from polarspark.errors import StreamingQueryException
-    #
-    #         bad_udf = udf(lambda x: 1 / 0)
-    #         sq = (
-    #             sdf.select(bad_udf(col("value")))
-    #             .writeStream.format("memory")
-    #             .queryName("this_query")
-    #             .start()
-    #         )
-    #         try:
-    #             # Process some data to fail the query
-    #             sq.processAllAvailable()
-    #             self.fail("bad udf should fail the query")
-    #         except StreamingQueryException as e:
-    #             # This is expected
-    #             self._assert_exception_tree_contains_msg(e, "ZeroDivisionError")
-    #         finally:
-    #             exception = sq.exception()
-    #             sq.stop()
-    #         self.assertIsInstance(exception, StreamingQueryException)
-    #         self._assert_exception_tree_contains_msg(exception, "ZeroDivisionError")
-    #
-    # def test_query_manager_no_recreation(self):
-    #     # SPARK-46873: There should not be a new StreamingQueryManager created every time
-    #     # spark.streams is called.
-    #     for i in range(5):
-    #         self.assertTrue(self.spark.streams == self.spark.streams)
-    #
-    # def test_query_manager_get(self):
-    #     df = self.spark.readStream.format("rate").load()
-    #     for q in self.spark.streams.active:
-    #         q.stop()
-    #     q = df.writeStream.format("noop").start()
-    #
-    #     self.assertTrue(q.isActive)
-    #     self.assertTrue(q.id == self.spark.streams.get(q.id).id)
-    #
-    #     q.stop()
-    #
-    #     self.assertIsNone(self.spark.streams.get(q.id))
+    @pytest.mark.skip(reason="UDF not supported")
+    def test_stream_exception(self):
+        with self.sql_conf({"spark.sql.execution.pyspark.udf.simplifiedTraceback.enabled": True}):
+            sdf = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
+            sq = sdf.writeStream.format("memory").queryName("query_explain").start()
+            try:
+                sq.processAllAvailable()
+                self.assertEqual(sq.exception(), None)
+            finally:
+                sq.stop()
+
+            from polarspark.sql.functions import col, udf
+            from polarspark.errors import StreamingQueryException
+
+            bad_udf = udf(lambda x: 1 / 0)
+            sq = (
+                sdf.select(bad_udf(col("value")))
+                .writeStream.format("memory")
+                .queryName("this_query")
+                .start()
+            )
+            try:
+                # Process some data to fail the query
+                sq.processAllAvailable()
+                self.fail("bad udf should fail the query")
+            except StreamingQueryException as e:
+                # This is expected
+                self._assert_exception_tree_contains_msg(e, "ZeroDivisionError")
+            finally:
+                exception = sq.exception()
+                sq.stop()
+            self.assertIsInstance(exception, StreamingQueryException)
+            self._assert_exception_tree_contains_msg(exception, "ZeroDivisionError")
+
+    def test_query_manager_no_recreation(self):
+        # SPARK-46873: There should not be a new StreamingQueryManager created every time
+        # spark.streams is called.
+        for i in range(5):
+            self.assertTrue(self.spark.streams == self.spark.streams)
+
+    def test_query_manager_get(self):
+        df = self.spark.readStream.format("rate").load()
+        for q in self.spark.streams.active:
+            q.stop()
+        q = df.writeStream.format("noop").start()
+
+        self.assertTrue(q.isActive)
+        self.assertTrue(q.id == self.spark.streams.get(q.id).id)
+
+        q.stop()
+
+        self.assertIsNone(self.spark.streams.get(q.id))
+
     #
     # def test_query_manager_await_termination(self):
     #     df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
