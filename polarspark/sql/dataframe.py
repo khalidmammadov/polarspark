@@ -67,7 +67,7 @@ from polarspark.sql.types import (
     _to_polars_type,
     _parse_datatype_json_string,
 )
-from polarspark.sql.utils import NOTHING, get_active_spark_context
+from polarspark.sql.utils import NO_INPUT, get_active_spark_context
 from polarspark.sql.pandas.conversion import PandasConversionMixin, schema_from_polars
 from polarspark.sql.pandas.map_ops import PandasMapOpsMixin
 from polarspark.sql.pandas.types import to_polars_selector
@@ -157,6 +157,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         rdds: RDD = None,
         alias: Optional[str] = None,
         is_streaming=False,
+        origin: Any = None,
     ):
         from polarspark.sql.context import SQLContext
 
@@ -180,6 +181,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self._sc: SparkContext = sql_ctx._sc
         self._is_streaming = is_streaming
         self.is_cached = False
+        self._origin = origin
         if rdds:
             self.rdds = rdds
         else:
@@ -6577,8 +6579,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         trans = [t for t in self._trans_gen()]
         assert trans
         for origin_ldf in trans[0]():
-            if not isinstance(origin_ldf, pl.LazyFrame) and origin_ldf == NOTHING:
-                yield NOTHING
+            if origin_ldf is NO_INPUT:
+                yield NO_INPUT
                 continue
             yield reduce(lambda ldf, y: y(ldf), trans[1:], origin_ldf)
 

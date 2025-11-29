@@ -90,10 +90,10 @@ class StreamingTestsForeachBatchMixin:
     def test_streaming_foreach_batch_graceful_stop(self):
         # SPARK-39218: Make foreachBatch streaming query stop gracefully
         def func(batch_df, _):
-            time.sleep(10)
+            time.sleep(2)
 
         q = self.spark.readStream.format("rate").load().writeStream.foreachBatch(func).start()
-        time.sleep(3)  # 'rowsPerSecond' defaults to 1. Waits 3 secs out for the input.
+        time.sleep(1)  # 'rowsPerSecond' defaults to 1. Waits 3 secs out for the input.
         q.stop()
         self.assertIsNone(q.exception(), "No exception has to be propagated.")
 

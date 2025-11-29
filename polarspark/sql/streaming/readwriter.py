@@ -32,7 +32,7 @@ import polars as pl
 from polarspark.sql.readwriter import OptionUtils, to_str, _save
 from polarspark.sql.streaming.query import StreamingQuery
 from polarspark.sql.types import Row, StructType, DataType
-from polarspark.sql.utils import NOTHING, ForeachBatchFunction
+from polarspark.sql.utils import NO_INPUT, ForeachBatchFunction
 from polarspark.errors import (
     PySparkTypeError,
     PySparkValueError,
@@ -313,9 +313,9 @@ class DataStreamReader(OptionUtils):
 
         def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
             for i in itertools.count():
-                yield pl.LazyFrame({"value", i})
+                yield pl.LazyFrame({"value": [i]})
 
-        return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
+        return DataFrame(None, ldf_generator, self._spark, is_streaming=True, origin=self)
 
     def _streaming_df_from_path(self, path) -> "DataFrame":
         from polarspark.sql.dataframe import DataFrame
@@ -334,7 +334,7 @@ class DataStreamReader(OptionUtils):
             if self._format in ["text", "csv", "json", "parquet", "excel"]:
                 for file in watch_files(path):
                     if file and not isinstance(file, Path):
-                        yield NOTHING
+                        yield NO_INPUT
                         continue
                     # TODO: Fix this so you get LDF directly rather than
                     # evaluating using DF load which does eager schema
@@ -347,7 +347,7 @@ class DataStreamReader(OptionUtils):
             else:
                 raise NotImplementedError(f"Source {self._format} is not supported.")
 
-        return DataFrame(None, ldf_generator, self._spark, is_streaming=True)
+        return DataFrame(None, ldf_generator, self._spark, is_streaming=True, origin=self)
 
     def json(
         self,
@@ -971,6 +971,7 @@ class DataStreamWriter:
         self._future: Optional[Future] = None
 
         self._active = Event()  # Thread safe due to GIL
+        self._process_all_available = Event()
 
     def outputMode(self, outputMode: str) -> "DataStreamWriter":
         """Specifies how data of a streaming DataFrame/Dataset is written to a streaming sink.
@@ -1714,37 +1715,44 @@ class DataStreamWriter:
             Path(chk).mkdir(parents=True, exist_ok=True)
 
         def starter():
-            if self._foreach_func:
-                self._foreach_func(self._df, 0)
-            else:
-                for i, ldf in enumerate(self._df._gather()):  # noqa
-                    if self._active.isSet() or isinstance(ldf, pl.LazyFrame):
+            for i, ldf in enumerate(self._df._gather()):  # noqa
+                if self._stream_alive(ldf):
+                    if isinstance(ldf, pl.LazyFrame):
                         t = time.process_time()
                         rows = []
-                        if isinstance(ldf, pl.LazyFrame):
-                            if self._format in ["memory", "noop"]:
-                                rows = ldf.collect()
-                                print(rows)
-                            else:
-                                _save(
-                                    ldf=ldf, path=path, format=self._format, options=self._options
-                                )
-                            duration = time.process_time() - t
-                            progress.append(
-                                {
-                                    "name": self._query_name,
-                                    "id": self._query_id,
-                                    "timestamp": str(datetime.now()),
-                                    "batchId": i,
-                                    "batchDuration": duration,
-                                    "runId": run_id,
-                                    "stateOperators": [self._get_state(len(rows))],
-                                    "sources": [self._get_source()],
-                                    "sink": self._get_sink(len(rows)),
-                                }
-                            )
-                    else:
-                        break
+                        if self._foreach_func:
+                            from polarspark.sql.dataframe import DataFrame
+
+                            def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
+                                yield ldf
+
+                            df = DataFrame(None, ldf_generator, self._spark)
+                            self._foreach_func(df, i)
+                        elif self._format == "memory":
+                            rows = ldf.collect()
+                            print(rows)
+                        elif self._format == "noop":
+                            rows = ldf.collect()
+                            if i > 1:  # Seems that noop stops after first round, so stop
+                                break
+                        else:
+                            _save(ldf=ldf, path=path, format=self._format, options=self._options)
+                        duration = time.process_time() - t
+                        progress.append(
+                            {
+                                "name": self._query_name,
+                                "id": self._query_id,
+                                "timestamp": str(datetime.now()),
+                                "batchId": i,
+                                "batchDuration": duration,
+                                "runId": run_id,
+                                "stateOperators": [self._get_state(len(rows))],
+                                "sources": [self._get_source()],
+                                "sink": self._get_sink(len(rows)),
+                            }
+                        )
+                else:
+                    break
 
             self._active.clear()
             self._spark.streams._remove(self._query_id)  # noqa
@@ -1753,6 +1761,18 @@ class DataStreamWriter:
         query = StreamingQuery(self, progress)
         self._spark.streams._add(query)  # noqa
         return query
+
+    def _stream_alive(self, ldf) -> bool:
+        # Apparently when it's rate it should also stop
+        is_rate_format = self._df._origin and self._df._origin._format == "rate"  # noqa  # noqa
+
+        # Check fist for explicit call to stop
+        process_all = self._process_all_available.isSet()
+        not_active = not self._active.isSet()
+
+        needs_breaking = (process_all and (ldf is NO_INPUT or is_rate_format)) or not_active
+
+        return not needs_breaking
 
     def toTable(
         self,
