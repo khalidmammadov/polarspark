@@ -16,8 +16,10 @@
 #
 
 import json
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
-from concurrent.futures import Future, TimeoutError
+import sys
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from threading import Event
 import traceback
 
 from polarspark.errors import StreamingQueryException, PySparkValueError
@@ -486,6 +488,7 @@ class StreamingQueryManager:
 
     def __init__(self) -> None:
         self._queries: Dict[str, StreamingQuery] = {}
+        self._terminated: List[StreamingQuery] = []
 
     @property
     def active(self) -> List[StreamingQuery]:
@@ -525,7 +528,8 @@ class StreamingQueryManager:
         self._queries[q.id] = q
 
     def _remove(self, _id: str):
-        self._queries.pop(_id, None)
+        if res := self._queries.pop(_id, None):
+            self._terminated.append(res)
 
     def get(self, id: str) -> Optional[StreamingQuery]:
         """
@@ -627,11 +631,31 @@ class StreamingQueryManager:
                     error_class="VALUE_NOT_POSITIVE",
                     message_parameters={"arg_name": "timeout", "arg_value": type(timeout).__name__},
                 )
-            raise NotImplementedError()
-        #     return self._jsqm.awaitAnyTermination(int(timeout * 1000))
-        else:
-            #     return self._jsqm.awaitAnyTermination()
-            raise NotImplementedError()
+
+            # The goal is to poll periodically
+            # as query can terminate in any second within timeout
+            timeouted = Event()
+
+            def check() -> Union[StreamingQuery, bool]:
+                while not timeouted.is_set():
+                    if self._terminated:
+                        return True
+                return False
+
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(check)
+                try:
+                    fut.result(timeout=int(timeout or sys.maxsize))
+                except TimeoutError:
+                    timeouted.set()
+                    return False
+
+        # Exception checking phase
+        for q in self._terminated:
+            if q.exception():
+                raise q.exception()
+
+        return True
 
     def resetTerminated(self) -> None:
         """
@@ -647,8 +671,7 @@ class StreamingQueryManager:
         --------
         >>> spark.streams.resetTerminated()
         """
-        # self._jsqm.resetTerminated()
-        raise NotImplementedError()
+        self._terminated = []
 
     # def addListener(self, listener: StreamingQueryListener) -> None:
     #     """

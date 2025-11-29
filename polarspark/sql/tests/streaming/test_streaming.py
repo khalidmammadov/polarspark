@@ -381,37 +381,36 @@ class StreamingTestsMixin:
 
         self.assertIsNone(self.spark.streams.get(q.id))
 
-    #
-    # def test_query_manager_await_termination(self):
-    #     df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
-    #     for q in self.spark.streams.active:
-    #         q.stop()
-    #     tmpPath = tempfile.mkdtemp()
-    #     shutil.rmtree(tmpPath)
-    #     self.assertTrue(df.isStreaming)
-    #     out = os.path.join(tmpPath, "out")
-    #     chk = os.path.join(tmpPath, "chk")
-    #     q = df.writeStream.start(
-    #         path=out, format="parquet", queryName="this_query", checkpointLocation=chk
-    #     )
-    #     try:
-    #         self.assertTrue(q.isActive)
-    #         try:
-    #             self.spark.streams.awaitAnyTermination("hello")
-    #             self.fail("Expected a value exception")
-    #         except ValueError:
-    #             pass
-    #         now = time.time()
-    #         # test should take at least 2 seconds
-    #         res = self.spark.streams.awaitAnyTermination(2.6)
-    #         duration = time.time() - now
-    #         self.assertTrue(duration >= 2)
-    #         self.assertFalse(res)
-    #     finally:
-    #         q.processAllAvailable()
-    #         q.stop()
-    #         shutil.rmtree(tmpPath)
-    #
+    def test_query_manager_await_termination(self):
+        df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
+        for q in self.spark.streams.active:
+            q.stop()
+        tmpPath = tempfile.mkdtemp()
+        shutil.rmtree(tmpPath)
+        self.assertTrue(df.isStreaming)
+        out = os.path.join(tmpPath, "out")
+        chk = os.path.join(tmpPath, "chk")
+        q = df.writeStream.start(
+            path=out, format="parquet", queryName="this_query", checkpointLocation=chk
+        )
+        try:
+            self.assertTrue(q.isActive)
+            try:
+                self.spark.streams.awaitAnyTermination("hello")
+                self.fail("Expected a value exception")
+            except ValueError:
+                pass
+            now = time.time()
+            # test should take at least 2 seconds
+            res = self.spark.streams.awaitAnyTermination(2.6)
+            duration = time.time() - now
+            self.assertTrue(duration >= 2)
+            self.assertFalse(res)
+        finally:
+            q.processAllAvailable()
+            q.stop()
+            shutil.rmtree(tmpPath)
+
     # def test_streaming_read_from_table(self):
     #     with self.table("input_table", "this_query"):
     #         self.spark.sql("CREATE TABLE input_table (value string) USING parquet")
