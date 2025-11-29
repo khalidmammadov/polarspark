@@ -636,7 +636,7 @@ class StreamingQueryManager:
             # as query can terminate in any second within timeout
             timeouted = Event()
 
-            def check() -> Union[StreamingQuery, bool]:
+            def check() -> bool:
                 while not timeouted.is_set():
                     if self._terminated:
                         return True
