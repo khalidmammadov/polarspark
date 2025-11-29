@@ -19,13 +19,6 @@ import functools
 import os
 from typing import Any, Callable, Optional, Sequence, TYPE_CHECKING, cast, TypeVar, Union, Type
 
-# from py4j.java_collections import JavaArray
-# from py4j.java_gateway import (
-#     JavaClass,
-#     JavaGateway,
-#     JavaObject,
-# )
-
 from polarspark import SparkContext
 
 # For backward compatibility.
@@ -63,25 +56,7 @@ except ImportError:
 
 FuncT = TypeVar("FuncT", bound=Callable[..., Any])
 
-NOTHING = object()
-
-# def toJArray(gateway: JavaGateway, jtype: JavaClass, arr: Sequence[Any]) -> JavaArray:
-#     """
-#     Convert python list to java type array
-#
-#     Parameters
-#     ----------
-#     gateway :
-#         Py4j Gateway
-#     jtype :
-#         java type of element in array
-#     arr :
-#         python type list
-#     """
-#     jarray: JavaArray = gateway.new_array(jtype, len(arr))
-#     for i in range(0, len(arr)):
-#         jarray[i] = arr[i]
-#     return jarray
+NO_INPUT = object()
 
 
 def require_test_compiled() -> None:
@@ -108,22 +83,6 @@ class ForeachBatchFunction:
     def __init__(self, session: "SparkSession", func: Callable[["DataFrame", int], None]):
         self.func = func
         self.session = session
-
-    # def call(self, jdf: JavaObject, batch_id: int) -> None:
-    #     from polarspark.sql.dataframe import DataFrame
-    #     from polarspark.sql.session import SparkSession
-    #
-    #     try:
-    #         session_jdf = jdf.sparkSession()
-    #         # assuming that spark context is still the same between JVM and PySpark
-    #         wrapped_session_jdf = SparkSession(self.session.sparkContext, session_jdf)
-    #         self.func(DataFrame(jdf, wrapped_session_jdf), batch_id)
-    #     except Exception as e:
-    #         self.error = e
-    #         raise e
-
-    class Java:
-        implements = ["org.apache.spark.sql.execution.streaming.sources.PythonForeachBatchFunction"]
 
 
 def to_str(value: Any) -> Optional[str]:
