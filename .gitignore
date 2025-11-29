@@ -4,3 +4,4 @@
 /venv/
 /.idea/
 /plspark.egg-info/
+__pycache__
