@@ -1747,6 +1747,7 @@ class DataStreamWriter:
                         break
 
             self._active.clear()
+            self._spark.streams._remove(self._query_id)  # noqa
 
         self._future = self._executor.submit(starter)
         query = StreamingQuery(self, progress)
