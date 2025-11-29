@@ -655,7 +655,13 @@ class StreamingQueryManager:
             if q.exception():
                 raise q.exception()
 
-        return True
+        # This method is overloaded in Scala
+        # one returns Boolean and Unit other one
+        if timeout:
+            return True
+        # After waiting indeterminately and
+        # seeing completion no errors were observed
+        return None
 
     def resetTerminated(self) -> None:
         """
