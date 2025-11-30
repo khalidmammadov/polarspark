@@ -25,7 +25,12 @@ So, the aim is to make **Polar Spark** drop in replacement for PySpark
 where PySpark is used on single machine or where data can fit into
 resources of a single machine.
 
-Usage examples:
+## Installation
+```shell
+pip install polarspark
+```
+
+## Usage examples:
 ### Create spark session
 ```python
 try:            
