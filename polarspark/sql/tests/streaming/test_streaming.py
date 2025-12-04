@@ -411,20 +411,20 @@ class StreamingTestsMixin:
             q.stop()
             shutil.rmtree(tmpPath)
 
-    # def test_streaming_read_from_table(self):
-    #     with self.table("input_table", "this_query"):
-    #         self.spark.sql("CREATE TABLE input_table (value string) USING parquet")
-    #         self.spark.sql("INSERT INTO input_table VALUES ('aaa'), ('bbb'), ('ccc')")
-    #         df = self.spark.readStream.table("input_table")
-    #         self.assertTrue(df.isStreaming)
-    #         q = df.writeStream.format("memory").queryName("this_query").start()
-    #         q.processAllAvailable()
-    #         q.stop()
-    #         result = self.spark.sql("SELECT * FROM this_query ORDER BY value").collect()
-    #         self.assertEqual(
-    #             set([Row(value="aaa"), Row(value="bbb"), Row(value="ccc")]), set(result)
-    #         )
-    #
+    def test_streaming_read_from_table(self):
+        with self.table("input_table", "this_query"):
+            self.spark.sql("CREATE TABLE input_table (value string) USING parquet")
+            self.spark.sql("INSERT INTO input_table VALUES ('aaa'), ('bbb'), ('ccc')")
+            df = self.spark.readStream.name("input_table")
+            self.assertTrue(df.isStreaming)
+            q = df.writeStream.format("memory").queryName("this_query").start()
+            q.processAllAvailable()
+            q.stop()
+            result = self.spark.sql("SELECT * FROM this_query ORDER BY value").collect()
+            self.assertEqual(
+                set([Row(value="aaa"), Row(value="bbb"), Row(value="ccc")]), set(result)
+            )
+
     # def test_streaming_write_to_table(self):
     #     with self.table("output_table"), tempfile.TemporaryDirectory(prefix="to_table") as tmpdir:
     #         df = self.spark.readStream.format("rate").option("rowsPerSecond", 10).load()
@@ -435,31 +435,32 @@ class StreamingTestsMixin:
     #         result = self.spark.sql("SELECT value FROM output_table").collect()
     #         self.assertTrue(len(result) > 0)
     #
-    # def test_streaming_write_to_table_cluster_by(self):
-    #     with self.table("output_table"), tempfile.TemporaryDirectory(prefix="to_table") as tmpdir:
-    #         df = self.spark.readStream.format("rate").option("rowsPerSecond", 10).load()
-    #         q = df.writeStream.clusterBy("value").toTable(
-    #             "output_table", format="parquet", checkpointLocation=tmpdir
-    #         )
-    #         self.assertTrue(q.isActive)
-    #         time.sleep(10)
-    #         q.stop()
-    #         result = self.spark.sql("DESCRIBE output_table").collect()
-    #         self.assertEqual(
-    #             set(
-    #                 [
-    #                     Row(col_name="timestamp", data_type="timestamp", comment=None),
-    #                     Row(col_name="value", data_type="bigint", comment=None),
-    #                     Row(col_name="# Clustering Information", data_type="", comment=""),
-    #                     Row(col_name="# col_name", data_type="data_type", comment="comment"),
-    #                     Row(col_name="value", data_type="bigint", comment=None),
-    #                 ]
-    #             ),
-    #             set(result),
-    #         )
-    #         result = self.spark.sql("SELECT value FROM output_table").collect()
-    #         self.assertTrue(len(result) > 0)
-    #
+    @pytest.mark.skip(reason="Cluster By not supported")
+    def test_streaming_write_to_table_cluster_by(self):
+        with self.table("output_table"), tempfile.TemporaryDirectory(prefix="to_table") as tmpdir:
+            df = self.spark.readStream.format("rate").option("rowsPerSecond", 10).load()
+            q = df.writeStream.clusterBy("value").toTable(
+                "output_table", format="parquet", checkpointLocation=tmpdir
+            )
+            self.assertTrue(q.isActive)
+            time.sleep(10)
+            q.stop()
+            result = self.spark.sql("DESCRIBE output_table").collect()
+            self.assertEqual(
+                set(
+                    [
+                        Row(col_name="timestamp", data_type="timestamp", comment=None),
+                        Row(col_name="value", data_type="bigint", comment=None),
+                        Row(col_name="# Clustering Information", data_type="", comment=""),
+                        Row(col_name="# col_name", data_type="data_type", comment="comment"),
+                        Row(col_name="value", data_type="bigint", comment=None),
+                    ]
+                ),
+                set(result),
+            )
+            result = self.spark.sql("SELECT value FROM output_table").collect()
+            self.assertTrue(len(result) > 0)
+
     # def test_streaming_with_temporary_view(self):
     #     """
     #     This verifies createOrReplaceTempView() works with a streaming dataframe. An SQL
@@ -483,31 +484,32 @@ class StreamingTestsMixin:
     #         self.assertEqual(
     #             set([Row(value="view_a"), Row(value="view_b"), Row(value="view_c")]), set(result)
     #         )
-    #
-    # def test_streaming_drop_duplicate_within_watermark(self):
-    #     """
-    #     This verifies dropDuplicatesWithinWatermark works with a streaming dataframe.
-    #     """
-    #     user_schema = StructType().add("time", TimestampType()).add("id", "integer")
-    #     df = (
-    #         self.spark.readStream.option("sep", ";")
-    #         .schema(user_schema)
-    #         .csv("polarspark/test_support/sql/streaming/time")
-    #     )
-    #     q1 = (
-    #         df.withWatermark("time", "2 seconds")
-    #         .dropDuplicatesWithinWatermark(["id"])
-    #         .writeStream.outputMode("update")
-    #         .format("memory")
-    #         .queryName("test_streaming_drop_duplicates_within_wm")
-    #         .start()
-    #     )
-    #     self.assertTrue(q1.isActive)
-    #     q1.processAllAvailable()
-    #     q1.stop()
-    #     result = self.spark.sql("SELECT * FROM test_streaming_drop_duplicates_within_wm").collect()
-    #     self.assertTrue(len(result) >= 6 and len(result) <= 9)
-    #
+
+    @pytest.mark.skip(reason="Watermark not supported")
+    def test_streaming_drop_duplicate_within_watermark(self):
+        """
+        This verifies dropDuplicatesWithinWatermark works with a streaming dataframe.
+        """
+        user_schema = StructType().add("time", TimestampType()).add("id", "integer")
+        df = (
+            self.spark.readStream.option("sep", ";")
+            .schema(user_schema)
+            .csv("polarspark/test_support/sql/streaming/time")
+        )
+        q1 = (
+            df.withWatermark("time", "2 seconds")
+            .dropDuplicatesWithinWatermark(["id"])
+            .writeStream.outputMode("update")
+            .format("memory")
+            .queryName("test_streaming_drop_duplicates_within_wm")
+            .start()
+        )
+        self.assertTrue(q1.isActive)
+        q1.processAllAvailable()
+        q1.stop()
+        result = self.spark.sql("SELECT * FROM test_streaming_drop_duplicates_within_wm").collect()
+        self.assertTrue(len(result) >= 6 and len(result) <= 9)
+
 
 
 class StreamingTests(StreamingTestsMixin, ReusedSQLTestCase):

@@ -15,7 +15,6 @@
 # limitations under the License.
 #
 import os
-import sys
 import warnings
 from array import array
 from collections.abc import Sized
@@ -41,7 +40,6 @@ from typing import (
 )
 
 import polars as pl
-from polars.polars import PyDataFrame
 
 # from build.lib.polarspark.sql.functions import struct
 from polarspark import SparkConf, SparkContext
@@ -74,6 +72,8 @@ from polarspark.sql.types import (
 
 from polarspark.sql.utils import is_timestamp_ntz_preferred, to_str, try_remote_session_classmethod
 from polarspark.errors import PySparkValueError, PySparkTypeError, PySparkRuntimeError
+
+from polarspark.sql._internal.parser import ddl
 
 if TYPE_CHECKING:
     from polarspark.sql._typing import AtomicValue, RowLike, OptionalPrimitiveType
@@ -1575,6 +1575,9 @@ class SparkSession(SparkConversionMixin):
         # finally:
         #     if len(kwargs) > 0:
         #         formatter.clear()
+        if ddl.execute_sql(self, sqlQuery):
+           return self.createDataFrame([], schema="res STRING")
+
         return self._create_base_dataframe(self._pl_ctx.execute(sqlQuery))
 
     def table(self, tableName: str) -> DataFrame:
@@ -1597,7 +1600,7 @@ class SparkSession(SparkConversionMixin):
         Examples
         --------
         >>> spark.range(5).createOrReplaceTempView("table1")
-        >>> spark.table("table1").sort("id").show()
+        >>> spark.name("table1").sort("id").show()
         +---+
         | id|
         +---+

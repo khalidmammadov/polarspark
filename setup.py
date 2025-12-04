@@ -10,7 +10,9 @@ setup(
         'polars==1.33.1',
         'pyarrow>=4.0.0',
         'tzlocal==5.2',
-        'deltalake==0.22.3'
+        'deltalake==0.22.3',
+        'watchdog',
+        'sqlglot'
     ],
     author='Khalid Mammadov',
     author_email='xmamedov@gmail.com',

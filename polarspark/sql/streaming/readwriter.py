@@ -900,14 +900,14 @@ class DataStreamReader(OptionUtils):
         ...         "my_table", checkpointLocation=d)
         ...
         ...     # Read the table back and print out in the console.
-        ...     q2 = spark.readStream.table("my_table").writeStream.format("console").start()
+        ...     q2 = spark.readStream.name("my_table").writeStream.format("console").start()
         ...     time.sleep(3)
         ...     q1.stop()
         ...     q2.stop()
         ...     _ = spark.sql("DROP TABLE my_table")
         """
         if isinstance(tableName, str):
-            return self._df(self._jreader.table(tableName))
+            return self._df(self._jreader.name(tableName))
         else:
             raise PySparkTypeError(
                 error_class="NOT_STR",
@@ -1849,7 +1849,7 @@ class DataStreamWriter:
         ...             checkpointLocation=d)
         ...     time.sleep(3)
         ...     q.stop()
-        ...     spark.read.table("my_table2").show()
+        ...     spark.read.name("my_table2").show()
         ...     _ = spark.sql("DROP TABLE my_table2")
         +...---------+-----+
         |...timestamp|value|
