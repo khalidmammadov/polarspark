@@ -3,9 +3,9 @@ from typing import Optional
 from sqlglot.expressions import (
     Create, Table, Identifier, Schema,
     FileFormatProperty, LocationProperty,
-    PartitionedByProperty, ColumnDef, Insert, Expression)
+    PartitionedByProperty, ColumnDef, Insert, Expression, Select, Drop)
 
-from polarspark.sql._internal.parser.models import CreateTable, InsertInto
+from polarspark.sql._internal.parser.models import CreateTable, InsertInto, SelectFrom, DropTable
 
 
 def get_schema(expr: Expression) -> Optional[Expression]:
@@ -16,13 +16,14 @@ def get_table(expr: Expression) -> Optional[Expression]:
     return expr.find(Table)
 
 
-def get_name(expr: Expression, sbj: str = "this") -> Optional[str]:
+def get_name(expr: Optional[Expression] = None, sbj: str = "this") -> Optional[str]:
     """
     Get name from Identifier in any Expression
     """
-    res = expr.args.get(sbj)
-    if res:
-        return str(res.this)
+    if expr:
+        res = expr.args.get(sbj)
+        if res:
+            return str(res.this)
     return None
 
 
@@ -61,7 +62,7 @@ def create_table(expr: Create) -> CreateTable:
     columns = get_columns(expr)
     partitioned_by = get_partitioned_by(expr)
     location = get_location(expr)
-    file_format = get_format(expr)
+    file_format = get_format(expr) or "parquet"
     return CreateTable(
         name= table_name,
         db = db,
@@ -70,6 +71,20 @@ def create_table(expr: Create) -> CreateTable:
         partitioned_by = partitioned_by,
         location = location
     )
+
+
+def select_table(expr: Select) -> SelectFrom:
+    tbl = get_table(expr)
+    table_name = get_name(tbl)
+    db = get_name(tbl, sbj="db")
+    return SelectFrom(table=table_name, db=db)
+
+
+def drop_table(expr: Drop) -> DropTable:
+    tbl = get_table(expr)
+    table_name = get_name(tbl)
+    db = get_name(tbl, sbj="db")
+    return DropTable(table=table_name, db=db)
 
 
 def get_insert_cols(expr: Expression) -> Optional[list[str]]:
@@ -92,6 +107,6 @@ def insert_table(expr: Insert) -> InsertInto:
     return InsertInto(
         table = get_name(tbl),
         db = get_name(tbl, sbj="db"),
-        columns = get_insert_cols(expr),
+        columns = get_insert_cols(expr) or [],
         values = get_insert_values(expr)
     )

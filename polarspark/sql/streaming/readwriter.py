@@ -907,7 +907,12 @@ class DataStreamReader(OptionUtils):
         ...     _ = spark.sql("DROP TABLE my_table")
         """
         if isinstance(tableName, str):
-            return self._df(self._jreader.name(tableName))
+            tbl = self._spark.catalog._cat.get_table(tableName)
+            return self.load(
+                path=tbl.location,
+                format=tbl.format,
+                schema=",".join([" ".join(col) for col in tbl.columns]),
+            )
         else:
             raise PySparkTypeError(
                 error_class="NOT_STR",

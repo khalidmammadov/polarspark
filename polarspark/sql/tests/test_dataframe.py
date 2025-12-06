@@ -1301,8 +1301,6 @@ class DataFrameTestsMixin:
                 self.check_to_pandas_with_duplicated_column_names()
 
     def check_to_pandas_with_duplicated_column_names(self):
-        import numpy as np
-
         sql = "select 1 v, 1 v1"
         df = self.spark.sql(sql)
         pdf = df.toPandas()

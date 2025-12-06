@@ -113,7 +113,7 @@ class StreamingTestsForeachBatchMixin:
             q.processAllAvailable()
             q.stop()
 
-            actual = self.spark.read.name(table_name)
+            actual = self.spark.read.table(table_name)
             df = (
                 self.spark.read.format("text")
                 .load(path="polarspark/test_support/sql/streaming/")
@@ -137,7 +137,7 @@ class StreamingTestsForeachBatchMixin:
             q.processAllAvailable()
             q.stop()
 
-            actual = self.spark.read.name(table_name)
+            actual = self.spark.read.table(table_name)
             df = self.spark.read.format("text").load(path="polarspark/test_support/sql/streaming/")
             df = df.union(df)
             self.assertEqual(sorted(df.collect()), sorted(actual.collect()))
@@ -171,7 +171,7 @@ class StreamingTestsForeachBatchMixin:
             q.processAllAvailable()
             q.stop()
 
-            actual = self.spark.read.name(table_name)
+            actual = self.spark.read.table(table_name)
             df = self.spark.createDataFrame(
                 [
                     (my_test_function_1(),),
@@ -200,7 +200,7 @@ class StreamingTestsForeachBatchMixin:
             q.processAllAvailable()
             q.stop()
 
-            actual = self.spark.read.name(table_name)
+            actual = self.spark.read.table(table_name)
             df = self.spark.read.format("text").load("polarspark/test_support/sql/streaming")
             self.assertEqual(sorted(df.collect()), sorted(actual.collect()))
 

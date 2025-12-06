@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import inspect
 import os
 import warnings
 from array import array
@@ -44,6 +45,7 @@ import polars as pl
 # from build.lib.polarspark.sql.functions import struct
 from polarspark import SparkConf, SparkContext
 from polarspark.rdd import RDD
+from polarspark.sql._internal.parser.models import CreateTable, InsertInto, SelectFrom, DropTable
 
 # from polarspark.sql.column import _to_java_column
 from polarspark.sql.conf import RuntimeConfig
@@ -526,11 +528,6 @@ class SparkSession(SparkConversionMixin):
             catalogImplementation=self.conf.get("spark.sql.catalogImplementation"),
             sc_HTML=self.sparkContext._repr_html_(),
         )
-
-    # @property
-    # def _jconf(self) -> "JavaObject":
-    #     """Accessor for the JVM SQL-specific configurations"""
-    #     return self._jsparkSession.sessionState().conf()
 
     def newSession(self) -> "SparkSession":
         """
@@ -1575,10 +1572,18 @@ class SparkSession(SparkConversionMixin):
         # finally:
         #     if len(kwargs) > 0:
         #         formatter.clear()
-        if ddl.execute_sql(self, sqlQuery):
-           return self.createDataFrame([], schema="res STRING")
+        for res_ast in ddl.execute_sql(self, sqlQuery):
+            if isinstance(res_ast, (CreateTable, InsertInto, DropTable)):
+               continue
+            if isinstance(res_ast, SelectFrom):
+                if res_ast.table:
+                    ex_ctx = self.catalog._cat.get_ts(res_ast.table).pl_ctx.execute # noqa
+                else:
+                    ex_ctx = pl.sql
+                return self._create_base_dataframe(ex_ctx(sqlQuery))
+            raise NotImplementedError("This SQL type not implemented yet")
 
-        return self._create_base_dataframe(self._pl_ctx.execute(sqlQuery))
+        return self.createDataFrame([], schema="res STRING")
 
     def table(self, tableName: str) -> DataFrame:
         """Returns the specified table as a :class:`DataFrame`.

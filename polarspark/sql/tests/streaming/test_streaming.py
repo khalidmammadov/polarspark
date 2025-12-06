@@ -415,7 +415,7 @@ class StreamingTestsMixin:
         with self.table("input_table", "this_query"):
             self.spark.sql("CREATE TABLE input_table (value string) USING parquet")
             self.spark.sql("INSERT INTO input_table VALUES ('aaa'), ('bbb'), ('ccc')")
-            df = self.spark.readStream.name("input_table")
+            df = self.spark.readStream.table("input_table")
             self.assertTrue(df.isStreaming)
             q = df.writeStream.format("memory").queryName("this_query").start()
             q.processAllAvailable()

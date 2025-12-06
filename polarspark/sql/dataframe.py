@@ -438,7 +438,13 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
-        self._session._pl_ctx.register(name, self._gather_first())
+        (self.sparkSession # noqa
+            .catalog
+            ._cat
+            .get_ts(name)
+            .pl_ctx
+            .register(name, self._gather_first())
+         )
 
     def createGlobalTempView(self, name: str) -> None:
         """Creates a global temporary view with this :class:`DataFrame`.
