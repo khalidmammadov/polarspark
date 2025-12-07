@@ -900,14 +900,19 @@ class DataStreamReader(OptionUtils):
         ...         "my_table", checkpointLocation=d)
         ...
         ...     # Read the table back and print out in the console.
-        ...     q2 = spark.readStream.table("my_table").writeStream.format("console").start()
+        ...     q2 = spark.readStream.name("my_table").writeStream.format("console").start()
         ...     time.sleep(3)
         ...     q1.stop()
         ...     q2.stop()
         ...     _ = spark.sql("DROP TABLE my_table")
         """
         if isinstance(tableName, str):
-            return self._df(self._jreader.table(tableName))
+            tbl = self._spark.catalog._cat.get_table(tableName)
+            return self.load(
+                path=tbl.location,
+                format=tbl.format,
+                schema=",".join([" ".join(col) for col in tbl.columns]),
+            )
         else:
             raise PySparkTypeError(
                 error_class="NOT_STR",
@@ -1729,8 +1734,10 @@ class DataStreamWriter:
                             df = DataFrame(None, ldf_generator, self._spark)
                             self._foreach_func(df, i)
                         elif self._format == "memory":
-                            rows = ldf.collect()
-                            print(rows)
+                            if self._query_name:
+                                self._spark.catalog._cat.create_or_append_in_mem_table(
+                                    self._query_name, ldf
+                                )  # noqa
                         elif self._format == "noop":
                             rows = ldf.collect()
                             if i > 1:  # Seems that noop stops after first round, so stop

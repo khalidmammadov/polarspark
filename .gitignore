@@ -5,3 +5,4 @@
 /.idea/
 /plspark.egg-info/
 __pycache__
+/spark-warehouse/

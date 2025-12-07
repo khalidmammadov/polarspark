@@ -397,12 +397,13 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
-        if name in self._session._pl_ctx.tables():
+        _cat = self.sparkSession.catalog._cat  # noqa
+        if _cat.get_table(name):
             raise PySparkValueError(
                 error_class="TEMP_TABLE_OR_VIEW_ALREADY_EXISTS",
                 message_parameters={"relationName": name},
             )
-        self._session._pl_ctx.register(name, self._gather_first())
+        _cat.create_or_append_in_mem_table(name, self._gather_first())
 
     def createOrReplaceTempView(self, name: str) -> None:
         """Creates or replaces a local temporary view with this :class:`DataFrame`.
@@ -438,7 +439,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
-        self._session._pl_ctx.register(name, self._gather_first())
+        (
+            self.sparkSession.catalog._cat.create_or_append_in_mem_table(  # noqa
+                name, self._gather_first()
+            )
+        )
 
     def createGlobalTempView(self, name: str) -> None:
         """Creates a global temporary view with this :class:`DataFrame`.

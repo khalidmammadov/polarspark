@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import inspect
 import os
-import sys
 import warnings
 from array import array
 from collections.abc import Sized
@@ -41,11 +41,11 @@ from typing import (
 )
 
 import polars as pl
-from polars.polars import PyDataFrame
 
 # from build.lib.polarspark.sql.functions import struct
 from polarspark import SparkConf, SparkContext
 from polarspark.rdd import RDD
+from polarspark.sql._internal.parser.models import SourceTable, InsertInto, SelectFrom, DropTable
 
 # from polarspark.sql.column import _to_java_column
 from polarspark.sql.conf import RuntimeConfig
@@ -74,6 +74,8 @@ from polarspark.sql.types import (
 
 from polarspark.sql.utils import is_timestamp_ntz_preferred, to_str, try_remote_session_classmethod
 from polarspark.errors import PySparkValueError, PySparkTypeError, PySparkRuntimeError
+
+from polarspark.sql._internal.parser import ddl
 
 if TYPE_CHECKING:
     from polarspark.sql._typing import AtomicValue, RowLike, OptionalPrimitiveType
@@ -526,11 +528,6 @@ class SparkSession(SparkConversionMixin):
             catalogImplementation=self.conf.get("spark.sql.catalogImplementation"),
             sc_HTML=self.sparkContext._repr_html_(),
         )
-
-    # @property
-    # def _jconf(self) -> "JavaObject":
-    #     """Accessor for the JVM SQL-specific configurations"""
-    #     return self._jsparkSession.sessionState().conf()
 
     def newSession(self) -> "SparkSession":
         """
@@ -1421,9 +1418,12 @@ class SparkSession(SparkConversionMixin):
         df._schema = struct
         return df
 
-    def _create_base_dataframe(self, ldf):
+    def _create_base_dataframe(self, ldf: Union[pl.LazyFrame, list[pl.LazyFrame]]):
         def df_generator() -> Generator[pl.LazyFrame, None, None]:
-            yield ldf
+            if isinstance(ldf, (list, tuple)):
+                yield from ldf
+            else:
+                yield ldf
 
         return DataFrame(None, df_generator, self)
 
@@ -1575,7 +1575,22 @@ class SparkSession(SparkConversionMixin):
         # finally:
         #     if len(kwargs) > 0:
         #         formatter.clear()
-        return self._create_base_dataframe(self._pl_ctx.execute(sqlQuery))
+        for res_ast in ddl.execute_sql(self, sqlQuery):
+            if not isinstance(res_ast, (SourceTable, InsertInto, DropTable, SelectFrom)):
+                raise NotImplementedError("This SQL type not implemented yet")
+
+            if isinstance(res_ast, SelectFrom):
+                if res_ast.table:
+                    # This covers in memory selects as well
+                    ts = self.catalog._cat.get_ts(res_ast.table)  # noqa
+                    # Run in context now
+                    ex_ctx = ts.pl_ctx.execute  # noqa
+                else:
+                    # No table source, VALUES etc
+                    ex_ctx = pl.sql
+                return self._create_base_dataframe(ex_ctx(sqlQuery))
+
+        return self.createDataFrame([], schema="res STRING")
 
     def table(self, tableName: str) -> DataFrame:
         """Returns the specified table as a :class:`DataFrame`.

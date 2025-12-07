@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 import os
+import pathlib
 import sys
 from typing import cast, overload, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING, Union
 from functools import partial, reduce
@@ -23,6 +24,7 @@ import shutil
 import uuid
 
 from polarspark import RDD, since
+from polarspark.sql._internal.catalog.utils import parse_table_name
 
 # from polarspark.sql.column import _to_seq, _to_java_column, Column
 from polarspark.sql.column import Column
@@ -535,13 +537,7 @@ class DataFrameReader(OptionUtils):
         +---+
         >>> _ = spark.sql("DROP TABLE tblA")
         """
-        ldf = self._spark._pl_ctx.execute(f"select * from {tableName}")  # noqa
-        from polarspark.sql.dataframe import DataFrame
-
-        def df_generator():
-            yield ldf
-
-        return DataFrame(None, df_generator, self._spark)
+        return self._spark.sql(f"SELECT * FROM {tableName}")
 
     def parquet(self, *paths: str, **options: "OptionalPrimitiveType") -> "DataFrame":
         """
@@ -1741,7 +1737,7 @@ class DataFrameWriter(OptionUtils):
         ...     (100, "Hyukjin Kwon"), (120, "Hyukjin Kwon"), (140, "Haejoon Lee")],
         ...     schema=["age", "name"]
         ... ).write.saveAsTable("tblA")
-        >>> spark.read.table("tblA").sort("age").show()
+        >>> spark.read.name("tblA").sort("age").show()
         +---+------------+
         |age|        name|
         +---+------------+
@@ -1754,11 +1750,18 @@ class DataFrameWriter(OptionUtils):
         self.mode(mode).options(**options)
         if partitionBy is not None:
             self.partitionBy(partitionBy)
-        if format is not None:
-            self.format(format)
+        self.format(format or "parquet")
 
-        # Register immutable (no insert supported yet) virtual table for now
-        self._spark._pl_ctx.register(name, self._df._gather_first())  # noqa
+        cat = self._spark.catalog
+        names = parse_table_name(name)
+        default_spark_path = cat.DEFAULT_SPARK_PATH
+        path = pathlib.Path(default_spark_path).joinpath(names.table)
+
+        # Save
+        self.save(str(path.absolute()))
+
+        if not cat._cat.get_table(name):  # noqa
+            cat.createTable(names.table, str(path.absolute()))
         # TODO: Add mode support for inserts and overwrites
 
     def json(
@@ -2257,7 +2260,7 @@ def _save(
     # Create dir with target file name
     p = Path(path or options.get("path"))
     if format != "delta":
-        path = p / f"part-00000-{uuid.uuid4()}-c000{p.suffix}"
+        path = p / f"part-00000-{uuid.uuid4()}-c000.{p.suffix or format}"
     else:
         path = p
 

@@ -17,19 +17,25 @@
 
 import sys
 import warnings
-from typing import Any, Callable, NamedTuple, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, NamedTuple, List, Optional, TYPE_CHECKING, Generator
 import re
 import pathlib
 
+from polarspark.sql._internal.parser.models import SourceTable
 from polarspark.storagelevel import StorageLevel
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql.session import SparkSession
 from polarspark.sql.types import StructType
 from polarspark.errors import AnalysisException
 
+from polarspark.sql._internal.catalog.in_memory_catalog import InMemoryCatalog  # noqa
+from polarspark.sql._internal.catalog.utils import parse_table_name, TableName  # noqa
+
+
 if TYPE_CHECKING:
     from polarspark.sql._typing import UserDefinedFunctionLike
     from polarspark.sql.types import DataType
+    import polars as pl
 
 
 class CatalogMetadata(NamedTuple):
@@ -87,18 +93,19 @@ class Catalog:
         Supports Spark Connect.
     """
 
+    DEFAULT_SPARK_PATH = "spark-warehouse"
+
     _default_catalog = "spark_catalog"
     _default_database = "default"
     _current_catalog = _default_catalog
     _current_database = _default_database
-    _all_catalogs = [_default_catalog]
-    _all_databases = {_default_database: _default_catalog}
     _cached_tables = {}
 
     def __init__(self, sparkSession: SparkSession) -> None:
         """Create a new Catalog that wraps the underlying JVM object."""
         self._sparkSession = sparkSession
-        self._sc = sparkSession._sc
+
+        self._cat = InMemoryCatalog()
 
     def currentCatalog(self) -> str:
         """Returns the current default catalog in this session.
@@ -110,7 +117,8 @@ class Catalog:
         >>> spark.catalog.currentCatalog()
         'spark_catalog'
         """
-        return self._current_catalog
+        cat_str, _ = self._cat.get_current_catalog()
+        return cat_str
 
     def setCurrentCatalog(self, catalogName: str) -> None:
         """Sets the current default catalog in this session.
@@ -126,7 +134,7 @@ class Catalog:
         --------
         >>> spark.catalog.setCurrentCatalog("spark_catalog")
         """
-        self._current_catalog = catalogName
+        self._cat.set_current_catalog(catalogName)
 
     def listCatalogs(self, pattern: Optional[str] = None) -> List[CatalogMetadata]:
         """Returns a list of catalogs in this session.
@@ -157,9 +165,11 @@ class Catalog:
         []
         """
         if pattern is None:
-            it = self._all_catalogs
+            it = self._cat.catalogs().keys()
         else:
-            it = [s for s in self._all_catalogs if re.match(self._regex_pattern, s)]
+            it = [
+                s for s in self._cat.catalogs().keys() if re.match(self._regex_pattern(pattern), s)
+            ]
         catalogs = []
         for i in it:
             catalogs.append(CatalogMetadata(name=i, description=""))
@@ -181,7 +191,7 @@ class Catalog:
         >>> spark.catalog.currentDatabase()
         'default'
         """
-        return self._current_database
+        return self._cat.get_current_database_name()
 
     def setCurrentDatabase(self, dbName: str) -> None:
         """
@@ -193,7 +203,7 @@ class Catalog:
         --------
         >>> spark.catalog.setCurrentDatabase("default")
         """
-        self._current_database = dbName
+        self._cat.set_current_database(dbName)
 
     def listDatabases(self, pattern: Optional[str] = None) -> List[Database]:
         """
@@ -224,16 +234,18 @@ class Catalog:
         >>> spark.catalog.listDatabases("def2*")
         []
         """
-        if pattern is None:
-            it = self._all_catalogs
-        else:
-            it = {
-                db: cat
-                for db, cat in self._all_databases.items()
-                if re.match(self._regex_pattern, db)
-            }
+        cat_name = self._cat.get_current_catalog_name()
+
+        def it():
+            for _db in self._cat.get_current_catalog():
+                if pattern:
+                    if re.match(pattern, _db):
+                        yield db, cat_name
+                else:
+                    yield db, cat_name
+
         databases = []
-        for db, cat in it:
+        for db, cat in it():
             databases.append(
                 Database(
                     name=db,
@@ -270,13 +282,17 @@ class Catalog:
         >>> spark.catalog.getDatabase("spark_catalog.default")
         Database(name='default', catalog='spark_catalog', description='default database', ...
         """
-        cat = self._all_databases[dbName]
-        return Database(
-            name=dbName,
-            catalog=cat,
-            description="",
-            locationUri="",
-        )
+        cat_name = self._cat.get_current_catalog_name()
+        for _db in self._cat.get_current_catalog():
+            if dbName == _db:
+                return Database(
+                    name=dbName,
+                    catalog=cat_name,
+                    description="",
+                    locationUri="",
+                )
+
+        raise AnalysisException(f"Database '{dbName}' not found.")
 
     def databaseExists(self, dbName: str) -> bool:
         """Check if the database with the specified name exists.
@@ -312,7 +328,11 @@ class Catalog:
         True
         >>> _ = spark.sql("DROP DATABASE test_new_database")
         """
-        return dbName in self._all_databases
+        try:
+            self.getDatabase(dbName)
+        except AnalysisException:
+            return False
+        return True
 
     def listTables(
         self, dbName: Optional[str] = None, pattern: Optional[str] = None
@@ -361,24 +381,17 @@ class Catalog:
         []
         """
         if dbName is None:
-            dbName = self._current_database
+            dbName = self._cat.get_current_database_name()
 
-        if pattern is None:
-            # Get for the current/only database for now
-            it = self._sparkSession._pl_ctx.tables()
-        else:
-            it = [
-                s for s in self._sparkSession._pl_ctx.tables() if re.match(self._regex_pattern, s)
-            ]
+        _dbs = self._cat.get_current_catalog()
+
         tables = []
-        for t in it:
-            namespace = [self._current_database]
-
+        for t in _dbs[dbName].tables:
             tables.append(
                 Table(
                     name=t,
-                    catalog=self._current_catalog,
-                    namespace=namespace,
+                    catalog=self._cat.get_current_catalog_name(),
+                    namespace=[self._current_database],
                     description="",
                     tableType="TEMPORARY",
                     isTemporary=True,
@@ -427,14 +440,22 @@ class Catalog:
             ...
         AnalysisException: ...
         """
-        return Table(
-            name=tableName,
-            catalog=self._current_catalog,
-            namespace=[self._current_database],
-            description="",
-            tableType="TEMPORARY",
-            isTemporary=True,
-        )
+        names = parse_table_name(tableName)
+        _cat = names.catalog or self._cat.get_current_catalog_name()
+        _db = names.database or self._cat.get_current_database_name()
+        try:
+            _dbs = self._cat.catalogs()[_cat]
+            if tableName in _dbs[_db].tables:
+                return Table(
+                    name=names.table,
+                    catalog=names.catalog,
+                    namespace=[_db],
+                    description="",
+                    tableType="TEMPORARY",
+                    isTemporary=True,
+                )
+        finally:
+            raise AnalysisException(f"Database '{tableName}' not found.")
 
     def listFunctions(
         self, dbName: Optional[str] = None, pattern: Optional[str] = None
@@ -594,17 +615,21 @@ class Catalog:
         [Column(name='name', description=None, dataType='string', nullable=True, ...
         >>> _ = spark.sql("DROP TABLE tblA")
         """
+        tbl_name = None
         if dbName is None:
-            pass
+            tbl_name = parse_table_name(tableName).table
         else:
             warnings.warn(
                 "`dbName` has been deprecated since Spark 3.4 and might be removed in "
                 "a future version. Use listColumns(`dbName.tableName`) instead.",
                 FutureWarning,
             )
+        tbl_name = tbl_name or tableName
 
-        def df_generator():
-            yield self._sparkSession._pl_ctx.execute(f"select * from {tableName}")  # noqa
+        def df_generator() -> Generator[pl.LazyFrame, None, None]:
+            _cat = self._cat.get_current_catalog()
+            ts = _cat[dbName or self._cat.get_current_database_name()]
+            yield ts.pl_ctx.execute(f"select * from {tbl_name}")  # noqa
 
         df = DataFrame(None, df_generator, self._sparkSession, alias=tableName)
 
@@ -695,7 +720,10 @@ class Catalog:
         >>> spark.catalog.tableExists("view1")
         False
         """
-        return tableName in self._sparkSession._pl_ctx.tables()
+        _cat = self._cat.get_current_catalog()
+        _cdb = _cat[dbName or self._cat.get_current_database_name()]
+
+        return tableName in _cdb.pl_ctx.tables()
 
     def createExternalTable(
         self,
@@ -789,7 +817,11 @@ class Catalog:
         ...         "tbl2", schema=spark.range(1).schema, path=d, source='parquet')
         >>> _ = spark.sql("DROP TABLE tbl2")
         """
-        _path = pathlib.Path(path) if path else pathlib.Path("spark-warehouse").joinpath(tableName)
+        _path = (
+            pathlib.Path(path)
+            if path
+            else pathlib.Path(self.DEFAULT_SPARK_PATH).joinpath(tableName)
+        )
 
         # Create empty table
         if not _path.exists():
@@ -800,8 +832,29 @@ class Catalog:
                 raise ValueError("For empty path schema must be specified")
 
         # Read existing
-        df = self._sparkSession.read.format(source).schema(schema).options(**options).load(path)
-        self._sparkSession._pl_ctx.register(tableName, df._gather_first())  # noqa
+        reader = self._sparkSession.read
+        reader = reader.format(source or "parquet")
+        if schema:
+            reader = reader.schema(schema)
+
+        df = reader.options(**options).load(str(_path.absolute()))
+
+        if not schema:
+            schema = df.schema
+
+        names = parse_table_name(tableName)
+        ts = self._cat.get_ts(tableName)
+        if names.table not in ts.tables:
+            cols = [tuple(f.simpleString().split(":")) for f in schema.fields]
+            ts.tables[names.table] = SourceTable(
+                name=names.table,
+                db=names.database,
+                format=source or options.get("format", "parquet"),
+                location=str(_path.absolute()),
+                columns=cols,
+            )
+            ts.pl_ctx.register(names.table, df._gather_first())  # noqa
+
         return df
 
     def dropTempView(self, viewName: str) -> bool:
@@ -836,12 +889,13 @@ class Catalog:
 
         Throw an exception if the temporary view does not exists.
 
-        >>> spark.table("my_table")
+        >>> spark.name("my_table")
         Traceback (most recent call last):
             ...
         AnalysisException: ...
         """
-        self._sparkSession._pl_ctx.unregister(viewName)
+        ts = self._cat.get_ts(viewName)
+        ts.pl_ctx.unregister(viewName)
         return True
 
     def dropGlobalTempView(self, viewName: str) -> bool:
@@ -874,7 +928,7 @@ class Catalog:
 
         Throw an exception if the global view does not exists.
 
-        >>> spark.table("global_temp.my_table")
+        >>> spark.name("global_temp.my_table")
         Traceback (most recent call last):
             ...
         AnalysisException: ...
@@ -994,9 +1048,10 @@ class Catalog:
 
         self._require_table_exists(tableName)
 
-        ldf = self._sparkSession._pl_ctx.execute(f"select * from {tableName}")
+        ts = self._cat.get_ts(tableName)
+        ldf = ts.pl_ctx.execute(f"select * from {tableName}")
 
-        self._sparkSession._pl_ctx.register(tableName, ldf.collect())
+        ts.pl_ctx.register(tableName, ldf.collect())
         self._cached_tables[tableName] = ldf
 
     def uncacheTable(self, tableName: str) -> None:
@@ -1037,10 +1092,11 @@ class Catalog:
         """
         self._require_table_exists(tableName)
 
+        ts = self._cat.get_ts(tableName)
         # Delete materialized pl.DataFrame from the Context
-        self._sparkSession._pl_ctx.unregister(tableName)
+        ts.pl_ctx.unregister(tableName)
         # Get saved pl.LazyFrame and re-register to have it in the Catalog
-        self._sparkSession._pl_ctx.register(tableName, self._cached_tables[tableName])
+        ts.pl_ctx.register(tableName, self._cached_tables[tableName])
         # Delete cached link
         self._cached_tables.pop(tableName)
 
@@ -1085,7 +1141,7 @@ class Catalog:
         ...         "CREATE TABLE tbl1 (col STRING) USING TEXT LOCATION '{}'".format(d))
         ...     _ = spark.sql("INSERT INTO tbl1 SELECT 'abc'")
         ...     spark.catalog.cacheTable("tbl1")
-        ...     spark.table("tbl1").show()
+        ...     spark.name("tbl1").show()
         +---+
         |col|
         +---+
@@ -1094,13 +1150,13 @@ class Catalog:
 
         Because the table is cached, it computes from the cached data as below.
 
-        >>> spark.table("tbl1").count()
+        >>> spark.name("tbl1").count()
         1
 
         After refreshing the table, it shows 0 because the data does not exist anymore.
 
         >>> spark.catalog.refreshTable("tbl1")
-        >>> spark.table("tbl1").count()
+        >>> spark.name("tbl1").count()
         0
 
         Using the fully qualified name for the table.
@@ -1137,9 +1193,9 @@ class Catalog:
         ...     _ = spark.sql(
         ...          "CREATE TABLE tbl1 (key LONG, value LONG)"
         ...          "USING parquet OPTIONS (path '{}') PARTITIONED BY (key)".format(d))
-        ...     spark.table("tbl1").show()
+        ...     spark.name("tbl1").show()
         ...     spark.catalog.recoverPartitions("tbl1")
-        ...     spark.table("tbl1").show()
+        ...     spark.name("tbl1").show()
         +-----+---+
         |value|key|
         +-----+---+
@@ -1175,7 +1231,7 @@ class Catalog:
         ...         "CREATE TABLE tbl1 (col STRING) USING TEXT LOCATION '{}'".format(d))
         ...     _ = spark.sql("INSERT INTO tbl1 SELECT 'abc'")
         ...     spark.catalog.cacheTable("tbl1")
-        ...     spark.table("tbl1").show()
+        ...     spark.name("tbl1").show()
         +---+
         |col|
         +---+
@@ -1184,13 +1240,13 @@ class Catalog:
 
         Because the table is cached, it computes from the cached data as below.
 
-        >>> spark.table("tbl1").count()
+        >>> spark.name("tbl1").count()
         1
 
         After refreshing the table by path, it shows 0 because the data does not exist anymore.
 
         >>> spark.catalog.refreshByPath(d)
-        >>> spark.table("tbl1").count()
+        >>> spark.name("tbl1").count()
         0
 
         >>> _ = spark.sql("DROP TABLE tbl1")
@@ -1210,7 +1266,8 @@ class Catalog:
         return "^" + re.escape(pattern).replace(r"\*", ".*") + "$"
 
     def _require_table_exists(self, tableName: str):
-        if tableName not in self._sparkSession._pl_ctx.tables():
+        ts = self._cat.get_ts(tableName)
+        if tableName not in ts.pl_ctx.tables():
             raise AnalysisException(f"Table {tableName} does not exist")
 
 
