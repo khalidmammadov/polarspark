@@ -570,7 +570,7 @@ class SQLContext:
         Examples
         --------
         >>> sqlContext.registerDataFrameAsTable(df, "table1")
-        >>> df2 = sqlContext.name("table1")
+        >>> df2 = sqlContext.table("table1")
         >>> sorted(df.collect()) == sorted(df2.collect())
         True
         """

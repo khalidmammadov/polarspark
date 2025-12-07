@@ -1616,7 +1616,7 @@ class SparkSession(SparkConversionMixin):
         Examples
         --------
         >>> spark.range(5).createOrReplaceTempView("table1")
-        >>> spark.name("table1").sort("id").show()
+        >>> spark.table("table1").sort("id").show()
         +---+
         | id|
         +---+

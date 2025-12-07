@@ -520,7 +520,7 @@ class DataFrameReader(OptionUtils):
         --------
         >>> df = spark.range(10)
         >>> df.createOrReplaceTempView('tblA')
-        >>> spark.read.name('tblA').show()
+        >>> spark.read.table('tblA').show()
         +---+
         | id|
         +---+
@@ -1432,7 +1432,7 @@ class DataFrameWriter(OptionUtils):
         ...     schema=["age", "name"]
         ... ).write.bucketBy(2, "name").mode("overwrite").saveAsTable("bucketed_table")
         >>> # Read the Parquet file as a DataFrame.
-        ... spark.read.name("bucketed_table").sort("age").show()
+        ... spark.read.table("bucketed_table").sort("age").show()
         +---+------------+
         |age|        name|
         +---+------------+
@@ -1521,7 +1521,7 @@ class DataFrameWriter(OptionUtils):
         ... ).write.bucketBy(1, "name").sortBy("age").mode(
         ...     "overwrite").saveAsTable("sorted_bucketed_table")
         >>> # Read the Parquet file as a DataFrame.
-        ... spark.read.name("sorted_bucketed_table").sort("age").show()
+        ... spark.read.table("sorted_bucketed_table").sort("age").show()
         +---+------------+
         |age|        name|
         +---+------------+
@@ -1664,7 +1664,7 @@ class DataFrameWriter(OptionUtils):
         Insert the data into 'tblA' table but with different column names.
 
         >>> df.selectExpr("age AS col1", "name AS col2").write.insertInto("tblA")
-        >>> spark.read.name("tblA").sort("age").show()
+        >>> spark.read.table("tblA").sort("age").show()
         +---+------------+
         |age|        name|
         +---+------------+

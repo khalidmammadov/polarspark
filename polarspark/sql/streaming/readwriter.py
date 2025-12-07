@@ -1856,7 +1856,7 @@ class DataStreamWriter:
         ...             checkpointLocation=d)
         ...     time.sleep(3)
         ...     q.stop()
-        ...     spark.read.name("my_table2").show()
+        ...     spark.read.table("my_table2").show()
         ...     _ = spark.sql("DROP TABLE my_table2")
         +...---------+-----+
         |...timestamp|value|
