@@ -1581,12 +1581,8 @@ class SparkSession(SparkConversionMixin):
 
             if isinstance(res_ast, SelectFrom):
                 if res_ast.table:
+                    # This covers in memory selects as well
                     ts = self.catalog._cat.get_ts(res_ast.table)  # noqa
-                    t = ts.tables.get(res_ast.table)
-
-                    if t.format == "memory":
-                        return self._create_base_dataframe(t.data)
-
                     # Run in context now
                     ex_ctx = ts.pl_ctx.execute  # noqa
                 else:

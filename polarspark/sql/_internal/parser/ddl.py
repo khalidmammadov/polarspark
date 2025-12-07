@@ -26,14 +26,16 @@ def execute_create_table(spark: "SparkSession", ctx: SourceTable):
 
 
 def execute_insert_into(spark: "SparkSession", ctx: InsertInto):
-    tbl = spark.catalog._cat.get_ts(ctx.table).tables[ctx.table]  # noqa
-    schema = [
-        "{} {}".format(col, AST_TYPE_MAP.get(ty, ty))
-        for col, ty in tbl.columns
-        if col in ctx.columns
-    ]
+    tbl = spark.catalog._cat.get_table(ctx.table)  # noqa
 
-    df = spark.createDataFrame(ctx.values or [], schema=schema)
+    # Filter only requested columns
+    cols = tbl.columns
+    if ctx.columns:
+        cols = [c for c in cols if c[0] in ctx.columns]
+
+    schema = ["{}: {}".format(col, AST_TYPE_MAP.get(ty, ty)) for col, ty in cols]
+
+    df = spark.createDataFrame(ctx.values or [], schema=", ".join(schema))
     df.show()
     df.write.mode("append").format(tbl.format).save(tbl.location)
 
