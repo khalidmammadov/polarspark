@@ -6,6 +6,4 @@ def parse_sql(sql: str) -> Generator[Expression, None, None]:
     statements = parse(sql, read="spark")
 
     for s in statements:
-        print(type(s), s)
         yield s
-

@@ -1760,7 +1760,7 @@ class DataFrameWriter(OptionUtils):
         # Save
         self.save(str(path.absolute()))
 
-        if not cat._cat.get_table(name): # noqa
+        if not cat._cat.get_table(name):  # noqa
             cat.createTable(names.table, str(path.absolute()))
         # TODO: Add mode support for inserts and overwrites
 

@@ -1734,8 +1734,10 @@ class DataStreamWriter:
                             df = DataFrame(None, ldf_generator, self._spark)
                             self._foreach_func(df, i)
                         elif self._format == "memory":
-                            rows = ldf.collect()
-                            print(rows)
+                            if self._query_name:
+                                self._spark.catalog._cat.create_or_append_in_mem_table(
+                                    self._query_name, ldf
+                                )  # noqa
                         elif self._format == "noop":
                             rows = ldf.collect()
                             if i > 1:  # Seems that noop stops after first round, so stop

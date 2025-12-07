@@ -45,7 +45,7 @@ import polars as pl
 # from build.lib.polarspark.sql.functions import struct
 from polarspark import SparkConf, SparkContext
 from polarspark.rdd import RDD
-from polarspark.sql._internal.parser.models import CreateTable, InsertInto, SelectFrom, DropTable
+from polarspark.sql._internal.parser.models import SourceTable, InsertInto, SelectFrom, DropTable
 
 # from polarspark.sql.column import _to_java_column
 from polarspark.sql.conf import RuntimeConfig
@@ -1418,9 +1418,12 @@ class SparkSession(SparkConversionMixin):
         df._schema = struct
         return df
 
-    def _create_base_dataframe(self, ldf):
+    def _create_base_dataframe(self, ldf: Union[pl.LazyFrame, list[pl.LazyFrame]]):
         def df_generator() -> Generator[pl.LazyFrame, None, None]:
-            yield ldf
+            if isinstance(ldf, (list, tuple)):
+                yield from ldf
+            else:
+                yield ldf
 
         return DataFrame(None, df_generator, self)
 
@@ -1573,15 +1576,23 @@ class SparkSession(SparkConversionMixin):
         #     if len(kwargs) > 0:
         #         formatter.clear()
         for res_ast in ddl.execute_sql(self, sqlQuery):
-            if isinstance(res_ast, (CreateTable, InsertInto, DropTable)):
-               continue
+            if not isinstance(res_ast, (SourceTable, InsertInto, DropTable, SelectFrom)):
+                raise NotImplementedError("This SQL type not implemented yet")
+
             if isinstance(res_ast, SelectFrom):
                 if res_ast.table:
-                    ex_ctx = self.catalog._cat.get_ts(res_ast.table).pl_ctx.execute # noqa
+                    ts = self.catalog._cat.get_ts(res_ast.table)  # noqa
+                    t = ts.tables.get(res_ast.table)
+
+                    if t.format == "memory":
+                        return self._create_base_dataframe(t.data)
+
+                    # Run in context now
+                    ex_ctx = ts.pl_ctx.execute  # noqa
                 else:
+                    # No table source, VALUES etc
                     ex_ctx = pl.sql
                 return self._create_base_dataframe(ex_ctx(sqlQuery))
-            raise NotImplementedError("This SQL type not implemented yet")
 
         return self.createDataFrame([], schema="res STRING")
 

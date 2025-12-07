@@ -511,7 +511,6 @@ class StreamingTestsMixin:
         self.assertTrue(len(result) >= 6 and len(result) <= 9)
 
 
-
 class StreamingTests(StreamingTestsMixin, ReusedSQLTestCase):
     def _assert_exception_tree_contains_msg(self, exception, msg):
         e = exception

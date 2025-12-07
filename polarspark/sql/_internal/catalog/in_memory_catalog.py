@@ -1,16 +1,17 @@
 from dataclasses import dataclass
+from functools import reduce
 from typing import Dict
 
 import polars as pl
 
 from polarspark.sql._internal.catalog.utils import parse_table_name
-from polarspark.sql._internal.parser.models import CreateTable
+from polarspark.sql._internal.parser.models import SourceTable
 
 
 @dataclass
 class TableStore:
     pl_ctx: pl.SQLContext
-    tables: Dict[str, CreateTable]
+    tables: Dict[str, SourceTable]
 
 
 class InMemoryCatalog:
@@ -19,14 +20,12 @@ class InMemoryCatalog:
 
     def __init__(self):
         self._catalogs = {
-            self._default_catalog: {
-                self._default_database: TableStore(pl.SQLContext(), {})
-            }
+            self._default_catalog: {self._default_database: TableStore(pl.SQLContext(), {})}
         }
         self._current_catalog = self._default_catalog
         self._current_database = self._default_database
 
-    def add_table(self, table: CreateTable):
+    def add_table(self, table: SourceTable) -> None:
         cat = self._catalogs[self._default_catalog]
         ts = cat[table.db]
         ts.tables[table.name] = table
@@ -50,18 +49,29 @@ class InMemoryCatalog:
     def get_current_catalog(self) -> Dict[str, TableStore]:
         return self._catalogs[self._current_catalog]
 
-    def get_table(self, table_name: str):
+    def get_table(self, table_name: str) -> SourceTable:
         names = parse_table_name(table_name)
         ts = self.get_ts(table_name)
         return ts.tables.get(names.table)
 
-    def catalogs(self):
+    def catalogs(self) -> dict:
         return self._catalogs
 
-    def get_ts(self, table_name: str):
+    def get_ts(self, table_name: str) -> TableStore:
         names = parse_table_name(table_name)
         _cat_name = names.catalog or self.get_current_catalog_name()
         _db_name = names.database or self.get_current_database_name()
         dbs = self._catalogs[_cat_name]
         return dbs[_db_name]
 
+    def create_or_append_in_mem_table(self, table_name: str, ldf: pl.LazyFrame) -> None:
+        names = parse_table_name(table_name)
+        ts = self.get_ts(table_name)
+        if t := ts.tables.get(names.table):
+            t.data.append(ldf)
+        else:
+            t = SourceTable(name=names.table, db=names.database, format="memory", data=[ldf])
+            ts.tables[table_name] = t
+
+        _ldf = pl.concat(t.data, how="vertical")
+        ts.pl_ctx.register(names.table, _ldf)  # noqa

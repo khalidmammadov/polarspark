@@ -1,11 +1,21 @@
 from typing import Optional
 
 from sqlglot.expressions import (
-    Create, Table, Identifier, Schema,
-    FileFormatProperty, LocationProperty,
-    PartitionedByProperty, ColumnDef, Insert, Expression, Select, Drop)
+    Create,
+    Table,
+    Identifier,
+    Schema,
+    FileFormatProperty,
+    LocationProperty,
+    PartitionedByProperty,
+    ColumnDef,
+    Insert,
+    Expression,
+    Select,
+    Drop,
+)
 
-from polarspark.sql._internal.parser.models import CreateTable, InsertInto, SelectFrom, DropTable
+from polarspark.sql._internal.parser.models import SourceTable, InsertInto, SelectFrom, DropTable
 
 
 def get_schema(expr: Expression) -> Optional[Expression]:
@@ -31,7 +41,7 @@ def get_columns(expr: Expression) -> list[tuple[str]]:
     columns = []
     for col in expr.find_all(ColumnDef):
         col_name = col.name
-        col_type = col.args["kind"].sql()    # e.g. INT, DOUBLE
+        col_type = col.args["kind"].sql()  # e.g. INT, DOUBLE
         columns.append((col_name, col_type))
     return columns
 
@@ -54,7 +64,7 @@ def get_partitioned_by(expr: Expression) -> Optional[list[str]]:
     return None
 
 
-def create_table(expr: Create) -> CreateTable:
+def create_table(expr: Create) -> SourceTable:
     tbl = get_table(expr)
     table_name = get_name(tbl)
     db = get_name(tbl, sbj="db")
@@ -63,13 +73,13 @@ def create_table(expr: Create) -> CreateTable:
     partitioned_by = get_partitioned_by(expr)
     location = get_location(expr)
     file_format = get_format(expr) or "parquet"
-    return CreateTable(
-        name= table_name,
-        db = db,
-        columns = columns,
-        format = file_format,
-        partitioned_by = partitioned_by,
-        location = location
+    return SourceTable(
+        name=table_name,
+        db=db,
+        columns=columns,
+        format=file_format,
+        partitioned_by=partitioned_by,
+        location=location,
     )
 
 
@@ -97,16 +107,15 @@ def get_insert_cols(expr: Expression) -> Optional[list[str]]:
 def get_insert_values(expr: Expression) -> Optional[list]:
     if values := expr.args.get("expression"):
         if tuples := values.expressions:
-            return [[l.this for l in t.expressions]
-                        for t in tuples]
+            return [[l.this for l in t.expressions] for t in tuples]
     return None
 
 
 def insert_table(expr: Insert) -> InsertInto:
     tbl = get_table(expr)
     return InsertInto(
-        table = get_name(tbl),
-        db = get_name(tbl, sbj="db"),
-        columns = get_insert_cols(expr) or [],
-        values = get_insert_values(expr)
+        table=get_name(tbl),
+        db=get_name(tbl, sbj="db"),
+        columns=get_insert_cols(expr) or [],
+        values=get_insert_values(expr),
     )

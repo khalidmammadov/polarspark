@@ -21,14 +21,14 @@ from typing import Any, Callable, NamedTuple, List, Optional, TYPE_CHECKING, Gen
 import re
 import pathlib
 
-from polarspark.sql._internal.parser.models import CreateTable
+from polarspark.sql._internal.parser.models import SourceTable
 from polarspark.storagelevel import StorageLevel
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql.session import SparkSession
 from polarspark.sql.types import StructType
 from polarspark.errors import AnalysisException
 
-from polarspark.sql._internal.catalog.in_memory_catalog import InMemoryCatalog # noqa
+from polarspark.sql._internal.catalog.in_memory_catalog import InMemoryCatalog  # noqa
 from polarspark.sql._internal.catalog.utils import parse_table_name, TableName  # noqa
 
 
@@ -167,8 +167,9 @@ class Catalog:
         if pattern is None:
             it = self._cat.catalogs().keys()
         else:
-            it = [s for s in self._cat.catalogs().keys()
-                  if re.match(self._regex_pattern(pattern), s)]
+            it = [
+                s for s in self._cat.catalogs().keys() if re.match(self._regex_pattern(pattern), s)
+            ]
         catalogs = []
         for i in it:
             catalogs.append(CatalogMetadata(name=i, description=""))
@@ -234,6 +235,7 @@ class Catalog:
         []
         """
         cat_name = self._cat.get_current_catalog_name()
+
         def it():
             for _db in self._cat.get_current_catalog():
                 if pattern:
@@ -454,7 +456,6 @@ class Catalog:
                 )
         finally:
             raise AnalysisException(f"Database '{tableName}' not found.")
-
 
     def listFunctions(
         self, dbName: Optional[str] = None, pattern: Optional[str] = None
@@ -816,7 +817,11 @@ class Catalog:
         ...         "tbl2", schema=spark.range(1).schema, path=d, source='parquet')
         >>> _ = spark.sql("DROP TABLE tbl2")
         """
-        _path = pathlib.Path(path) if path else pathlib.Path(self.DEFAULT_SPARK_PATH).joinpath(tableName)
+        _path = (
+            pathlib.Path(path)
+            if path
+            else pathlib.Path(self.DEFAULT_SPARK_PATH).joinpath(tableName)
+        )
 
         # Create empty table
         if not _path.exists():
@@ -832,7 +837,6 @@ class Catalog:
         if schema:
             reader = reader.schema(schema)
 
-        print(f"Reading {tableName} from {str(_path.absolute())}")
         df = reader.options(**options).load(str(_path.absolute()))
 
         if not schema:
@@ -842,13 +846,12 @@ class Catalog:
         ts = self._cat.get_ts(tableName)
         if names.table not in ts.tables:
             cols = [tuple(f.simpleString().split(":")) for f in schema.fields]
-            print(f"Cols {cols}")
-            ts.tables[names.table] = CreateTable(
-                names.table,
-                names.database,
-                format= source or options.get("format", "parquet"),
+            ts.tables[names.table] = SourceTable(
+                name=names.table,
+                db=names.database,
+                format=source or options.get("format", "parquet"),
                 location=str(_path.absolute()),
-                columns=cols
+                columns=cols,
             )
             ts.pl_ctx.register(names.table, df._gather_first())  # noqa
 
@@ -1266,7 +1269,6 @@ class Catalog:
         ts = self._cat.get_ts(tableName)
         if tableName not in ts.pl_ctx.tables():
             raise AnalysisException(f"Table {tableName} does not exist")
-
 
 
 def _test() -> None:
