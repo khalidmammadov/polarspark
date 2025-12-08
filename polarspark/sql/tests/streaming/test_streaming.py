@@ -425,16 +425,16 @@ class StreamingTestsMixin:
                 set([Row(value="aaa"), Row(value="bbb"), Row(value="ccc")]), set(result)
             )
 
-    # def test_streaming_write_to_table(self):
-    #     with self.table("output_table"), tempfile.TemporaryDirectory(prefix="to_table") as tmpdir:
-    #         df = self.spark.readStream.format("rate").option("rowsPerSecond", 10).load()
-    #         q = df.writeStream.toTable("output_table", format="parquet", checkpointLocation=tmpdir)
-    #         self.assertTrue(q.isActive)
-    #         time.sleep(10)
-    #         q.stop()
-    #         result = self.spark.sql("SELECT value FROM output_table").collect()
-    #         self.assertTrue(len(result) > 0)
-    #
+    def test_streaming_write_to_table(self):
+        with self.table("output_table"), tempfile.TemporaryDirectory(prefix="to_table") as tmpdir:
+            df = self.spark.readStream.format("rate").option("rowsPerSecond", 10).load()
+            q = df.writeStream.toTable("output_table", format="parquet", checkpointLocation=tmpdir)
+            self.assertTrue(q.isActive)
+            time.sleep(3)
+            q.stop()
+            result = self.spark.sql("SELECT value FROM output_table").collect()
+            self.assertTrue(len(result) > 0)
+
     @pytest.mark.skip(reason="Cluster By not supported")
     def test_streaming_write_to_table_cluster_by(self):
         with self.table("output_table"), tempfile.TemporaryDirectory(prefix="to_table") as tmpdir:

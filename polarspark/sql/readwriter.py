@@ -348,9 +348,10 @@ class DataFrameReader(OptionUtils):
 
         ldf = reader(path, **self._options)
         sample = ldf.first().collect()
-
         def df_generator():
-            yield ldf
+            # This not dup. LazyFrame's sources are evaluated during scan initialisation
+            # hence for paths we need to read when requested
+            yield reader(path, **self._options)
 
         df = DataFrame(None, df_generator, self._spark)
         df._schema = schema_from_polars(sample)
@@ -1134,7 +1135,7 @@ class DataFrameWriter(OptionUtils):
         self._df = df
         self._spark = df.sparkSession
         self._mode = "error"
-        self._format = None
+        self._format = self._spark.conf.get("spark.sql.sources.default")
         self._options = {}
         self._part_cols = []
         self._bucket_by = ()
@@ -1750,7 +1751,8 @@ class DataFrameWriter(OptionUtils):
         self.mode(mode).options(**options)
         if partitionBy is not None:
             self.partitionBy(partitionBy)
-        self.format(format or "parquet")
+        if format is not None:
+            self.format(format)
 
         cat = self._spark.catalog
         names = parse_table_name(name)
@@ -1898,7 +1900,6 @@ class DataFrameWriter(OptionUtils):
         if partitionBy is not None:
             self.partitionBy(partitionBy)
         self._set_opts(compression=compression)
-        # self._jwrite.parquet(path)
         self.save(path=path, format="parquet")
 
     def text(

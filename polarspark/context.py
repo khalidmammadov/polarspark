@@ -154,8 +154,7 @@ class SparkContext:
     ValueError: ...
     """
 
-    # _gateway: ClassVar[Optional[JavaGateway]] = None
-    # _jvm: ClassVar[Optional[JVMView]] = None #REMOVE
+    _conf: SparkConf
     _next_accum_id = 0
     _active_spark_context: ClassVar[Optional["SparkContext"]] = None
     _lock = RLock()
@@ -300,7 +299,7 @@ class SparkContext:
         # FIX
         # self._jsc = jsc or self._initialize_context(self._conf._jconf)
         # Reset the SparkConf to the one actually used by the SparkContext in JVM.
-        self._conf = SparkConf()  # _jconf=self._jsc.sc().conf()) #FIX
+        # self._conf = SparkConf()  # _jconf=self._jsc.sc().conf()) #FIX
 
         # Create a single Accumulator in Java that we'll send all our updates through;
         # they will be passed back to us through a TCP server
