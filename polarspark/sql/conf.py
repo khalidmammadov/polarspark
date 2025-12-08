@@ -16,7 +16,7 @@
 #
 
 import sys
-from typing import Any, Optional, Union, Mapping
+from typing import Any, Optional, Union, Mapping, Dict
 
 from polarspark import since, _NoValue
 from polarspark._globals import _NoValueType
@@ -36,13 +36,13 @@ class RuntimeConfig:
     _defaults = {
         "spark.sql.sources.partitionOverwriteMode": "STATIC",
         "spark.sql.crossJoin.enabled": True,
+        "spark.sql.sources.default": "parquet"
     }
 
     _non_mutable = {"spark.sql.warehouse.dir": resolve_uri("spark-warehouse")}
 
-    _conf: Mapping
+    _conf: Dict
 
-    # def __init__(self, jconf: JavaObject) -> None:
     def __init__(self, conf: dict) -> None:
         """Create a new RuntimeConfig that wraps the underlying JVM object."""
         self._conf = conf

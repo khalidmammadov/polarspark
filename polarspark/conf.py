@@ -20,9 +20,6 @@ __all__ = ["SparkConf"]
 import sys
 from typing import Dict, List, Optional, Tuple, cast, overload
 
-# REMOVE
-# from py4j.java_gateway import JVMView, JavaObject
-
 from polarspark.errors import PySparkRuntimeError
 
 
@@ -110,36 +107,17 @@ class SparkConf:
     spark.home=/path
     """
 
-    # REMOVE
-    # _jconf: Optional[JavaObject]
     _conf: Optional[Dict[str, str]]
 
     def __init__(
         self,
         loadDefaults: bool = True,
-        # _jvm: Optional[JVMView] = None, #REMOVE
-        # _jconf: Optional[JavaObject] = None,
     ):
         """
         Create a new Spark configuration.
         """
         self._conf = {}
-        # REMOVE
-        # if _jconf:
-        #     self._jconf = _jconf
-        # else:
-        #     from polarspark.context import SparkContext
-        #
-        #     _jvm = _jvm or SparkContext._jvm
-        #
-        #     if _jvm is not None:
-        #         # JVM is created, so create self._jconf directly through JVM
-        #         self._jconf = _jvm.SparkConf(loadDefaults)
-        #         self._conf = None
-        #     else:
-        #         # JVM is not created, so store data in self._conf first
-        #         self._jconf = None
-        #         self._conf = {}
+
 
     def set(self, key: str, value: str) -> "SparkConf":
         """Set a configuration property."""

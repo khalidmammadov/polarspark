@@ -170,6 +170,8 @@ class SparkSession(SparkConversionMixin):
     ... )  # doctest: +SKIP
     """
 
+    _conf: RuntimeConfig = None
+
     class Builder:
         """Builder for :class:`SparkSession`."""
 
@@ -422,8 +424,6 @@ class SparkSession(SparkConversionMixin):
             """
             from polarspark.context import SparkContext
             from polarspark.conf import SparkConf
-
-            opts = dict(self._options)
 
             with self._lock:
                 session = SparkSession._instantiatedSession
@@ -688,8 +688,8 @@ class SparkSession(SparkConversionMixin):
         >>> spark.conf.get("key")
         'value'
         """
-        if not hasattr(self, "_conf"):
-            self._conf = RuntimeConfig({})
+        if not self._conf:
+            self._conf = RuntimeConfig(dict(self.sparkContext.getConf().getAll()))
         return self._conf
 
     @property

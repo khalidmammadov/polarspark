@@ -7,7 +7,7 @@ import polars as pl
 @dataclass
 class SourceTable:
     name: str
-    format: str = "parquet"
+    format: Optional[str]
     db: Optional[str] = None
     columns: Optional[list[tuple[str]]] = field(default_factory=list)
     partitioned_by: Optional[list[str]] = None

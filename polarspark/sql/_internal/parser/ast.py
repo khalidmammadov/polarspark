@@ -72,7 +72,7 @@ def create_table(expr: Create) -> SourceTable:
     columns = get_columns(expr)
     partitioned_by = get_partitioned_by(expr)
     location = get_location(expr)
-    file_format = get_format(expr) or "parquet"
+    file_format = get_format(expr)
     return SourceTable(
         name=table_name,
         db=db,

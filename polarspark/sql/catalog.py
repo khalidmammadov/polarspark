@@ -822,22 +822,25 @@ class Catalog:
             if path
             else pathlib.Path(self.DEFAULT_SPARK_PATH).joinpath(tableName)
         )
+        _path_str = str(_path.absolute())
+
+        source = source or options.get("format", self._sparkSession.conf.get("spark.sql.sources.default"))
 
         # Create empty table
         if not _path.exists():
             if schema:
                 df = self._sparkSession.createDataFrame([], schema=schema)
-                df.write.format(source).options(**options).save(str(_path.absolute()))
+                df.write.format(source).options(**options).save(_path_str)
             else:
                 raise ValueError("For empty path schema must be specified")
 
         # Read existing
         reader = self._sparkSession.read
-        reader = reader.format(source or "parquet")
+        reader = reader.format(source)
         if schema:
             reader = reader.schema(schema)
 
-        df = reader.options(**options).load(str(_path.absolute()))
+        df = reader.options(**options).load(_path_str)
 
         if not schema:
             schema = df.schema
@@ -849,8 +852,8 @@ class Catalog:
             ts.tables[names.table] = SourceTable(
                 name=names.table,
                 db=names.database,
-                format=source or options.get("format", "parquet"),
-                location=str(_path.absolute()),
+                format=source,
+                location=_path_str,
                 columns=cols,
             )
             ts.pl_ctx.register(names.table, df._gather_first())  # noqa

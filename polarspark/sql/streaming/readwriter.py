@@ -312,8 +312,16 @@ class DataStreamReader(OptionUtils):
         from polarspark.sql.dataframe import DataFrame
 
         def ldf_generator() -> Generator[pl.LazyFrame, None, None]:
-            for i in itertools.count():
-                yield pl.LazyFrame({"value": [i]})
+            rps = self._options.get("rowsPerSecond")
+            i = 0
+            step = int(rps) if rps else 1
+            while True:
+                if rps:
+                    yield pl.LazyFrame({"value": list(range(i, i + step))})
+                    time.sleep(1)
+                else:
+                    yield pl.LazyFrame({"value": [i]})
+                i = i + step
 
         return DataFrame(None, ldf_generator, self._spark, is_streaming=True, origin=self)
 
@@ -1865,6 +1873,8 @@ class DataStreamWriter:
         """
         self.options(**options)
         if outputMode is not None:
+            if outputMode != "append":
+                raise NotImplementedError(f"outputMode={outputMode} is not supported yet")
             self.outputMode(outputMode)
         if partitionBy is not None:
             self.partitionBy(partitionBy)
@@ -1873,7 +1883,11 @@ class DataStreamWriter:
         if queryName is not None:
             self.queryName(queryName)
 
-        raise NotImplementedError
+        if not (tbl := self._spark.catalog._cat.get_table(tableName)): # noqa
+            self._spark.catalog.createTable(tableName, schema=self._df.schema)
+            tbl = self._spark.catalog._cat.get_table(tableName) # noqa
+
+        return self.start(path=tbl.location)
 
 
 def _test() -> None:
