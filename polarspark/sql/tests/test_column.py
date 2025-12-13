@@ -157,7 +157,6 @@ class ColumnTestsMixin:
         result = df.select(df.a.bitwiseXOR(df.b)).collect()[0].asDict()
         self.assertEqual(170 ^ 75, result["(a ^ b)"])
         result = df.select(functions.bitwiseNOT(df.b)).collect()[0].asDict()
-        print(result)
         self.assertEqual(~75, result["~b"])
         result = df.select(functions.bitwise_not(df.b)).collect()[0].asDict()
         self.assertEqual(~75, result["~b"])

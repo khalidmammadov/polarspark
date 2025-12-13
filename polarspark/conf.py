@@ -118,7 +118,6 @@ class SparkConf:
         """
         self._conf = {}
 
-
     def set(self, key: str, value: str) -> "SparkConf":
         """Set a configuration property."""
         # Try to set self._jconf first if JVM is created, set self._conf if JVM is not created yet.

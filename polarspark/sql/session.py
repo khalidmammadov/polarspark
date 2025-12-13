@@ -45,7 +45,7 @@ import polars as pl
 # from build.lib.polarspark.sql.functions import struct
 from polarspark import SparkConf, SparkContext
 from polarspark.rdd import RDD
-from polarspark.sql._internal.parser.models import SourceTable, InsertInto, SelectFrom, DropTable
+from polarspark.sql._internal.parser.models import SourceRelation, InsertInto, SelectFrom, DropTable
 
 # from polarspark.sql.column import _to_java_column
 from polarspark.sql.conf import RuntimeConfig
@@ -1418,14 +1418,11 @@ class SparkSession(SparkConversionMixin):
         df._schema = struct
         return df
 
-    def _create_base_dataframe(self, ldf: Union[pl.LazyFrame, list[pl.LazyFrame]]):
+    def _create_base_dataframe(self, ldf: pl.LazyFrame, is_streaming: bool = False) -> DataFrame:
         def df_generator() -> Generator[pl.LazyFrame, None, None]:
-            if isinstance(ldf, (list, tuple)):
-                yield from ldf
-            else:
-                yield ldf
+            yield ldf
 
-        return DataFrame(None, df_generator, self)
+        return DataFrame(None, df_generator, self, is_streaming=is_streaming)
 
     def sql(
         self, sqlQuery: str, args: Optional[Union[Dict[str, Any], List]] = None, **kwargs: Any
@@ -1576,19 +1573,32 @@ class SparkSession(SparkConversionMixin):
         #     if len(kwargs) > 0:
         #         formatter.clear()
         for res_ast in ddl.execute_sql(self, sqlQuery):
-            if not isinstance(res_ast, (SourceTable, InsertInto, DropTable, SelectFrom)):
+            if not isinstance(res_ast, (SourceRelation, InsertInto, DropTable, SelectFrom)):
                 raise NotImplementedError("This SQL type not implemented yet")
 
             if isinstance(res_ast, SelectFrom):
                 if res_ast.table:
                     # This covers in memory selects as well
                     ts = self.catalog._cat.get_ts(res_ast.table)  # noqa
-                    # Run in context now
-                    ex_ctx = ts.pl_ctx.execute  # noqa
-                else:
-                    # No table source, VALUES etc
-                    ex_ctx = pl.sql
-                return self._create_base_dataframe(ex_ctx(sqlQuery))
+                    tbl = self.catalog._cat.get_table(res_ast.table)  # noqa
+                    if tbl.is_streaming:
+
+                        def transformer(ldf: pl.LazyFrame) -> pl.LazyFrame:
+                            # Should we separate select part from table so we can easily replace that here??
+                            ts.pl_ctx.register(res_ast.table, ldf)
+                            return ts.pl_ctx.execute(sqlQuery)
+
+                        return DataFrame(tbl.df, transformer, self, is_streaming=tbl.is_streaming)
+
+                    def df_generator() -> Generator[pl.LazyFrame, None, None]:
+                        if tbl.format == "view":
+                            ts.pl_ctx.register(res_ast.table, tbl.df._gather_first())  # noqa
+                        yield ts.pl_ctx.execute(sqlQuery)
+
+                    return DataFrame(None, df_generator, self)
+
+                # No table source, VALUES etc
+                return self._create_base_dataframe(pl.sql(sqlQuery))
 
         return self.createDataFrame([], schema="res STRING")
 

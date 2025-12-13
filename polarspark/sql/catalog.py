@@ -21,7 +21,7 @@ from typing import Any, Callable, NamedTuple, List, Optional, TYPE_CHECKING, Gen
 import re
 import pathlib
 
-from polarspark.sql._internal.parser.models import SourceTable
+from polarspark.sql._internal.parser.models import SourceRelation
 from polarspark.storagelevel import StorageLevel
 from polarspark.sql.dataframe import DataFrame
 from polarspark.sql.session import SparkSession
@@ -824,7 +824,9 @@ class Catalog:
         )
         _path_str = str(_path.absolute())
 
-        source = source or options.get("format", self._sparkSession.conf.get("spark.sql.sources.default"))
+        source = source or options.get(
+            "format", self._sparkSession.conf.get("spark.sql.sources.default")
+        )
 
         # Create empty table
         if not _path.exists():
@@ -849,7 +851,7 @@ class Catalog:
         ts = self._cat.get_ts(tableName)
         if names.table not in ts.tables:
             cols = [tuple(f.simpleString().split(":")) for f in schema.fields]
-            ts.tables[names.table] = SourceTable(
+            ts.tables[names.table] = SourceRelation(
                 name=names.table,
                 db=names.database,
                 format=source,
@@ -1052,7 +1054,12 @@ class Catalog:
         self._require_table_exists(tableName)
 
         ts = self._cat.get_ts(tableName)
-        ldf = ts.pl_ctx.execute(f"select * from {tableName}")
+        tbl = self._cat.get_table(tableName)
+
+        if tbl.format == "view":
+            ldf = tbl.df._gather_first()  # noqa
+        else:
+            ldf = ts.pl_ctx.execute(f"select * from {tableName}")
 
         ts.pl_ctx.register(tableName, ldf.collect())
         self._cached_tables[tableName] = ldf
@@ -1268,10 +1275,11 @@ class Catalog:
     def _regex_pattern(pattern: str):
         return "^" + re.escape(pattern).replace(r"\*", ".*") + "$"
 
-    def _require_table_exists(self, tableName: str):
-        ts = self._cat.get_ts(tableName)
-        if tableName not in ts.pl_ctx.tables():
-            raise AnalysisException(f"Table {tableName} does not exist")
+    def _require_table_exists(self, table_name: str):
+        tbl = self._cat.get_table(table_name)
+        # if tableName not in ts.pl_ctx.tables():
+        if tbl is None:
+            raise AnalysisException(f"Table {table_name} does not exist")
 
 
 def _test() -> None:

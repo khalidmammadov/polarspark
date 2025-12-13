@@ -348,6 +348,7 @@ class DataFrameReader(OptionUtils):
 
         ldf = reader(path, **self._options)
         sample = ldf.first().collect()
+
         def df_generator():
             # This not dup. LazyFrame's sources are evaluated during scan initialisation
             # hence for paths we need to read when requested

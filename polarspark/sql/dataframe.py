@@ -403,7 +403,12 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="TEMP_TABLE_OR_VIEW_ALREADY_EXISTS",
                 message_parameters={"relationName": name},
             )
-        _cat.create_or_append_in_mem_table(name, self._gather_first())
+        if self._is_streaming:
+            _cat.create_or_replace_tmp_view_relation(name, self, is_streaming=True)
+        else:
+            _cat.create_or_replace_tmp_view_relation(name, self)
+        # Delegate to SQL which will figure out in-Memory table location and ldf
+        # self._session.sql(f"select * from {name}")
 
     def createOrReplaceTempView(self, name: str) -> None:
         """Creates or replaces a local temporary view with this :class:`DataFrame`.
@@ -439,11 +444,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
-        (
-            self.sparkSession.catalog._cat.create_or_append_in_mem_table(  # noqa
-                name, self._gather_first()
-            )
-        )
+        # TODO: add replace part
+        self.createTempView(name)
 
     def createGlobalTempView(self, name: str) -> None:
         """Creates a global temporary view with this :class:`DataFrame`.
@@ -517,6 +519,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         True
 
         """
+        # TODO: add replace part
         self.createTempView(name)
 
     @property
@@ -1312,7 +1315,14 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> [row.asDict() for row in rows]
         [{'age': 14, 'name': 'Tom'}, {'age': 23, 'name': 'Alice'}, {'age': 16, 'name': 'Bob'}]
         """
-        pdf: pl.DataFrame = self._gather_first().collect()
+        pdfs = []
+        for pdf in self._gather():
+            pdfs.append(pdf.collect())
+
+        if len(pdfs) == 1:
+            pdf = pdfs[0]
+        else:
+            pdf = pl.concat(pdfs, how="vertical")
         return list(_pdf_to_row_iter(pdf))
 
     def toLocalIterator(self, prefetchPartitions: bool = False) -> Iterator[Row]:
@@ -6581,13 +6591,16 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         )
 
     def _gather(self) -> Generator[Optional[pl.LazyFrame], None, None]:
-        trans = [t for t in self._trans_gen()]
-        assert trans
-        for origin_ldf in trans[0]():
+        transformers = [t for t in self._trans_gen()]
+        assert transformers
+
+        generator = transformers[0]()
+
+        for origin_ldf in generator:
             if origin_ldf is NO_INPUT:
                 yield NO_INPUT
                 continue
-            yield reduce(lambda ldf, y: y(ldf), trans[1:], origin_ldf)
+            yield reduce(lambda agg_ldf, trans: trans(agg_ldf), transformers[1:], origin_ldf)
 
     def _gather_first(self):
         return next(self._gather())
