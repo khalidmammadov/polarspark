@@ -15,7 +15,7 @@ from sqlglot.expressions import (
     Drop,
 )
 
-from polarspark.sql._internal.parser.models import SourceTable, InsertInto, SelectFrom, DropTable
+from polarspark.sql._internal.parser.models import SourceRelation, InsertInto, SelectFrom, DropTable
 
 
 def get_schema(expr: Expression) -> Optional[Expression]:
@@ -64,7 +64,7 @@ def get_partitioned_by(expr: Expression) -> Optional[list[str]]:
     return None
 
 
-def create_table(expr: Create) -> SourceTable:
+def create_table(expr: Create) -> SourceRelation:
     tbl = get_table(expr)
     table_name = get_name(tbl)
     db = get_name(tbl, sbj="db")
@@ -73,7 +73,7 @@ def create_table(expr: Create) -> SourceTable:
     partitioned_by = get_partitioned_by(expr)
     location = get_location(expr)
     file_format = get_format(expr)
-    return SourceTable(
+    return SourceRelation(
         name=table_name,
         db=db,
         columns=columns,

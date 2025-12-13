@@ -5,7 +5,7 @@ import polars as pl
 
 
 @dataclass
-class SourceTable:
+class SourceRelation:
     name: str
     format: Optional[str]
     db: Optional[str] = None
@@ -13,6 +13,8 @@ class SourceTable:
     partitioned_by: Optional[list[str]] = None
     location: Optional[str] = None
     data: Optional[list[pl.LazyFrame]] = field(default_factory=list)
+    is_streaming: bool = False
+    df: Optional["DataFrame"] = None
 
 
 @dataclass

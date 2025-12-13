@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 from shutil import rmtree
 import sqlglot.expressions as expr
 
-from polarspark.sql._internal.parser.models import SourceTable, InsertInto, DropTable
+from polarspark.sql._internal.parser.models import SourceRelation, InsertInto, DropTable
 from polarspark.sql.types import _parse_datatype_string
 from polarspark.sql._internal.parser.parser import parse_sql
 from polarspark.sql._internal.parser import ast
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 AST_TYPE_MAP = {"TEXT": "STRING"}
 
 
-def execute_create_table(spark: "SparkSession", ctx: SourceTable):
+def execute_create_table(spark: "SparkSession", ctx: SourceRelation):
     table_name = ctx.name
     schema = ["{} {}".format(col, AST_TYPE_MAP.get(ty, ty)) for col, ty in ctx.columns]
     schema = ", ".join(schema)
@@ -36,7 +36,6 @@ def execute_insert_into(spark: "SparkSession", ctx: InsertInto):
     schema = ["{}: {}".format(col, AST_TYPE_MAP.get(ty, ty)) for col, ty in cols]
 
     df = spark.createDataFrame(ctx.values or [], schema=", ".join(schema))
-    df.show()
     df.write.mode("append").format(tbl.format).save(tbl.location)
 
 

@@ -36,7 +36,7 @@ class RuntimeConfig:
     _defaults = {
         "spark.sql.sources.partitionOverwriteMode": "STATIC",
         "spark.sql.crossJoin.enabled": True,
-        "spark.sql.sources.default": "parquet"
+        "spark.sql.sources.default": "parquet",
     }
 
     _non_mutable = {"spark.sql.warehouse.dir": resolve_uri("spark-warehouse")}

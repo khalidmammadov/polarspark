@@ -1743,7 +1743,7 @@ class DataStreamWriter:
                             self._foreach_func(df, i)
                         elif self._format == "memory":
                             if self._query_name:
-                                self._spark.catalog._cat.create_or_append_in_mem_table(
+                                self._spark.catalog._cat.create_or_append_in_mem_table(  # noqa
                                     self._query_name, ldf
                                 )  # noqa
                         elif self._format == "noop":
@@ -1883,9 +1883,9 @@ class DataStreamWriter:
         if queryName is not None:
             self.queryName(queryName)
 
-        if not (tbl := self._spark.catalog._cat.get_table(tableName)): # noqa
+        if not (tbl := self._spark.catalog._cat.get_table(tableName)):  # noqa
             self._spark.catalog.createTable(tableName, schema=self._df.schema)
-            tbl = self._spark.catalog._cat.get_table(tableName) # noqa
+            tbl = self._spark.catalog._cat.get_table(tableName)  # noqa
 
         return self.start(path=tbl.location)
 
