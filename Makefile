@@ -1,9 +1,45 @@
-PYTHON_EXECUTABLE = python3.9
+PY = python3.9
 
-.PHONY: lint reformat
+.PHONY: lint reformat build cleanup install test
 
 lint:
-	@PYTHON_EXECUTABLE=$(PYTHON_EXECUTABLE) ./bin/lint-python
+	@PYTHON_EXECUTABLE=$(PY) ./bin/lint-python
 
 reformat:
-	@PYTHON_EXECUTABLE=$(PYTHON_EXECUTABLE) ./bin/reformat-python
+	@PYTHON_EXECUTABLE=$(PY) ./bin/reformat-python
+
+build:
+	@PYTHON_EXECUTABLE=$(PY) uv build
+
+cleanup:
+	./bin/cleanup.sh
+
+install:
+	$(MAKE) cleanup
+	$(MAKE) build
+	uv pip install --force-reinstall dist/*.whl
+
+test:
+	$(MAKE) cleanup
+	pytest
+
+remove-venv:
+	rm -fR .venv
+
+create-venv:
+	uv venv --python 3.9
+
+
+setup-dev:
+	uv sync
+
+bump-version:
+	uv version --bump minor
+
+publish-test:
+	uv publish --index testpypi
+
+publish-prod:
+	uv publish
+
+
