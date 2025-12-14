@@ -15,9 +15,9 @@ It is designed as a drop-in replacement for PySpark in scenarios where a full Sp
 Instead of relying on the JVM-based Spark engine, Polar Spark runs on Polars’ Lazy API, powered by a high-performance Rust execution engine 🦀. This avoids the overhead of the JVM, which can be slow and heavy for small or local workloads.
 
 By leveraging Polars, Polar Spark automatically benefits from:
-	•	🚀 Advanced query optimization
-	•	🧵 Efficient multithreading
-	•	🖥️ Excellent performance on modern CPUs
+* 🚀 Advanced query optimization
+* 🧵 Efficient multithreading
+* 🖥️ Excellent performance on modern CPUs
 
 🎯 Goal: Make Polar Spark a seamless PySpark replacement whenever workloads fit on a single machine or within local resource limits.
 
