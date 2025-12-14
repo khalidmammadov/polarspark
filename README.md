@@ -6,32 +6,28 @@
 |_|   \___/|_|\__,_|_|    |____/| .__/ \__,_|_|  |_|\_\
                                 |_|                    
 ```
-# Apache PySpark on Polars.
+⚡ Apache Spark on Polars
 
-**Polar Spark** is PySpark on [Polars](https://github.com/pola-rs/polars) for single machine workloads.
+Polar Spark brings the PySpark API to Polars, optimized for single-machine workloads.
 
-It uses PySpark API so it can be used as a drop in replacement for small workloads
-where Spark is not needed. One main example is automated unit tests that runs 
-on CI/CD pipelines.
+It is designed as a drop-in replacement for PySpark in scenarios where a full Spark cluster is not needed. A common use case is running fast, lightweight unit tests in CI/CD pipelines 🧪.
 
-It runs on Polars' Lazy API which is backed by powerful Rust engine
-whereas classic PySpark depends on JVM/Java based engine
-which is slow for these types of workloads.
+Instead of relying on the JVM-based Spark engine, Polar Spark runs on Polars’ Lazy API, powered by a high-performance Rust execution engine 🦀. This avoids the overhead of the JVM, which can be slow and heavy for small or local workloads.
 
-It benefits all the performance improvements and optimizations **Polars** provides 
-to run on a multithreaded environment with modern CPUs.
+By leveraging Polars, Polar Spark automatically benefits from:
+	•	🚀 Advanced query optimization
+	•	🧵 Efficient multithreading
+	•	🖥️ Excellent performance on modern CPUs
 
-So, the aim is to make **Polar Spark** drop in replacement for PySpark
-where PySpark is used on single machine or where data can fit into
-resources of a single machine.
+🎯 Goal: Make Polar Spark a seamless PySpark replacement whenever workloads fit on a single machine or within local resource limits.
 
 ## Installation
 ```shell
 pip install polarspark
 ```
 
-## Usage examples:
-### Create spark session
+## Examples:
+### Spark session
 ```python
 try:            
     from polarspark.sql.session import SparkSession
@@ -47,7 +43,7 @@ print(type(spark))
 >>> <class 'polarspark.sql.session.SparkSession'>
 ```
 
-### Create DataFrame
+### DataFrame API
 ```python
 try:
     from polarspark.sql import Row
@@ -78,14 +74,14 @@ df_no_rows = spark.createDataFrame([], schema=schema)
 print(df_no_rows.isEmpty())
 >>> True
 
-```
-### Project
-```python
-pprint(df.offset(1).first())
->>>  Row(age=100, name='Tome')
+# or using Spark DDL
+df = spark.createDataFrame([("Alice", 3), ("Ben", 5)], schema="name STRING, age INT")
+print(df.isEmpty())
+>>> False
+
 ```
 
-### Read and write Parquet, Delta, CSV etc.
+### Read / write Parquet, Delta, CSV etc.
 ```python
 base_path = "/var/tmp"
 
@@ -107,9 +103,35 @@ df2 = spark.read.parquet(f"{base_path}/data_json_to_parquet.parquet",
                                f"{base_path}/data_json_to_parquet.parquet")
 ```
 
+### Streaming (Stateless)
+```python
+df = self.spark.readStream.format("rate").load()
+q = df.writeStream.toTable("output_table", format="parquet", checkpointLocation=tmpdir)
+q.stop()
+result = self.spark.sql("SELECT value FROM output_table").collect()    
+```
+
+### Streaming (foreachBatch)
+```python
+def collectBatch(batch_df, batch_id):
+    batch_df.write.format("parquet").mode("overwrite").saveAsTable("test_table1")
 
 
-Some more:
+df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
+q = df.writeStream.foreachBatch(collectBatch).start()
+q.processAllAvailable()
+collected = self.spark.sql("select * from test_table1").collect()
+
+```
+
+## Some more:
+
+### Filter
+```python
+pprint(df.offset(1).first())
+>>>  Row(age=100, name='Tome')
+```
+
 ```python
 df.show()
 
