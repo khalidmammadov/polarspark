@@ -6,7 +6,7 @@
 |_|   \___/|_|\__,_|_|    |____/| .__/ \__,_|_|  |_|\_\
                                 |_|                    
 ```
-⚡ Apache Spark on Polars
+# ⚡ Apache Spark on Polars
 
 Polar Spark brings the PySpark API to Polars, optimized for single-machine workloads.
 
