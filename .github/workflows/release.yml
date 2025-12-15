@@ -59,7 +59,7 @@ jobs:
       - name: Publish
         run: |
           if [ "${{ steps.target.outputs.repo }}" = "testpypi" ]; then
-            uv publish --repository testpypi
+            uv publish --index testpypi
           else
             uv publish
           fi
