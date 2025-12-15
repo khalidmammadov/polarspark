@@ -33,7 +33,7 @@ setup-dev:
 	uv sync
 
 tag-push-release:
-	git add pyproject.toml
+	git add .
 	VERSION=$(uv version --short)
 	git commit -S -m "chore(release): v${VERSION}"
 	git tag v$(uv version --short)
@@ -41,7 +41,7 @@ tag-push-release:
 
 # To test the build
 release:
-	uv version patch        # bumps version in pyproject.toml
+	uv version --bump patch
 	$(MAKE) tag-push-release
 
 release-candidate:
