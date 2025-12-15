@@ -1,5 +1,4 @@
-# .github/workflows/python-app.yml
-name: PolarSpark
+name: CI
 
 on:
   push:
@@ -26,3 +25,11 @@ jobs:
     - name: Run tests
       run: |
         uv run pytest
+
+    - name: Build package
+      run: |
+        uv build
+
+    - name: Validate artifacts
+      run: |
+        uv run twine check dist/*

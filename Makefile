@@ -21,7 +21,7 @@ install:
 
 test:
 	$(MAKE) cleanup
-	pytest
+	uv run pytest
 
 remove-venv:
 	rm -fR .venv
@@ -29,17 +29,11 @@ remove-venv:
 create-venv:
 	uv venv --python 3.9
 
-
 setup-dev:
 	uv sync
 
-bump-version:
-	uv version --bump minor
-
-publish-test:
-	uv publish --index testpypi
-
-publish-prod:
-	uv publish
-
+# To test the build
+release:
+	uv version patch
+	uv build
 
