@@ -1,26 +1,9 @@
 name: Release to PyPI
 
 on:
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: "Version bump type"
-        required: true
-        default: "patch"
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-      prerelease:
-        description: "Mark GitHub release as pre-release"
-        required: false
-        default: "false"
-      publish_target:
-        description: "Where to publish"
-        required: true
-        type: choice
-        options: [testpypi, pypi]
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write        # push tag + create release
@@ -49,14 +32,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-      - name: Bump version
-        run: |
-          if [ "${{ inputs.bump }}" = "prerelease" ]; then
-            uv version prerelease --pre rc
-          else
-            uv version --bump ${{ inputs.bump }}
-          fi
-
       - name: Get version
         id: version
         run: |
@@ -66,23 +41,24 @@ jobs:
         run: |
           grep -q "## \\[${{ steps.version.outputs.version }}\\]" CHANGELOG.md
 
-      - name: Commit version bump
-        run: |
-          git add pyproject.toml
-          git commit -m "chore(release): v${{ steps.version.outputs.version }}"
-
-      - name: Create git tag
-        run: |
-          git tag v${{ steps.version.outputs.version }}
-          git push origin HEAD --tags
-
       - name: Build package
         run: |
           uv build
 
+      - name: Determine target
+        id: target
+        run: |
+          if echo "${{ steps.version.outputs.version }}" | grep -Eq '(a|b|rc)[0-9]+$'; then
+            echo "repo=testpypi" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "repo=pypi" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish
         run: |
-          if [ "${{ inputs.publish_target }}" = "testpypi" ]; then
+          if [ "${{ steps.target.outputs.repo }}" = "testpypi" ]; then
             uv publish --repository testpypi
           else
             uv publish

@@ -32,8 +32,18 @@ create-venv:
 setup-dev:
 	uv sync
 
+tag-push-release:
+	git add pyproject.toml
+	VERSION=$(uv version --short)
+	git commit -S -m "chore(release): v${VERSION}"
+	git tag v$(uv version --short)
+	git push origin v$(uv version --short)
+
 # To test the build
 release:
-	uv version patch
-	uv build
+	uv version patch        # bumps version in pyproject.toml
+	$(MAKE) tag-push-release
 
+release-candidate:
+	uv version prerelease --pre rc
+	$(MAKE) tag-push-release
