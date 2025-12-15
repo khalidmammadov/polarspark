@@ -74,6 +74,14 @@ jobs:
             flag {print}
           " CHANGELOG.md > release_notes.txt
 
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          prerelease: ${{ steps.target.outputs.prerelease }}
+          body_path: release_notes.txt
+
 # WHEN PR titles are clean then use this
 #      - name: Create GitHub Release
 #        uses: softprops/action-gh-release@v2
