@@ -24,7 +24,7 @@ jobs:
 
     - name: Install dev tools
       run: |
-        uv sync --extra dev
+        uv sync --group ci
 
     - name: Run tests
       run: |
