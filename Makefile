@@ -34,8 +34,7 @@ setup-dev:
 
 tag-push-release:
 	git add .
-	VERSION=$(uv version --short)
-	git commit -S -m "chore(release): v${VERSION}"
+	git commit -S -m "chore(release): v$(uv version --short)"
 	git tag v$(uv version --short)
 	git push origin v$(uv version --short)
 

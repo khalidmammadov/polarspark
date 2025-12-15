@@ -1036,7 +1036,7 @@ wheels = [
 
 [[package]]
 name = "polarspark"
-version = "0.1.14rc5"
+version = "0.1.14rc6"
 source = { editable = "." }
 dependencies = [
     { name = "deltalake" },
