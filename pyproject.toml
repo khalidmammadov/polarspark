@@ -35,7 +35,8 @@ dev = [
     "mypy==0.982",
 #    "pytest-mypy-plugins==1.9.3",
 #    "numpydoc",
-    "black==23.12.1"
+    "black==23.12.1",
+    "twine>=5.0",
 ]
 
 [[tool.uv.index]]
