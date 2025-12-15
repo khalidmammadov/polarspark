@@ -45,5 +45,5 @@ release:
 	$(MAKE) tag-push-release
 
 release-candidate:
-	uv version prerelease --pre rc
+	uv version --bump rc --bump patch
 	$(MAKE) tag-push-release
