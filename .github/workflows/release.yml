@@ -98,16 +98,6 @@ jobs:
             flag {print}
           " CHANGELOG.md > release_notes.txt
 
-      - name: Extract release notes
-        id: notes
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          awk "
-            /^## \\[$VERSION\\]/ {flag=1; next}
-            /^## \\[/ {flag=0}
-            flag {print}
-          " CHANGELOG.md > release_notes.txt
-
 # WHEN PR titles are clean then use this
 #      - name: Create GitHub Release
 #        uses: softprops/action-gh-release@v2
