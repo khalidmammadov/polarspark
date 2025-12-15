@@ -54,7 +54,7 @@ jobs:
           if [ "${{ inputs.bump }}" = "prerelease" ]; then
             uv version prerelease --pre rc
           else
-            uv version ${{ inputs.bump }}
+            uv version --bump ${{ inputs.bump }}
           fi
 
       - name: Get version
