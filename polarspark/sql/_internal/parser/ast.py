@@ -12,7 +12,7 @@ from sqlglot.expressions import (
     Insert,
     Expression,
     Select,
-    Drop,
+    Drop, Literal,
 )
 
 from polarspark.sql._internal.parser.models import SourceRelation, InsertInto, SelectFrom, DropTable
@@ -104,10 +104,17 @@ def get_insert_cols(expr: Expression) -> Optional[list[str]]:
     return None
 
 
+def convert(l: Literal):
+    if l.is_int:
+        return int(l.this)
+    if l.is_number:
+        return float(l.this)
+    return l.this
+
 def get_insert_values(expr: Expression) -> Optional[list]:
     if values := expr.args.get("expression"):
         if tuples := values.expressions:
-            return [[l.this for l in t.expressions] for t in tuples]
+            return [[convert(l) for l in t.expressions] for t in tuples]
     return None
 
 

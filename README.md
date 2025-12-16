@@ -69,6 +69,11 @@ pprint(rows)
 >>>  Row(age=100, name='Tome'),
 >>>  Row(age=99, name='Sim')]
 
+df.printSchema()
+>>> root
+>>>  |-- age: long (nullable = true)
+>>>  |-- name: string (nullable = true)
+
 
 # With schema
 schema = StructType([
@@ -126,6 +131,25 @@ q = df.writeStream.foreachBatch(collectBatch).start()
 q.processAllAvailable()
 collected = self.spark.sql("select * from test_table1").collect()
 
+```
+
+### In Memory Catalog
+```python
+df.write.saveAsTable("my_table")
+spark.sql("select * from my_table").show()
+```
+
+### SQL
+```python
+spark.sql("CREATE TABLE input_table (value string) USING parquet")
+spark.sql("INSERT INTO input_table VALUES (1), (2), (3)")
+
+spark.sql("""
+    SELECT * 
+    FROM input_table i 
+        JOIN my_table m 
+    ON i.value = m.age
+""").show()
 ```
 
 ## Some more:
