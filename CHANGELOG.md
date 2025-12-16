@@ -1,4 +1,4 @@
-## [0.1.14rc1] - 2025-12-15
+## [0.2.1] - 2025-12-16
   
 Streaming, In Memory Catalog, DDL executions
  
@@ -12,6 +12,6 @@ Streaming, In Memory Catalog, DDL executions
 - SQL: Create, Insert, Drop and Select
  
 ### Changed
-  - Introduce Transformers and Generators for DataFrame builds
+- Introduce Transformers and Generators for DataFrame builds
 ### Fixed
 - Fix Rate stream processing and long-running tests and simplify (#56) (bf5dae1)
