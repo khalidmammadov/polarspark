@@ -1,3 +1,7 @@
+![CI](https://github.com/khalidmammadov/polarspark/actions/workflows/ci.yml/badge.svg)
+![PyPI](https://img.shields.io/pypi/v/polarspark)
+![Python](https://img.shields.io/pypi/pyversions/polarspark)
+![License](https://img.shields.io/github/license/khalidmammadov/polarspark)
 ```
  ____       _              ____                   _    
 |  _ \ ___ | | __ _ _ __  / ___| _ __   __ _ _ __| | __
