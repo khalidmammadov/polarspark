@@ -1,4 +1,4 @@
-![CI](https://github.com/khalidmammadov/polarspark/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/khalidmammadov/polarspark/workflows/ci.yml/badge.svg)
 ![PyPI](https://img.shields.io/pypi/v/polarspark)
 ![Python](https://img.shields.io/pypi/pyversions/polarspark)
 ![License](https://img.shields.io/github/license/khalidmammadov/polarspark)
