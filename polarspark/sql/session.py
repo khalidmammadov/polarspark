@@ -1581,6 +1581,11 @@ class SparkSession(SparkConversionMixin):
                     # This covers in memory selects as well
                     ts = self.catalog._cat.get_ts(res_ast.table)  # noqa
                     tbl = self.catalog._cat.get_table(res_ast.table)  # noqa
+                    if tbl is None:
+                        raise PySparkValueError(
+                            error_class="TABLE_OR_VIEW_NOT_FOUND",
+                            message_parameters={"relationName": res_ast.table},
+                        )
                     if tbl.is_streaming:
 
                         def transformer(ldf: pl.LazyFrame) -> pl.LazyFrame:
