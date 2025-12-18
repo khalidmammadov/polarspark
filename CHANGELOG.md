@@ -16,6 +16,6 @@ Streaming, In Memory Catalog, DDL executions
 ### Fixed
 - Fix Rate stream processing and long-running tests and simplify (#56) (bf5dae1)
 
-## [0.2.2a3] - 2025-12-18
+## [0.2.2a4] - 2025-12-18
 ### Fixed
 - Fix Multiple Insert using SQL statement 
