@@ -48,13 +48,19 @@ jobs:
       - name: Determine target
         id: target
         run: |
-          if echo "${{ steps.version.outputs.version }}" | grep -Eq '(a|b|rc)[0-9]+$'; then
-            echo "repo=testpypi" >> $GITHUB_OUTPUT
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "repo=pypi" >> $GITHUB_OUTPUT
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-          fi
+          echo "repo=pypi" >> $GITHUB_OUTPUT
+          echo "prerelease=false" >> $GITHUB_OUTPUT
+
+#      - name: Determine target
+#        id: target
+#        run: |
+#          if echo "${{ steps.version.outputs.version }}" | grep -Eq '(a|b|rc)[0-9]+$'; then
+#            echo "repo=testpypi" >> $GITHUB_OUTPUT
+#            echo "prerelease=true" >> $GITHUB_OUTPUT
+#          else
+#            echo "repo=pypi" >> $GITHUB_OUTPUT
+#            echo "prerelease=false" >> $GITHUB_OUTPUT
+#          fi
 
       - name: Publish
         run: |
