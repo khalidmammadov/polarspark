@@ -15,3 +15,7 @@ Streaming, In Memory Catalog, DDL executions
 - Introduce Transformers and Generators for DataFrame builds
 ### Fixed
 - Fix Rate stream processing and long-running tests and simplify (#56) (bf5dae1)
+
+## [0.2.2a3] - 2025-12-18
+### Fixed
+- Fix Multiple Insert using SQL statement 
