@@ -27,7 +27,7 @@ By leveraging Polars, Polar Spark automatically benefits from:
 
 ## Installation
 ```shell
-pip install polarspark
+pip install polarspark==0.2.2a4
 ```
 
 ## Examples:
