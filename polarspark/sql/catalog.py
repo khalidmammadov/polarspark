@@ -21,6 +21,7 @@ from typing import Any, Callable, NamedTuple, List, Optional, TYPE_CHECKING, Gen
 import re
 import pathlib
 
+from polarspark.sql._internal.executor.loader import load_df_from_location
 from polarspark.sql._internal.parser.models import SourceRelation
 from polarspark.storagelevel import StorageLevel
 from polarspark.sql.dataframe import DataFrame
@@ -837,12 +838,7 @@ class Catalog:
                 raise ValueError("For empty path schema must be specified")
 
         # Read existing
-        reader = self._sparkSession.read
-        reader = reader.format(source)
-        if schema:
-            reader = reader.schema(schema)
-
-        df = reader.options(**options).load(_path_str)
+        df = load_df_from_location(self._sparkSession, _path_str, source, schema, **options)
 
         if not schema:
             schema = df.schema

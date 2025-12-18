@@ -27,8 +27,7 @@ class InsertInto:
 
 @dataclass
 class SelectFrom:
-    table: Optional[str] = None
-    db: Optional[str] = None
+    tables: Optional[list[str]] = None
 
 
 @dataclass
