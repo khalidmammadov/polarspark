@@ -45,6 +45,7 @@ import polars as pl
 # from build.lib.polarspark.sql.functions import struct
 from polarspark import SparkConf, SparkContext
 from polarspark.rdd import RDD
+from polarspark.sql._internal.executor.loader import load_df_from_location
 from polarspark.sql._internal.parser.models import SourceRelation, InsertInto, SelectFrom, DropTable
 
 # from polarspark.sql.column import _to_java_column
@@ -1577,28 +1578,45 @@ class SparkSession(SparkConversionMixin):
                 raise NotImplementedError("This SQL type not implemented yet")
 
             if isinstance(res_ast, SelectFrom):
-                if res_ast.table:
+                if res_ast.tables:
                     # This covers in memory selects as well
-                    ts = self.catalog._cat.get_ts(res_ast.table)  # noqa
-                    tbl = self.catalog._cat.get_table(res_ast.table)  # noqa
-                    if tbl is None:
-                        raise PySparkValueError(
-                            error_class="TABLE_OR_VIEW_NOT_FOUND",
-                            message_parameters={"relationName": res_ast.table},
-                        )
-                    if tbl.is_streaming:
+                    for table_name in res_ast.tables:
+                        ts = self.catalog._cat.get_ts(table_name)  # noqa
+                        tbl = self.catalog._cat.get_table(table_name)  # noqa
+                        if tbl is None:
+                            raise PySparkValueError(
+                                error_class="TABLE_OR_VIEW_NOT_FOUND",
+                                message_parameters={"relationName": table_name},
+                            )
 
-                        def transformer(ldf: pl.LazyFrame) -> pl.LazyFrame:
-                            # Should we separate select part from table so we can easily replace that here??
-                            ts.pl_ctx.register(res_ast.table, ldf)
-                            return ts.pl_ctx.execute(sqlQuery)
+                        # When table here is stream query name
+                        if tbl.is_streaming:
 
-                        return DataFrame(tbl.df, transformer, self, is_streaming=tbl.is_streaming)
+                            def transformer(ldf: pl.LazyFrame) -> pl.LazyFrame:
+                                # Should we separate select part from table so we can easily replace that here??
+                                ts.pl_ctx.register(table_name, ldf)
+                                return ts.pl_ctx.execute(sqlQuery)
+
+                            return DataFrame(
+                                tbl.df, transformer, self, is_streaming=tbl.is_streaming
+                            )
 
                     def df_generator() -> Generator[pl.LazyFrame, None, None]:
-                        if tbl.format == "view":
-                            ts.pl_ctx.register(res_ast.table, tbl.df._gather_first())  # noqa
-                        yield ts.pl_ctx.execute(sqlQuery)
+                        for t_name in res_ast.tables:
+                            ts = self.catalog._cat.get_ts(t_name)  # noqa
+                            tbl = self.catalog._cat.get_table(t_name)  # noqa
+                            if tbl.format == "view":
+                                ts.pl_ctx.register(t_name, tbl.df._gather_first())  # noqa
+
+                            if tbl.format not in ["memory", "view"]:
+                                df = load_df_from_location(self, tbl.location, tbl.format)
+                                ts.pl_ctx.register(t_name, df._gather_first())  # noqa
+
+                            if len(res_ast.tables) == 1:
+                                yield ts.pl_ctx.execute(sqlQuery)
+
+                        if len(res_ast.tables) > 1:
+                            yield self._pl_ctx.execute(sqlQuery)
 
                     return DataFrame(None, df_generator, self)
 

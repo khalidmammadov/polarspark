@@ -59,7 +59,7 @@ def execute_sql(spark: "SparkSession", sql: str):
             execute_insert_into(spark, ins)
             yield ins
         if isinstance(x, expr.Select):
-            yield ast.select_table(x)
+            yield ast.select_tables(x)
         if isinstance(x, expr.Drop):
             drp = ast.drop_table(x)
             execute_drop_table(spark, drp)

@@ -27,6 +27,10 @@ def get_table(expr: Expression) -> Optional[Expression]:
     return expr.find(Table)
 
 
+def get_tables(expr: Expression) -> Optional[list[Expression]]:
+    return list(expr.find_all(Table))
+
+
 def get_name(expr: Optional[Expression] = None, sbj: str = "this") -> Optional[str]:
     """
     Get name from Identifier in any Expression
@@ -84,11 +88,10 @@ def create_table(expr: Create) -> SourceRelation:
     )
 
 
-def select_table(expr: Select) -> SelectFrom:
-    tbl = get_table(expr)
-    table_name = get_name(tbl)
-    db = get_name(tbl, sbj="db")
-    return SelectFrom(table=table_name, db=db)
+def select_tables(expr: Select) -> SelectFrom:
+    tables = get_tables(expr)
+    names = [get_name(tbl) for tbl in tables if tbl]
+    return SelectFrom(tables=names)
 
 
 def drop_table(expr: Drop) -> DropTable:
