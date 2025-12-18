@@ -10,7 +10,7 @@
 |_|   \___/|_|\__,_|_|    |____/| .__/ \__,_|_|  |_|\_\
                                 |_|                    
 ```
-# ⚡ Apache Spark on Polars
+# 🚀 Apache Spark on Polars
 
 Polar Spark brings the PySpark API to Polars, optimized for single-machine workloads.
 
@@ -56,38 +56,60 @@ except Exception:
     from pyspark.sql import Row
     from pyspark.sql.types import *    
 from pprint import pprint
-
+```
+```python
 
 d = [{'name': 'Alice', 'age': 1}, 
      {'name': 'Tome', 'age': 100}, 
      {'name': 'Sim', 'age': 99}]
 df = spark.createDataFrame(d)
 rows = df.collect()
+```
 
+### SQL
+```python
+spark.sql("CREATE TABLE input_table (value string) USING parquet")
+spark.sql("INSERT INTO input_table VALUES (1), (2), (3)")
+
+spark.sql("""
+    SELECT * 
+    FROM input_table i 
+        JOIN my_table m 
+    ON i.value = m.age
+""").show()
+```
+
+### API
+```python
 pprint(rows)
 >>> [Row(age=1, name='Alice'),
 >>>  Row(age=100, name='Tome'),
 >>>  Row(age=99, name='Sim')]
+```
 
+```python
 df.printSchema()
 >>> root
 >>>  |-- age: long (nullable = true)
 >>>  |-- name: string (nullable = true)
+```
 
-
+```python
 # With schema
 schema = StructType([
             StructField("name", StringType(), True),
             StructField("age", IntegerType(), True)])
 df_no_rows = spark.createDataFrame([], schema=schema)
+
 print(df_no_rows.isEmpty())
 >>> True
+```
 
+```python
 # or using Spark DDL
 df = spark.createDataFrame([("Alice", 3), ("Ben", 5)], schema="name STRING, age INT")
 print(df.isEmpty())
 >>> False
-
 ```
 
 ### Read / write Parquet, Delta, CSV etc.
@@ -125,31 +147,16 @@ result = self.spark.sql("SELECT value FROM output_table").collect()
 def collectBatch(batch_df, batch_id):
     batch_df.write.format("parquet").mode("overwrite").saveAsTable("test_table1")
 
-
 df = self.spark.readStream.format("text").load("polarspark/test_support/sql/streaming")
 q = df.writeStream.foreachBatch(collectBatch).start()
 q.processAllAvailable()
 collected = self.spark.sql("select * from test_table1").collect()
-
 ```
 
 ### In Memory Catalog
 ```python
 df.write.saveAsTable("my_table")
 spark.sql("select * from my_table").show()
-```
-
-### SQL
-```python
-spark.sql("CREATE TABLE input_table (value string) USING parquet")
-spark.sql("INSERT INTO input_table VALUES (1), (2), (3)")
-
-spark.sql("""
-    SELECT * 
-    FROM input_table i 
-        JOIN my_table m 
-    ON i.value = m.age
-""").show()
 ```
 
 ## Some more:
