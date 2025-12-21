@@ -118,7 +118,6 @@ class DataFrameJoinTestsMixin:
 
         # outer join
         result = df.join(df2, ["int", "str"], "outer").collect()
-        df.join(df2, ["int", "str"], "outer").show()
         expected = [(1, "1", 2, 3), (3, "3", 4, None), (5, "5", None, 6)]
         self._assert_rows_equal(result, expected)
 
