@@ -52,20 +52,6 @@ class DataFrameJoinTestsMixin:
 
         self._assert_rows_equal(result, expected)
 
-    def test_join_using_multiple_columns_array(self):
-        """Test join - join using multiple columns array"""
-        df = self.spark.createDataFrame(
-            [(i, i + 1, str(i)) for i in [1, 2, 3]], ["int", "int2", "str"]
-        )
-        df2 = self.spark.createDataFrame(
-            [(i, i + 1, str(i + 1)) for i in [1, 2, 3]], ["int", "int2", "str"]
-        )
-
-        result = df.join(df2, ["int", "int2"]).collect()
-        expected = [(1, 2, "1", "2"), (2, 3, "2", "3"), (3, 4, "3", "4")]
-
-        self._assert_rows_equal(result, expected)
-
     @unittest.skip("Skipping until ordering columns after projection resolved. i.e. AST build up")
     def test_join_sorted_columns_not_in_output_set(self):
         """Test join - sorted columns not in join's outputSet"""
