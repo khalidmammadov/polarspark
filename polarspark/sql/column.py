@@ -1477,7 +1477,7 @@ class Column:
 
     def _to_col(self, expr: pl.Expr, name: str = None, desc: bool = False):
         _name = name or self._name
-        return Column(expr, name=_name, desc=desc)
+        return Column(expr, name=_name, col_expr=self._col_expr, desc=desc)
 
 
 def _test() -> None:
