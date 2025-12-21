@@ -66,25 +66,36 @@ class DataFrameJoinTestsMixin:
 
         self._assert_rows_equal(result, expected)
 
-    # def test_join_sorted_columns_not_in_output_set(self):
-    #     """Test join - sorted columns not in join's outputSet"""
-    #     df = self.spark.createDataFrame([(1, 2, "1"), (3, 4, "3")], ["int", "int2", "str_sort"]).alias("df1")
-    #     df2 = self.spark.createDataFrame([(1, 3, "1"), (5, 6, "5")], ["int", "int2", "str"]).alias("df2")
-    #     df3 = self.spark.createDataFrame([(1, 3, "1"), (5, 6, "5")], ["int", "int2", "str"]).alias("df3")
+    @unittest.skip("Skipping until ordering columns after projection resolved. i.e. AST build up")
+    def test_join_sorted_columns_not_in_output_set(self):
+        """Test join - sorted columns not in join's outputSet"""
+        df = self.spark.createDataFrame(
+            [(1, 2, "1"), (3, 4, "3")], ["int", "int2", "str_sort"]
+        ).alias("df1")
+        df2 = self.spark.createDataFrame([(1, 3, "1"), (5, 6, "5")], ["int", "int2", "str"]).alias(
+            "df2"
+        )
+        df3 = self.spark.createDataFrame([(1, 3, "1"), (5, 6, "5")], ["int", "int2", "str"]).alias(
+            "df3"
+        )
 
-    #     result = df.join(df2, col("df1.int") == col("df2.int"), "outer") \
-    #         .select(col("df1.int"), col("df2.int2")) \
-    #         .orderBy(col("str_sort").asc(), col("str").asc()) \
-    #         .collect()
-    #     expected = [(None, 6), (1, 3), (3, None)]
-    #     self._assert_rows_equal(result, expected)
+        result = (
+            df.join(df2, col("df1.int") == col("df2.int"), "outer")
+            .select(col("df1.int"), col("df2.int2"))
+            .orderBy(col("str_sort").asc(), col("str").asc())
+            .collect()
+        )
+        expected = [(None, 6), (1, 3), (3, None)]
+        self._assert_rows_equal(result, expected)
 
-    #     result2 = df2.join(df3, col("df2.int") == col("df3.int"), "inner") \
-    #         .select(col("df2.int"), col("df3.int")) \
-    #         .orderBy(col("df2.str").desc()) \
-    #         .collect()
-    #     expected2 = [(5, 5), (1, 1)]
-    #     self._assert_rows_equal(result2, expected2)
+        result2 = (
+            df2.join(df3, col("df2.int") == col("df3.int"), "inner")
+            .select(col("df2.int"), col("df3.int"))
+            .orderBy(col("df2.str").desc())
+            .collect()
+        )
+        expected2 = [(5, 5), (1, 1)]
+        self._assert_rows_equal(result2, expected2)
 
     def test_join_using_specifying_join_type(self):
         """Test join - join using specifying join type"""
@@ -143,15 +154,3 @@ class DataFrameJoinTestsMixin:
 
 class DataFrameJoinTests(DataFrameJoinTestsMixin, ReusedSQLTestCase):
     pass
-
-
-if __name__ == "__main__":
-    from polarspark.sql.tests.test_datafrma_join_ported import *  # noqa: F401
-
-    try:
-        import xmlrunner
-
-        testRunner = xmlrunner.XMLTestRunner(output="target/test-reports", verbosity=2)
-    except ImportError:
-        testRunner = None
-    unittest.main(testRunner=testRunner, verbosity=2)
