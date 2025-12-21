@@ -2826,15 +2826,31 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         assert isinstance(how, str), "how should be a string"
 
         def transformer(ldf):
+            left_ldf = ldf
+            right_ldf = other._gather_first()
             if left_on and right_on:
-                _ldf = ldf.join(other._gather_first(), how=how, left_on=left_on, right_on=right_on)
+                _ldf = left_ldf.join(right_ldf, how=how, left_on=left_on, right_on=right_on)
+
             elif on is not None:
                 _on = [o if isinstance(o, str) else o._name for o in on]
-                _ldf = ldf.join(other._gather_first(), _on, how, coalesce=True)
-                if how == "right":
-                    _ldf = _ldf.select(list(OrderedDict.fromkeys(self.columns + other.columns)))
+                # Order columns, set join columns first
+                _ldf = left_ldf.join(right_ldf, _on, how, coalesce=True)
+                self_cols_without_on = [c for c in self.columns if c not in _on]
+                other_cols_without_on = [
+                    c for c in _ldf.columns if c not in _on + self_cols_without_on
+                ]
+
+                other_cols = []
+                # Polars adds joined column when OUTER/FULL join, so:
+                for c in other_cols_without_on:
+                    if c.replace("_right", "") not in _on:
+                        other_cols.append(c)
+
+                projection = _on + self_cols_without_on + other_cols
+                _ldf = _ldf.select(projection).sort(_on)
             else:
-                _ldf = ldf.join(other._gather_first(), how=how)
+                _ldf = left_ldf.join(right_ldf, how=how)
+
             return _ldf
 
         return self._to_df(transformer)
