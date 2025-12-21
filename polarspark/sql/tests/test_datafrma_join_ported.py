@@ -16,7 +16,6 @@
 #
 import unittest
 
-from polarspark.sql import Row
 from polarspark.sql.functions import col
 from polarspark.testing.sqlutils import ReusedSQLTestCase
 
