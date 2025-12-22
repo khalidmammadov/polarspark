@@ -137,6 +137,29 @@ class DataFrameJoinTestsMixin:
         expected = [(3, "3", 4)]
         self._assert_rows_equal(result, expected)
 
+    def test_cross_join(self):
+        """Test join - cross join"""
+        df1 = self.spark.createDataFrame([(1, "1"), (3, "3")], ["int", "str"])
+        df2 = self.spark.createDataFrame([(2, "2"), (4, "4")], ["int", "str"])
+
+        # crossJoin method
+        result = df1.crossJoin(df2).collect()
+        expected = [(1, "1", 2, "2"), (1, "1", 4, "4"), (3, "3", 2, "2"), (3, "3", 4, "4")]
+        self._assert_rows_equal(result, expected)
+
+        result = df2.crossJoin(df1).collect()
+        expected = [(2, "2", 1, "1"), (2, "2", 3, "3"), (4, "4", 1, "1"), (4, "4", 3, "3")]
+        self._assert_rows_equal(result, expected)
+
+        # join with empty list and "cross" type
+        result = df1.join(df2, [], "cross").collect()
+        expected = [(1, "1", 2, "2"), (1, "1", 4, "4"), (3, "3", 2, "2"), (3, "3", 4, "4")]
+        self._assert_rows_equal(result, expected)
+
+        result = df2.join(df1, [], "cross").collect()
+        expected = [(2, "2", 1, "1"), (2, "2", 3, "3"), (4, "4", 1, "1"), (4, "4", 3, "3")]
+        self._assert_rows_equal(result, expected)
+
 
 class DataFrameJoinTests(DataFrameJoinTestsMixin, ReusedSQLTestCase):
     pass
