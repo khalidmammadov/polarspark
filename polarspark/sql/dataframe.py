@@ -2795,7 +2795,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         left_on = []
         right_on = []
 
-        if on is not None:
+        if on:
             if isinstance(on[0], str):
                 on = cast(List[str], on)
             else:
@@ -2831,7 +2831,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             if left_on and right_on:
                 _ldf = left_ldf.join(right_ldf, how=how, left_on=left_on, right_on=right_on)
 
-            elif on is not None:
+            elif on:
                 _on = [o if isinstance(o, str) else o._name for o in on]
                 # Order columns, set join columns first
                 _ldf = left_ldf.join(right_ldf, _on, how, coalesce=True)
