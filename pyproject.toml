@@ -21,7 +21,8 @@ dependencies = [
     'deltalake>=1.0.0',
     # For streaming from paths
     'watchdog',
-    'sqlglot'
+    'sqlglot',
+    "duckdb>=1.4.3",
 ]
 
 [build-system]

@@ -1,15 +1,13 @@
-PY = python3.9
-
 .PHONY: lint reformat build cleanup install test
 
 lint:
-	@PYTHON_EXECUTABLE=$(PY) ./bin/lint-python
+	@uv run ./bin/lint-python
 
 reformat:
-	@PYTHON_EXECUTABLE=$(PY) ./bin/reformat-python
+	@uv run ./bin/reformat-python
 
 build:
-	@PYTHON_EXECUTABLE=$(PY) uv build
+	@uv run build
 
 cleanup:
 	./bin/cleanup.sh
