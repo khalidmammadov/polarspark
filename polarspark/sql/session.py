@@ -41,6 +41,7 @@ from typing import (
 )
 
 import polars as pl
+import duckdb
 
 # from build.lib.polarspark.sql.functions import struct
 from polarspark import SparkConf, SparkContext
@@ -1602,21 +1603,21 @@ class SparkSession(SparkConversionMixin):
                             )
 
                     def df_generator() -> Generator[pl.LazyFrame, None, None]:
+                        con = duckdb.connect()
                         for t_name in res_ast.tables:
-                            ts = self.catalog._cat.get_ts(t_name)  # noqa
                             tbl = self.catalog._cat.get_table(t_name)  # noqa
                             if tbl.format == "view":
-                                ts.pl_ctx.register(t_name, tbl.df._gather_first())  # noqa
+                                con.register(t_name, tbl.df._gather_first().collect())
+
+                            if tbl.format == "memory":
+                                _ldf = pl.concat(tbl.data, how="vertical")
+                                con.register(t_name, _ldf.collect())
 
                             if tbl.format not in ["memory", "view"]:
                                 df = load_df_from_location(self, tbl.location, tbl.format)
-                                ts.pl_ctx.register(t_name, df._gather_first())  # noqa
+                                con.register(t_name, df._gather_first().collect())
 
-                            if len(res_ast.tables) == 1:
-                                yield ts.pl_ctx.execute(sqlQuery)
-
-                        if len(res_ast.tables) > 1:
-                            yield self._pl_ctx.execute(sqlQuery)
+                        yield pl.DataFrame(con.execute(sqlQuery).fetchdf()).lazy()
 
                     return DataFrame(None, df_generator, self)
 
