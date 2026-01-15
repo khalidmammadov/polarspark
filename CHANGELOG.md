@@ -1,3 +1,17 @@
+# Changelog
+
+## [0.2.3rc1] - 2026-01-15
+### Added
+- Add USING clause when equi join and columns are the same (#87)
+- Introduce DuckDB for SQL queiries (#86)
+- feat(DataFrame): Port cross join tests for DataFrame operations (#85)
+- feat(DataFrame): Ported Scala DataFrame join test (first batch) (#84)
+
+
+## [0.2.2a4] - 2025-12-18
+### Fixed
+- Fix Multiple Insert using SQL statement 
+
 ## [0.2.1] - 2025-12-16
   
 Streaming, In Memory Catalog, DDL executions
@@ -16,6 +30,3 @@ Streaming, In Memory Catalog, DDL executions
 ### Fixed
 - Fix Rate stream processing and long-running tests and simplify (#56) (bf5dae1)
 
-## [0.2.2a4] - 2025-12-18
-### Fixed
-- Fix Multiple Insert using SQL statement 
