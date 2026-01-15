@@ -16,6 +16,8 @@
 #
 import unittest
 
+import pytest
+
 from polarspark.sql.functions import col
 from polarspark.testing.sqlutils import ReusedSQLTestCase
 
@@ -158,6 +160,53 @@ class DataFrameJoinTestsMixin:
 
         result = df2.join(df1, [], "cross").collect()
         expected = [(2, "2", 1, "1"), (2, "2", 3, "3"), (4, "4", 1, "1"), (4, "4", 3, "3")]
+        self._assert_rows_equal(result, expected)
+
+    @pytest.mark.skip("Skipping until join optimization rules are implemented")
+    def test_join_outer_join_conversion(self):
+        """Test join - outer join conversion"""
+        df = self.spark.createDataFrame([(1, 2, "1"), (3, 4, "3")], ["int", "int2", "str"]).alias("a")
+        df2 = self.spark.createDataFrame([(1, 3, "1"), (5, 6, "5")], ["int", "int2", "str"]).alias("b")
+
+        # outer -> left
+        outer_join_2_left = df.join(df2, col("a.int") == col("b.int"), "outer").where(col("a.int") >= 3)
+        # plan_str = outer_join_2_left._jdf.queryExecution().optimizedPlan().toString()
+        # self.assertIn("LeftOuter", plan_str)
+        result = outer_join_2_left.collect()
+        expected = [(3, 4, "3", None, None, None)]
+        self._assert_rows_equal(result, expected)
+
+        # outer -> right
+        outer_join_2_right = df.join(df2, col("a.int") == col("b.int"), "outer").where(col("b.int") >= 3)
+        plan_str = outer_join_2_right._jdf.queryExecution().optimizedPlan().toString()
+        self.assertIn("RightOuter", plan_str)
+        result = outer_join_2_right.collect()
+        expected = [(None, None, None, 5, 6, "5")]
+        self._assert_rows_equal(result, expected)
+
+        # outer -> inner
+        outer_join_2_inner = df.join(df2, col("a.int") == col("b.int"), "outer") \
+            .where((col("a.int") == 1) & (col("b.int2") == 3))
+        plan_str = outer_join_2_inner._jdf.queryExecution().optimizedPlan().toString()
+        self.assertIn("Inner", plan_str)
+        result = outer_join_2_inner.collect()
+        expected = [(1, 2, "1", 1, 3, "1")]
+        self._assert_rows_equal(result, expected)
+
+        # right -> inner
+        right_join_2_inner = df.join(df2, col("a.int") == col("b.int"), "right").where(col("a.int") > 0)
+        plan_str = right_join_2_inner._jdf.queryExecution().optimizedPlan().toString()
+        self.assertIn("Inner", plan_str)
+        result = right_join_2_inner.collect()
+        expected = [(1, 2, "1", 1, 3, "1")]
+        self._assert_rows_equal(result, expected)
+
+        # left -> inner
+        left_join_2_inner = df.join(df2, col("a.int") == col("b.int"), "left").where(col("b.int2") > 0)
+        plan_str = left_join_2_inner._jdf.queryExecution().optimizedPlan().toString()
+        self.assertIn("Inner", plan_str)
+        result = left_join_2_inner.collect()
+        expected = [(1, 2, "1", 1, 3, "1")]
         self._assert_rows_equal(result, expected)
 
 

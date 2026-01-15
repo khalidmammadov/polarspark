@@ -74,6 +74,8 @@ from polarspark.sql.pandas.types import to_polars_selector
 
 import polars as pl
 from polars.lazyframe import LazyFrame
+import duckdb
+
 
 if TYPE_CHECKING:
     from polarspark._typing import PrimitiveType
@@ -192,7 +194,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         # Check whether _repr_html is supported or not, we use it to avoid calling _jdf twice
         # by __repr__ and _repr_html_ while eager evaluation opens.
         self._support_repr_html = False
-        self._alias = alias
+        self._alias = alias or f"df_{id(self):x}"
 
         self._storage_level = StorageLevel.NONE
 
@@ -2801,19 +2803,39 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             else:
                 assert isinstance(on[0], Column), "on should be Column or list of Column"
                 on = cast(List[Column], on)
-                # on = reduce(lambda x, y: x.__and__(y), cast(List[Column], on))
-                # on = on._expr
+                
+                using = []
+                # Check for USING expression (i.e., same column names)
                 for c in on:
-                    expr: List = c._col_expr
-                    if expr and len(expr) == 3:
-                        left, op, right, *_ = expr
+                    if c._col_expr:
+                        left, op, right = c._col_expr
                         if op == "__eq__":
-                            left_on.append(left._name)
-                            right_on.append(right._name)
-                        else:
-                            raise NotImplementedError(
-                                f"Join with {op} condition not implemented yet"
-                            )
+                            if left._name == right._name:
+                                using.append(left._name)
+                            else:
+                                using = []
+                                break
+
+                _expr = " and ".join(str(c) for c in on)
+                def transformer(ldf):
+                    left_df = ldf.collect()
+                    right_df = other._gather_first().collect()
+                    conn = duckdb.connect()
+                    conn.register("left_df", left_df)
+                    conn.register("right_df", right_df)
+                    if using:
+                        on = "USING ({})".format(", ".join(using))
+                    else:
+                        on = f"ON {_expr}"
+                    query = f"""
+                    SELECT * FROM left_df {self._alias}
+                    {how} JOIN right_df {other._alias}
+                    {on}
+                    """
+                    result_df = conn.execute(query).fetchdf()
+                    conn.close()
+                    return pl.from_pandas(result_df).lazy()
+                return self._to_df(transformer)
 
         if on is None and how != "cross":
             if self.sparkSession.conf.get("spark.sql.crossJoin.enabled") == "true":
@@ -3414,7 +3436,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         if isinstance(item, str):
             if item not in self._gather_first().collect_schema().names():
                 raise AnalysisException(f"Column {item} does not exists")
-            return col(item)
+            return Column(pl.col(item), name=item, df_alias=self._alias)
         elif isinstance(item, Column):
             return self.filter(item)
         elif isinstance(item, (list, tuple)):
