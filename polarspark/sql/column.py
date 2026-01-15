@@ -47,6 +47,15 @@ if TYPE_CHECKING:
 __all__ = ["Column"]
 
 
+OP_MAP = {
+    "__eq__": "==",
+    "__ne__": "!=",
+    "__lt__": "<",
+    "__le__": "<=",
+    "__gt__": ">",
+    "__ge__": ">=",
+}
+
 def _create_column_from_literal(literal: Union["LiteralType", "DecimalLiteral"]) -> "Column":
     return Column(pl.lit(literal))
 
@@ -180,12 +189,14 @@ class Column:
         self,
         expr: pl.Expr,
         name: str = None,
+        df_alias: str = None,
         col_expr: Optional[List[Union[str, "Column"]]] = None,
         desc: bool = False,
     ) -> None:
         self._desc = desc
         self._expr: pl.Expr = expr
         self._name = name
+        self._df_alias = df_alias
         self._col_expr = col_expr
 
     # arithmetic operators
@@ -1474,6 +1485,13 @@ class Column:
 
     def __repr__(self) -> str:
         return "Column<'%s'>" % str(self._expr)
+    
+    def __str__(self) -> str:
+        if self._col_expr:
+            left, op, right = self._col_expr
+            op = OP_MAP.get(op, op)
+            return f"({left._df_alias}.{str(left)} {op} {right._df_alias}.{str(right)})"
+        return self._name
 
     def _to_col(self, expr: pl.Expr, name: str = None, desc: bool = False):
         _name = name or self._name
