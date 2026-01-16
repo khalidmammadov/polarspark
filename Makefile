@@ -44,3 +44,17 @@ release:
 release-candidate:
 	uv version --bump rc --bump patch
 	$(MAKE) tag-push-release
+
+changelog:
+	@echo "# Changelog" > CHANGELOG.md.tmp
+	@echo "" >> CHANGELOG.md.tmp
+	@echo "## [$$(uv version --short)] - $$(date +%Y-%m-%d)" >> CHANGELOG.md.tmp
+	@echo "### Added" >> CHANGELOG.md.tmp
+	@git log "$$(git tag --sort=-creatordate | head -n 1)"..HEAD --pretty=format:"- %s" >> CHANGELOG.md.tmp
+	@if [ -f CHANGELOG.md ]; then \
+		echo "" >> CHANGELOG.md.tmp; \
+		echo "" >> CHANGELOG.md.tmp; \
+		tail -n +2 CHANGELOG.md >> CHANGELOG.md.tmp; \
+	fi
+	@mv CHANGELOG.md.tmp CHANGELOG.md
+	@echo "Changelog updated in CHANGELOG.md"
