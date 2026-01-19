@@ -1317,15 +1317,15 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> [row.asDict() for row in rows]
         [{'age': 14, 'name': 'Tom'}, {'age': 23, 'name': 'Alice'}, {'age': 16, 'name': 'Bob'}]
         """
-        pdfs = []
-        for pdf in self._gather():
-            pdfs.append(pdf.collect())
+        dfs = []
+        for df in self._gather():
+            dfs.append(df.collect())
 
-        if len(pdfs) == 1:
-            pdf = pdfs[0]
+        if len(dfs) == 1:
+            final_df = dfs[0]
         else:
-            pdf = pl.concat(pdfs, how="vertical")
-        return list(_pdf_to_row_iter(pdf))
+            final_df = pl.concat(dfs, how="vertical")
+        return list(_pdf_to_row_iter(final_df))
 
     def toLocalIterator(self, prefetchPartitions: bool = False) -> Iterator[Row]:
         """

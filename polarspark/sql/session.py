@@ -1575,6 +1575,7 @@ class SparkSession(SparkConversionMixin):
         #     if len(kwargs) > 0:
         #         formatter.clear()
         for res_ast in ddl.execute_sql(self, sqlQuery):
+            con = duckdb.connect()
             if not isinstance(res_ast, (SourceRelation, InsertInto, DropTable, SelectFrom)):
                 raise NotImplementedError("This SQL type not implemented yet")
 
@@ -1603,7 +1604,7 @@ class SparkSession(SparkConversionMixin):
                             )
 
                     def df_generator() -> Generator[pl.LazyFrame, None, None]:
-                        con = duckdb.connect()
+                        
                         for t_name in res_ast.tables:
                             tbl = self.catalog._cat.get_table(t_name)  # noqa
                             if tbl.format == "view":
@@ -1622,7 +1623,7 @@ class SparkSession(SparkConversionMixin):
                     return DataFrame(None, df_generator, self)
 
                 # No table source, VALUES etc
-                return self._create_base_dataframe(pl.sql(sqlQuery))
+                return self._create_base_dataframe(pl.DataFrame(con.execute(sqlQuery).fetchdf()).lazy())
 
         return self.createDataFrame([], schema="res STRING")
 
