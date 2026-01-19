@@ -4500,7 +4500,7 @@ def coalesce(*cols: "ColumnOrName") -> Column:
     +----+----+----------------+
     """
     exprs = (col._expr for col in cols)
-    return pl.coalesce(*exprs)
+    return Column(pl.coalesce(*exprs))
 
 
 @_try_remote_functions
