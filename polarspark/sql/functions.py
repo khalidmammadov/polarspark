@@ -429,7 +429,7 @@ def sqrt(col: "ColumnOrName") -> Column:
     |    2.0|
     +-------+
     """
-    return _invoke_function_over_columns("sqrt", col)
+    return _invoke_function_over_column("sqrt", col)
 
 
 @_try_remote_functions
@@ -1443,7 +1443,7 @@ def acos(col: "ColumnOrName") -> Column:
     |     NaN|
     +--------+
     """
-    return _invoke_function_over_columns("acos", col)
+    return _invoke_function_over_column("arccos", col)
 
 
 @_try_remote_functions
@@ -1477,7 +1477,7 @@ def acosh(col: "ColumnOrName") -> Column:
     |      0.0|
     +---------+
     """
-    return _invoke_function_over_columns("acosh", col)
+    return _invoke_function_over_column("arccosh", col)
 
 
 @_try_remote_functions
@@ -1511,7 +1511,7 @@ def asin(col: "ColumnOrName") -> Column:
     |     NaN|
     +--------+
     """
-    return _invoke_function_over_columns("asin", col)
+    return _invoke_function_over_column("arcsin", col)
 
 
 @_try_remote_functions
@@ -1544,7 +1544,7 @@ def asinh(col: "ColumnOrName") -> Column:
     |      0.0|
     +---------+
     """
-    return _invoke_function_over_columns("asinh", col)
+    return _invoke_function_over_column("arcsinh", col)
 
 
 @_try_remote_functions
@@ -1577,7 +1577,7 @@ def atan(col: "ColumnOrName") -> Column:
     |     0.0|
     +--------+
     """
-    return _invoke_function_over_columns("atan", col)
+    return _invoke_function_over_column("arctan", col)
 
 
 @_try_remote_functions
@@ -1611,7 +1611,7 @@ def atanh(col: "ColumnOrName") -> Column:
     |           NaN|
     +--------------+
     """
-    return _invoke_function_over_columns("atanh", col)
+    return _invoke_function_over_column("arctanh", col)
 
 
 @_try_remote_functions
@@ -1644,7 +1644,7 @@ def cbrt(col: "ColumnOrName") -> Column:
     |     3.0|
     +--------+
     """
-    return _invoke_function_over_columns("cbrt", col)
+    return _invoke_function_over_column("cbrt", col)
 
 
 @_try_remote_functions
@@ -1780,7 +1780,7 @@ def cos(col: "ColumnOrName") -> Column:
     >>> df.select(cos(lit(math.pi))).first()
     Row(COS(3.14159...)=-1.0)
     """
-    return _invoke_function_over_columns("cos", col)
+    return _invoke_function_over_column("cos", col)
 
 
 @_try_remote_functions
@@ -1809,7 +1809,7 @@ def cosh(col: "ColumnOrName") -> Column:
     >>> df.select(cosh(lit(1))).first()
     Row(COSH(1)=1.54308...)
     """
-    return _invoke_function_over_columns("cosh", col)
+    return _invoke_function_over_column("cosh", col)
 
 
 @_try_remote_functions
@@ -1839,7 +1839,7 @@ def cot(col: "ColumnOrName") -> Column:
     >>> df.select(cot(lit(math.radians(45)))).first()
     Row(COT(0.78539...)=1.00000...)
     """
-    return _invoke_function_over_columns("cot", col)
+    return _invoke_function_over_column("cot", col)
 
 
 @_try_remote_functions
@@ -1869,7 +1869,7 @@ def csc(col: "ColumnOrName") -> Column:
     >>> df.select(csc(lit(math.radians(90)))).first()
     Row(CSC(1.57079...)=1.0)
     """
-    return _invoke_function_over_columns("csc", col)
+    return 1 / _invoke_function_over_column("sin", col)
 
 
 @_try_remote_functions
@@ -2256,7 +2256,7 @@ def sec(col: "ColumnOrName") -> Column:
     >>> df.select(sec(lit(1.5))).first()
     Row(SEC(1.5)=14.13683...)
     """
-    return _invoke_function_over_columns("sec", col)
+    return 1 / _invoke_function_over_column("cos", col)
 
 
 @_try_remote_functions
@@ -2358,7 +2358,7 @@ def sin(col: "ColumnOrName") -> Column:
     >>> df.select(sin(lit(math.radians(90)))).first()
     Row(SIN(1.57079...)=1.0)
     """
-    return _invoke_function_over_columns("sin", col)
+    return _invoke_function_over_column("sin", col)
 
 
 @_try_remote_functions
@@ -2388,7 +2388,7 @@ def sinh(col: "ColumnOrName") -> Column:
     >>> df.select(sinh(lit(1.1))).first()
     Row(SINH(1.1)=1.33564...)
     """
-    return _invoke_function_over_columns("sinh", col)
+    return _invoke_function_over_column("sinh", col)
 
 
 @_try_remote_functions
@@ -2418,7 +2418,7 @@ def tan(col: "ColumnOrName") -> Column:
     >>> df.select(tan(lit(math.radians(45)))).first()
     Row(TAN(0.78539...)=0.99999...)
     """
-    return _invoke_function_over_columns("tan", col)
+    return _invoke_function_over_column("tan", col)
 
 
 @_try_remote_functions
@@ -2449,7 +2449,7 @@ def tanh(col: "ColumnOrName") -> Column:
     >>> df.select(tanh(lit(math.radians(90)))).first()
     Row(TANH(1.57079...)=0.91715...)
     """
-    return _invoke_function_over_columns("tanh", col)
+    return _invoke_function_over_column("tanh", col)
 
 
 @_try_remote_functions
@@ -3896,7 +3896,7 @@ def degrees(col: "ColumnOrName") -> Column:
     >>> df.select(degrees(lit(math.pi))).first()
     Row(DEGREES(3.14159...)=180.0)
     """
-    return _invoke_function_over_columns("degrees", col)
+    return _invoke_function_over_column("degrees", col)
 
 
 @_try_remote_functions
@@ -3926,7 +3926,7 @@ def radians(col: "ColumnOrName") -> Column:
     >>> df.select(radians(lit(180))).first()
     Row(RADIANS(180)=3.14159...)
     """
-    return _invoke_function_over_columns("radians", col)
+    return _invoke_function_over_column("radians", col)
 
 
 @_try_remote_functions
@@ -4499,7 +4499,8 @@ def coalesce(*cols: "ColumnOrName") -> Column:
     |NULL|   2|             0.0|
     +----+----+----------------+
     """
-    return _invoke_function_over_seq_of_columns("coalesce", cols)
+    exprs = (col._expr for col in cols)
+    return pl.coalesce(*exprs)
 
 
 @_try_remote_functions

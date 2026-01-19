@@ -1413,7 +1413,7 @@ class DataFrameTestsMixin:
         self.assertEqual(types.iloc[1], _at(pa.int16()))
         self.assertEqual(types.iloc[2], _at(pa.int32()))
         self.assertEqual(types.iloc[3], _at(pa.int64()))
-        self.assertEqual(types.iloc[4], _at(pa.float64()))
+        self.assertEqual(types.iloc[4], _at(pa.float32()))
         self.assertEqual(types.iloc[5], _at(pa.float64()))
         self.assertEqual(types.iloc[6], _at(pa.bool_()))
         self.assertEqual(types.iloc[7], _at(pa.large_string()))

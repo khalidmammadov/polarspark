@@ -228,13 +228,13 @@ class Column:
     __radd__ = cast(
         Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"], _bin_op("__add__")
     )
-    __rsub__ = _reverse_op("__rsub__")
+    __rsub__ = _reverse_op("__sub__")
     __rmul__ = cast(
         Callable[["Column", Union["LiteralType", "DecimalLiteral"]], "Column"], _bin_op("__rmul__")
     )
-    __rdiv__ = _reverse_op("__rdiv__")
-    __rtruediv__ = _reverse_op("__rtruediv__")
-    __rmod__ = _reverse_op("__rmod__")
+    __rdiv__ = _reverse_op("__div__")
+    __rtruediv__ = _reverse_op("__truediv__")
+    __rmod__ = _reverse_op("__mod__")
 
     __pow__ = _bin_op("__pow__")
     __rpow__ = _reverse_op("__pow__")
