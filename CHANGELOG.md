@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.5rc1] - 2026-01-22
+### Added
+- Polarspark activation
+
+
 ## [0.2.3rc1] - 2026-01-15
 ### Added
 - Add USING clause when equi join and columns are the same (#87)
