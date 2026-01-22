@@ -7,7 +7,7 @@ reformat:
 	@uv run ./bin/reformat-python
 
 build:
-	@uv run build
+	@uv build
 
 cleanup:
 	./bin/cleanup.sh
