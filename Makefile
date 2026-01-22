@@ -32,9 +32,9 @@ setup-dev:
 
 tag-push-release:
 	git add .
-	git commit -S -m "chore(release): v$(uv version --short)"
-	git tag v$(uv version --short)
-	git push origin v$(uv version --short)
+	git commit -S -m "chore(release): v$$(uv version --short)"
+	git tag v$$(uv version --short)
+	git push origin v$$(uv version --short)
 
 # To test the build
 release:
