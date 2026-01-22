@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.5rc2] - 2026-01-22
+### Added
+
+
+
 ## [0.2.5rc1] - 2026-01-22
 ### Added
 - Polarspark activation

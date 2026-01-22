@@ -39,10 +39,18 @@ tag-push-release:
 # To test the build
 release:
 	uv version --bump patch
+	$(MAKE) changelog
 	$(MAKE) tag-push-release
 
-release-candidate:
+# New release candidate
+rc:
 	uv version --bump rc --bump patch
+	$(MAKE) changelog
+	$(MAKE) tag-push-release
+
+next-rc:
+	uv version --bump rc
+	$(MAKE) changelog
 	$(MAKE) tag-push-release
 
 changelog:
