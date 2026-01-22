@@ -52,6 +52,7 @@ from typing import cast, Any, Callable, Optional, TypeVar, Union
 
 from polarspark.conf import SparkConf
 from polarspark.rdd import RDD
+from polarspark.utils.import_redirector import activate_polarspark
 
 # from polarspark.rdd import RDD, RDDBarrier
 # from polarspark.files import SparkFiles
@@ -168,4 +169,5 @@ __all__ = [
     # "InheritableThread",
     # "inheritable_thread_target",
     # "__version__",
+    "activate_polarspark",
 ]
